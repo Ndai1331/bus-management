@@ -1,0 +1,120 @@
+@using System.Globalization
+@using HCS.Localization
+@using Microsoft.Extensions.Localization
+@inject IJSRuntime JS
+@inject NavigationManager Navigation
+@inject IStringLocalizer<HCSResource> Localizer
+
+<div class="hcs-lang-switch @(isOpen ? "hcs-lang-switch--open" : null)" @onkeydown="OnKeyDown">
+    <button class="hcs-lang-switch__trigger"
+            type="button"
+            aria-haspopup="menu"
+            aria-expanded="@isOpen.ToString().ToLowerInvariant()"
+            aria-controls="hcs-lang-switch-menu"
+            aria-label="@Localizer["Auth:SelectLanguage"]"
+            title="@Localizer["Auth:SelectLanguage"]"
+            @onclick="Toggle">
+        <span class="hcs-lang-switch__flag" aria-hidden="true">@FlagIcon(CurrentCulture)</span>
+        <span class="hcs-lang-switch__code">@CurrentCode</span>
+    </button>
+
+    @if (isOpen)
+    {
+        <div class="hcs-lang-switch__backdrop" @onclick="Close"></div>
+        <div id="hcs-lang-switch-menu" class="hcs-lang-switch__panel" role="menu">
+            @foreach (var language in Languages)
+            {
+                var isCurrent = language.Culture == CurrentCulture;
+                <button class="hcs-lang-switch__item @(isCurrent ? "hcs-lang-switch__item--current" : null)"
+                        type="button"
+                        role="menuitem"
+                        aria-current="@(isCurrent ? "true" : "false")"
+                        @onclick="@(() => ChangeCultureAsync(language.Culture))">
+                    <span class="hcs-lang-switch__flag" aria-hidden="true">@FlagIcon(language.Culture)</span>
+                    <span>@Localizer[language.NameKey]</span>
+                </button>
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private static readonly LanguageOption[] Languages =
+    [
+        new("vi", "Auth:LanguageVietnamese", "Auth:LanguageVietnameseShort"),
+        new("en", "Auth:LanguageEnglish", "Auth:LanguageEnglishShort")
+    ];
+
+    private static readonly HashSet<string> SupportedCultures = Languages
+        .Select(language => language.Culture)
+        .ToHashSet(StringComparer.Ordinal);
+
+    private bool isOpen;
+
+    private string CurrentCulture =>
+        SupportedCultures.Contains(CultureInfo.CurrentUICulture.TwoLetterISOLanguageName)
+            ? CultureInfo.CurrentUICulture.TwoLetterISOLanguageName
+            : "en";
+
+    private string CurrentCode =>
+        Localizer[Languages.First(language => language.Culture == CurrentCulture).ShortKey];
+
+    private void Toggle() => isOpen = !isOpen;
+
+    private void Close() => isOpen = false;
+
+    private void OnKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Escape")
+        {
+            Close();
+        }
+    }
+
+    private async Task ChangeCultureAsync(string culture)
+    {
+        if (!SupportedCultures.Contains(culture) || culture == CurrentCulture)
+        {
+            Close();
+            return;
+        }
+
+        await JS.InvokeVoidAsync("hcsSetCulture", culture);
+        Navigation.NavigateTo(Navigation.Uri, forceLoad: true);
+    }
+
+    private static RenderFragment FlagIcon(string culture) => __builder =>
+    {
+        if (culture == "vi")
+        {
+            <svg viewBox="0 0 60 60" width="24" height="24" focusable="false" aria-hidden="true">
+                <rect width="60" height="60" fill="#DA251D" />
+                <polygon fill="#FFCD00" points="30,11 33.53,22.45 45.53,22.45 35.85,29.55 39.53,41.18 30,34.4 20.47,41.18 24.15,29.55 14.47,22.45 26.47,22.45" />
+            </svg>
+        }
+        else
+        {
+            <svg viewBox="0 0 60 60" width="24" height="24" focusable="false" aria-hidden="true">
+                <rect width="60" height="60" fill="#B31942" />
+                <rect y="4.62" width="60" height="4.62" fill="#fff" />
+                <rect y="13.85" width="60" height="4.62" fill="#fff" />
+                <rect y="23.08" width="60" height="4.62" fill="#fff" />
+                <rect y="32.31" width="60" height="4.62" fill="#fff" />
+                <rect y="41.54" width="60" height="4.62" fill="#fff" />
+                <rect y="50.77" width="60" height="4.62" fill="#fff" />
+                <rect width="26" height="32.31" fill="#0A3161" />
+                <g fill="#fff">
+                    <circle cx="4.3" cy="4.3" r=".7" /><circle cx="8.7" cy="4.3" r=".7" /><circle cx="13" cy="4.3" r=".7" /><circle cx="17.4" cy="4.3" r=".7" /><circle cx="21.7" cy="4.3" r=".7" />
+                    <circle cx="6.5" cy="8" r=".7" /><circle cx="10.8" cy="8" r=".7" /><circle cx="15.2" cy="8" r=".7" /><circle cx="19.5" cy="8" r=".7" />
+                    <circle cx="4.3" cy="11.7" r=".7" /><circle cx="8.7" cy="11.7" r=".7" /><circle cx="13" cy="11.7" r=".7" /><circle cx="17.4" cy="11.7" r=".7" /><circle cx="21.7" cy="11.7" r=".7" />
+                    <circle cx="6.5" cy="15.4" r=".7" /><circle cx="10.8" cy="15.4" r=".7" /><circle cx="15.2" cy="15.4" r=".7" /><circle cx="19.5" cy="15.4" r=".7" />
+                    <circle cx="4.3" cy="19.1" r=".7" /><circle cx="8.7" cy="19.1" r=".7" /><circle cx="13" cy="19.1" r=".7" /><circle cx="17.4" cy="19.1" r=".7" /><circle cx="21.7" cy="19.1" r=".7" />
+                    <circle cx="6.5" cy="22.8" r=".7" /><circle cx="10.8" cy="22.8" r=".7" /><circle cx="15.2" cy="22.8" r=".7" /><circle cx="19.5" cy="22.8" r=".7" />
+                    <circle cx="4.3" cy="26.5" r=".7" /><circle cx="8.7" cy="26.5" r=".7" /><circle cx="13" cy="26.5" r=".7" /><circle cx="17.4" cy="26.5" r=".7" /><circle cx="21.7" cy="26.5" r=".7" />
+                </g>
+            </svg>
+        }
+    };
+
+    private sealed record LanguageOption(string Culture, string ShortKey, string NameKey);
+}

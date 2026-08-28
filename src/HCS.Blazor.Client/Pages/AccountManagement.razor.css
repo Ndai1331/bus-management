@@ -1,0 +1,482 @@
+.hcs-account-page {
+    --account-ink: var(--hcs-ink, #19334c);
+    --account-muted: var(--hcs-muted, #63798b);
+    --account-line: var(--hcs-line, #dfe8eb);
+    --account-surface: var(--hcs-surface, #fff);
+    --account-primary: var(--hcs-color-primary, #0f6d78);
+    --account-primary-soft: var(--hcs-color-primary-soft, #e7f4f4);
+    margin: -1.5rem clamp(-2.5rem, -3vw, -.9rem) -2rem;
+    min-height: calc(100dvh - var(--hcs-header-h, 8.75rem));
+    padding: 1.5rem clamp(.9rem, 3vw, 2.5rem) 3rem;
+}
+
+.hcs-account-hero,
+.hcs-account-tabs,
+.hcs-account-panel,
+.hcs-account-loading {
+    margin-inline: auto;
+    max-width: 1440px;
+}
+
+.hcs-account-hero {
+    background: var(--account-surface);
+    border: 1px solid var(--account-line);
+    border-radius: 1rem;
+    box-shadow: 0 18px 45px rgba(34, 63, 80, .08);
+    overflow: hidden;
+}
+
+.hcs-account-hero__banner {
+    background: var(--hcs-color-primary-soft, #e7f4f4);
+    height: clamp(9rem, 22vw, 14rem);
+    overflow: hidden;
+    position: relative;
+}
+
+.hcs-account-hero__shape {
+    border: 1px solid rgba(255, 255, 255, .65);
+    border-radius: 48% 52% 62% 38%;
+    display: block;
+    position: absolute;
+    transform: rotate(-18deg);
+}
+
+.hcs-account-hero__shape--one {
+    background: rgba(15, 109, 120, .12);
+    height: 19rem;
+    left: 6%;
+    top: -8rem;
+    width: 33rem;
+}
+
+.hcs-account-hero__shape--two {
+    background: rgba(255, 255, 255, .3);
+    height: 16rem;
+    right: 4%;
+    top: -6rem;
+    transform: rotate(24deg);
+    width: 25rem;
+}
+
+.hcs-account-hero__shape--three {
+    background: rgba(20, 106, 147, .08);
+    bottom: -9rem;
+    height: 17rem;
+    right: 31%;
+    transform: rotate(-8deg);
+    width: 30rem;
+}
+
+.hcs-account-hero__body {
+    align-items: center;
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 0 clamp(1rem, 3vw, 2.25rem) 1.35rem;
+}
+
+.hcs-account-avatar-frame {
+    margin-top: -3.5rem;
+    position: relative;
+    z-index: 1;
+}
+
+.hcs-account-avatar {
+    align-items: center;
+    background: #e7f1f4;
+    border: .45rem solid var(--account-surface);
+    border-radius: 50%;
+    box-shadow: 0 8px 24px rgba(29, 64, 82, .16);
+    color: #146a93;
+    display: flex;
+    font-size: 1.65rem;
+    font-weight: 800;
+    height: 7.4rem;
+    justify-content: center;
+    object-fit: cover;
+    overflow: hidden;
+    width: 7.4rem;
+}
+
+.hcs-account-avatar__upload {
+    align-items: center;
+    background: var(--account-primary);
+    border: .2rem solid var(--account-surface);
+    border-radius: 50%;
+    bottom: .15rem;
+    color: #fff;
+    cursor: pointer;
+    display: flex;
+    height: 2.75rem;
+    justify-content: center;
+    position: absolute;
+    right: .15rem;
+    transition: transform .2s ease, background-color .2s ease;
+    width: 2.75rem;
+    z-index: 2;
+}
+
+.hcs-account-avatar__upload:hover,
+.hcs-account-avatar__upload:focus-within {
+    background: var(--hcs-color-primary-strong, #0b5560);
+    outline: 3px solid var(--hcs-color-primary, #0f6d78);
+    outline-offset: 3px;
+    transform: scale(1.05);
+}
+
+.hcs-account-avatar__upload.is-busy {
+    cursor: wait;
+    opacity: .65;
+}
+
+.hcs-account-avatar__input {
+    border: 0 !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+    height: 1px !important;
+    margin: -1px !important;
+    overflow: hidden;
+    padding: 0 !important;
+    position: absolute !important;
+    white-space: nowrap;
+    width: 1px !important;
+}
+
+.hcs-account-eyebrow {
+    color: var(--account-primary);
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .08em;
+    margin: 0 0 .3rem;
+    text-transform: uppercase;
+}
+
+.hcs-account-hero__identity h1 {
+    color: var(--account-ink);
+    font-size: clamp(1.4rem, 2.5vw, 2.1rem);
+    letter-spacing: -.035em;
+    margin: 0;
+}
+
+.hcs-account-hero__identity,
+.hcs-account-hero__identity h1,
+.hcs-account-hero__username {
+    min-width: 0;
+}
+
+.hcs-account-hero__username {
+    color: var(--account-muted);
+    overflow-wrap: anywhere;
+    margin: .15rem 0 .7rem;
+}
+
+.hcs-account-hero__meta {
+    color: var(--account-muted);
+    display: flex;
+    flex-wrap: wrap;
+    font-size: .9rem;
+    gap: .8rem 1.25rem;
+}
+
+.hcs-account-hero__meta span,
+.hcs-account-status {
+    align-items: center;
+    display: inline-flex;
+    gap: .45rem;
+}
+
+.hcs-account-hero__meta i {
+    color: var(--account-primary);
+}
+
+.hcs-account-hero__actions {
+    align-items: flex-end;
+    display: flex;
+    flex-direction: column;
+    gap: .7rem;
+}
+
+.hcs-account-status {
+    background: #e8f7ef;
+    border-radius: 999px;
+    color: #23724d;
+    font-size: .78rem;
+    font-weight: 700;
+    padding: .45rem .75rem;
+    white-space: nowrap;
+}
+
+.hcs-account-secondary-action {
+    min-height: 2.75rem !important;
+}
+
+.hcs-account-tabs {
+    align-items: center;
+    background: var(--account-surface);
+    border-bottom: 1px solid var(--account-line);
+    display: flex;
+    gap: .25rem;
+    margin-top: 1.25rem;
+    padding: .35rem .5rem 0;
+}
+
+.hcs-account-tab {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-bottom: .2rem solid transparent;
+    color: var(--account-muted);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: .95rem;
+    font-weight: 700;
+    gap: .55rem;
+    min-height: 3.1rem;
+    padding: .75rem 1rem .65rem;
+    transition: color .2s ease, border-color .2s ease, background-color .2s ease;
+}
+
+.hcs-account-tab:hover,
+.hcs-account-tab:focus-visible {
+    background: var(--account-primary-soft);
+    color: var(--account-primary);
+}
+
+.hcs-account-tab.is-active {
+    border-bottom-color: var(--account-primary);
+    color: var(--account-primary);
+}
+
+.hcs-account-panel {
+    padding-top: 1.25rem;
+}
+
+.hcs-account-content-grid {
+    display: grid;
+    gap: 1.25rem;
+    grid-template-columns: minmax(0, 1.25fr) minmax(19rem, .75fr);
+}
+
+.hcs-account-card {
+    border: 1px solid var(--account-line);
+    border-radius: .85rem;
+    box-shadow: 0 9px 25px rgba(34, 63, 80, .055);
+}
+
+.hcs-account-card .card-body {
+    padding: clamp(1rem, 2.4vw, 1.75rem);
+}
+
+.hcs-account-card__heading {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+}
+
+.hcs-account-card__heading h2 {
+    color: var(--account-ink);
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.hcs-account-card__heading > i {
+    color: var(--account-primary);
+    font-size: 1.3rem;
+}
+
+.hcs-account-form {
+    display: grid;
+    gap: 1rem;
+}
+
+.hcs-account-form__row {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hcs-account-form .form-label {
+    color: var(--account-ink);
+    font-weight: 700;
+    margin-bottom: .4rem;
+}
+
+.hcs-account-form .form-control {
+    min-height: 2.75rem;
+}
+
+.hcs-account-field-error {
+    color: #c5224d;
+    font-size: .82rem;
+    margin: .35rem 0 0;
+}
+
+.hcs-account-form__actions {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: .25rem;
+}
+
+.hcs-account-form__actions .btn i,
+.hcs-account-secondary-action i {
+    margin-right: .45rem;
+}
+
+.hcs-account-info-box {
+    align-items: flex-start;
+    background: #fff8e6;
+    border: 1px solid #f2dfad;
+    border-radius: .65rem;
+    color: #765913;
+    display: flex;
+    gap: .55rem;
+    line-height: 1.55;
+    margin: 1.25rem 0 0;
+    padding: .9rem;
+}
+
+.hcs-account-empty {
+    align-items: center;
+    background: var(--account-surface);
+    border: 1px dashed var(--account-line);
+    border-radius: .85rem;
+    color: var(--account-muted);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    margin-inline: auto;
+    max-width: 1440px;
+    min-height: 19rem;
+    padding: 2rem 1rem;
+    text-align: center;
+}
+
+.hcs-account-empty > i {
+    color: #c5224d;
+    font-size: 1.5rem;
+    margin-bottom: .7rem;
+}
+
+.hcs-account-empty h1 {
+    color: var(--account-ink);
+    font-size: 1.2rem;
+    margin: 0;
+}
+
+.hcs-account-empty p {
+    margin: .4rem 0 1rem;
+}
+
+.hcs-account-retry {
+    align-items: center;
+    background: var(--account-primary);
+    border: 1px solid transparent;
+    border-radius: .55rem;
+    color: #fff;
+    cursor: pointer;
+    display: inline-flex;
+    font-weight: 700;
+    gap: .45rem;
+    min-height: 2.75rem;
+    padding: .65rem .9rem;
+}
+
+.hcs-account-retry:hover,
+.hcs-account-retry:focus-visible {
+    background: var(--hcs-color-primary-strong, #0b5560);
+    color: #fff;
+}
+
+.hcs-account-loading {
+    display: grid;
+    gap: 1rem;
+}
+
+.hcs-account-skeleton {
+    animation: hcs-motion-skeleton-pulse var(--hcs-motion-duration-skeleton, 1600ms) var(--hcs-motion-ease-ambient, cubic-bezier(.4, 0, .2, 1)) infinite;
+    background: #e7eef0;
+    border-radius: .85rem;
+    display: block;
+}
+
+.hcs-account-skeleton--hero { height: 19rem; }
+.hcs-account-skeleton--line { height: 3.25rem; width: 35%; }
+.hcs-account-skeleton--body { height: 20rem; }
+
+@media (max-width: 900px) {
+    .hcs-account-hero__body {
+        align-items: flex-start;
+        grid-template-columns: auto minmax(0, 1fr);
+    }
+
+    .hcs-account-hero__actions {
+        align-items: flex-start;
+        grid-column: 2;
+        flex-direction: row;
+        flex-wrap: wrap;
+    }
+
+    .hcs-account-content-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .hcs-account-page {
+        margin: -1rem -.9rem -1.5rem;
+        padding: 1rem .9rem 2rem;
+    }
+
+    .hcs-account-hero__banner {
+        height: 8.5rem;
+    }
+
+    .hcs-account-hero__body {
+        display: block;
+        padding-bottom: 1rem;
+    }
+
+    .hcs-account-avatar-frame {
+        display: inline-block;
+        margin: -2.8rem 0 .8rem 1rem;
+    }
+
+    .hcs-account-avatar {
+        border-width: .35rem;
+        height: 5.8rem;
+        width: 5.8rem;
+    }
+
+    .hcs-account-hero__identity h1 {
+        font-size: 1.45rem;
+    }
+
+    .hcs-account-hero__actions {
+        align-items: flex-start;
+        margin-top: 1rem;
+    }
+
+    .hcs-account-tabs {
+        overflow-x: auto;
+        padding-inline: 0;
+    }
+
+    .hcs-account-tab {
+        flex: 1 0 max-content;
+        justify-content: center;
+        padding-inline: .85rem;
+    }
+
+    .hcs-account-form__row {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hcs-account-skeleton,
+    .hcs-account-avatar__upload,
+    .hcs-account-tab {
+        animation: none;
+        transition: none;
+    }
+}

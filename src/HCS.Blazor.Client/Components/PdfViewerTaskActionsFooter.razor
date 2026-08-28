@@ -1,0 +1,20 @@
+@inherits HCSComponentBase
+
+<ModalFooter>
+    <Button Color="Color.Secondary" Clicked="OnClose">
+        @L["Catalog:Cancel"]
+    </Button>
+    @if (ShowAssignTask)
+    {
+        <Button Color="Color.Primary" Clicked="OnAssignTask" Disabled="@DisableAssignTask">
+            <Icon Name="IconName.Users" Class="me-1" />
+            @L["Work:AssignTask"]
+        </Button>
+    }
+</ModalFooter>
+@code {
+    [Parameter] public EventCallback OnClose { get; set; }
+    [Parameter] public EventCallback OnAssignTask { get; set; }
+    [Parameter] public bool ShowAssignTask { get; set; } = true;
+    [Parameter] public bool DisableAssignTask { get; set; }
+}

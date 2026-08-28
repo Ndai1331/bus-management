@@ -1,0 +1,1491 @@
+@page "/chat"
+@page "/chat/{RedirectToConversationId:guid}"
+@page "/chat1"
+@page "/chat1/{RedirectToConversationId:guid}"
+@attribute [Authorize(Policy = CollaborationPermissions.Chat)]
+@using System.Globalization
+@using System.Net
+@using HCS.CollaborationService.Contracts
+@using HCS.Localization
+@using Microsoft.AspNetCore.SignalR.Client
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.Localization
+@using Microsoft.Extensions.Logging
+@using Volo.Abp.AspNetCore.Components.Messages
+@inject CollaborationClient Client
+@inject ChatRealtimeConnection Realtime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IConfiguration Configuration
+@inject IStringLocalizer<HCSResource> Localizer
+@inject ILogger<ChatWorkspace> Logger
+@inject IUiMessageService UiMessageService
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+
+<PageTitle>@T("Chat:Title") · HCS</PageTitle>
+
+<main class="hcs-chat-page" aria-labelledby="chat-title">
+    <h1 id="chat-title" class="visually-hidden">@T("Chat:Title")</h1>
+    <section class="hcs-chat @(infoOpen ? "hcs-chat--info-open" : "hcs-chat--info-collapsed")" aria-label="@T("Chat:Title")">
+        <aside class="hcs-chat__conversations @(mobileView == MobileView.List ? "hcs-chat__panel--mobile-active" : null)" aria-label="@T("Chat:ConversationList")">
+            <div class="hcs-chat__toolbar">
+                <label class="hcs-chat__search">
+                    <span class="visually-hidden">@T("Chat:Search")</span>
+                    <i class="fa fa-magnifying-glass" aria-hidden="true"></i>
+                    <input @bind="conversationSearch" @bind:event="oninput" type="search" placeholder="@T("Chat:Search")" />
+                </label>
+                <button class="hcs-chat__icon" type="button" title="@T("Chat:Retry")" aria-label="@T("Chat:Retry")" @onclick="LoadConversationsAsync" disabled="@isLoadingConversations">
+                    <i class="fa fa-rotate @(isLoadingConversations ? "fa-spin" : null)" aria-hidden="true"></i>
+                </button>
+                @* <button class="hcs-chat__compose" type="button" title="@T("Chat:NewConversation")" aria-label="@T("Chat:NewConversation")" @onclick="OpenNewConversation">
+                    <i class="fa fa-pen-to-square" aria-hidden="true"></i>
+                </button> *@
+            </div>
+            <nav class="hcs-chat__tabs" role="tablist">
+                <button class="@(leftTab == LeftTab.Conversations ? "is-active" : null)" type="button" role="tab" @onclick="() => leftTab = LeftTab.Conversations">@T("Chat:ConversationsTab")</button>
+                <button class="@(leftTab == LeftTab.Contacts ? "is-active" : null)" type="button" role="tab" @onclick="ShowContactsTabAsync">@T("Chat:ContactsTab")</button>
+            </nav>
+
+            @* The contact picker backs both the "new conversation" panel and the contacts tab. *@
+            @if (showNewConversation || leftTab == LeftTab.Contacts)
+            {
+                var contactListRole = showNewConversation ? "group" : "list";
+                var contactListLabel = showNewConversation ? T("Chat:SelectContacts") : T("Chat:Directory");
+                <section class="hcs-chat__new @(leftTab == LeftTab.Contacts && !showNewConversation ? "hcs-chat__new--directory" : null)" aria-labelledby="contact-picker-title">
+                    @if (showNewConversation)
+                    {
+                        <div class="hcs-chat__new-heading">
+                            <h2 id="contact-picker-title">@T("Chat:NewConversation")</h2>
+                            <button class="hcs-chat__close" type="button" @onclick="CloseNewConversation" aria-label="@T("Chat:Cancel")"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+                        </div>
+                    }
+                    else
+                    {
+                        <h2 id="contact-picker-title" class="visually-hidden">@T("Chat:ContactsTab")</h2>
+                    }
+                    <input class="hcs-chat__contact-filter" @bind="contactSearch" @bind:event="oninput" type="search" placeholder="@T("Chat:Search")" />
+                    @if (contactsLoading)
+                    {
+                        <p class="hcs-chat__state">@T("Chat:LoadingContacts")</p>
+                    }
+                    else if (contactsError is not null)
+                    {
+                        <div class="hcs-chat__inline-error" role="alert"><span>@contactsError</span><button type="button" @onclick="LoadContactsAsync">@T("Chat:Retry")</button></div>
+                    }
+                    else if (!FilteredContacts.Any())
+                    {
+                        <p class="hcs-chat__state">@T("Chat:EmptyContacts")</p>
+                    }
+                    else
+                    {
+                        <div class="hcs-chat__contacts" role="@contactListRole" aria-label="@contactListLabel">
+                            @foreach (var contact in FilteredContacts)
+                            {
+                                <label class="hcs-chat__contact">
+                                    <input type="checkbox" checked="@selectedContactIds.Contains(contact.Id)" @onchange="args => ToggleContact(contact.Id, args)" />
+                                    @UserAvatar(contact.Id, contact.DisplayName, avatarUrl: contact.AvatarUrl)
+                                    <span><strong>@contact.DisplayName</strong><small>@@@contact.UserName</small></span>
+                                </label>
+                            }
+                        </div>
+                    }
+                    @if (selectedContactIds.Count > 1)
+                    {
+                        <input class="hcs-chat__contact-filter" @bind="groupName" placeholder="@T("Chat:GroupNamePlaceholder")" maxlength="256" />
+                    }
+                    <button class="btn btn-primary w-100" type="button" @onclick="CreateConversationAsync" disabled="@(isCreatingConversation || selectedContactIds.Count == 0)">
+                        <i class="fa @(isCreatingConversation ? "fa-spinner fa-spin" : "fa-plus")" aria-hidden="true"></i>
+                        @(isCreatingConversation ? T("Chat:Loading") : T("Chat:CreateConversation"))
+                    </button>
+                </section>
+            }
+
+            @if (leftTab == LeftTab.Conversations)
+            {
+                @if (isLoadingConversations)
+                {
+                    <p class="hcs-chat__state" role="status">@T("Chat:Loading")</p>
+                }
+                else if (conversationError is not null)
+                {
+                    <div class="hcs-chat__state hcs-chat__state--error" role="alert"><p>@conversationError</p><button class="btn btn-light btn-sm" type="button" @onclick="LoadConversationsAsync">@T("Chat:Retry")</button></div>
+                }
+                else if (!FilteredConversations.Any())
+                {
+                    <p class="hcs-chat__state">@T("Chat:EmptyConversations")</p>
+                }
+                else
+                {
+                    <nav class="hcs-chat__conversation-list">
+                        @foreach (var conversation in FilteredConversations)
+                        {
+                            var isActive = selected?.Id == conversation.Id;
+                            <button @key="conversation.Id" class="hcs-chat__conversation @(isActive ? "active" : null) @(conversation.IsPinned ? "is-pinned" : null)" type="button" aria-current="@(isActive ? "true" : null)" @onclick="() => SelectAsync(conversation)">
+                                @ConversationAvatar(conversation, isOnline: IsConversationOnline(conversation))
+                                <span class="hcs-chat__conversation-copy">
+                                    <strong>@ConversationTitle(conversation)</strong>
+                                    <small>@(string.IsNullOrWhiteSpace(conversation.LastMessage) ? T("Chat:NoMessages") : conversation.LastMessage)</small>
+                                </span>
+                                <span class="hcs-chat__conversation-meta">
+                                    <time datetime="@FormatMessageTimestamp(conversation.LastMessageAt)">@FormatConversationTime(conversation.LastMessageAt)</time>
+                                    @if (conversation.IsPinned)
+                                    {
+                                        <i class="fa fa-thumbtack" aria-label="@T("Chat:Pin")"></i>
+                                    }
+                                    @if (conversation.UnreadCount > 0)
+                                    {
+                                        <em aria-label="@conversation.UnreadCount @T("Chat:Unread")">@conversation.UnreadCount</em>
+                                    }
+                                </span>
+                            </button>
+                        }
+                    </nav>
+                }
+            }
+        </aside>
+
+        <section class="hcs-chat__thread @(mobileView == MobileView.Thread ? "hcs-chat__panel--mobile-active" : null)" aria-label="@T("Chat:Title")">
+            @if (selected is null)
+            {
+                <div class="hcs-chat__empty"><i class="fa fa-comments" aria-hidden="true"></i><h2>@T("Chat:ChooseConversation")</h2><p>@T("Chat:ChooseConversationDescription")</p></div>
+            }
+            else
+            {
+                <header @key="selected.Id" class="hcs-chat__thread-header">
+                    <button class="hcs-chat__icon hcs-chat__back" type="button" aria-label="@T("Chat:ConversationList")" @onclick="ShowList"><i class="fa fa-arrow-left" aria-hidden="true"></i></button>
+                    <span class="hcs-chat__thread-avatar">
+                        @ConversationAvatar(selected, isOnline: IsConversationOnline(selected))
+                    </span>
+                    <div class="hcs-chat__thread-title">
+                        <h2>@ConversationTitle(selected)</h2>
+                        <small class="hcs-chat__thread-status">
+                            <span class="hcs-chat__presence hcs-chat__presence--inline @(IsConversationOnline(selected) ? null : "hcs-chat__presence--offline")" aria-hidden="true"></span>
+                            @ThreadPresenceLabel(selected)
+                        </small>
+                    </div>
+                    <div class="hcs-chat__thread-actions">
+                        <button class="hcs-chat__icon hcs-chat__info-button @(infoOpen ? "is-active" : null)" type="button" aria-pressed="@infoOpen.ToString().ToLowerInvariant()" aria-label="@(infoOpen ? T("Chat:HideInformation") : T("Chat:Information"))" @onclick="ToggleInfo"><i class="fa fa-ellipsis-vertical" aria-hidden="true"></i></button>
+                    </div>
+                </header>
+                @if (realtimeUnavailable)
+                {
+                    <p class="hcs-chat__realtime-warning" role="status"><i class="fa fa-plug-circle-xmark" aria-hidden="true"></i>@T("Chat:ConnectionUnavailable")</p>
+                }
+                @if (pinnedMessages.Count > 0)
+                {
+                    <button class="hcs-chat__pinned-bar @(pinnedPanelOpen ? "is-open" : null)" type="button" aria-expanded="@pinnedPanelOpen.ToString().ToLowerInvariant()" aria-label="@T("Chat:ViewPinned")" @onclick="TogglePinnedPanel">
+                        <i class="fa fa-thumbtack" aria-hidden="true"></i>
+                        <span>@T("Chat:PinnedMessages") · @pinnedMessages.Count</span>
+                        <i class="fa fa-chevron-down" aria-hidden="true"></i>
+                    </button>
+                    @if (pinnedPanelOpen)
+                    {
+                        <div class="hcs-chat__pinned-panel" role="list">
+                            @foreach (var pinned in pinnedMessages)
+                            {
+                                <button class="hcs-chat__pinned-item" type="button" @onclick="() => OpenPinnedMessageAsync(pinned)">
+                                    <strong>@MemberName(pinned.SenderUserId)</strong>
+                                    <span>@PreviewText(pinned.Text, pinned.Attachments.FirstOrDefault()?.FileName)</span>
+                                </button>
+                            }
+                        </div>
+                    }
+                }
+
+                <div id="hcs-chat-messages" class="hcs-chat__messages" aria-live="polite" @onscroll="OnMessagesScrollAsync" @onclick="CloseMessageMenu">
+                    @if (messages.Count < totalMessageCount)
+                    {
+                        <button class="hcs-chat__older" type="button" @onclick="LoadOlderMessagesAsync" disabled="@isLoadingMessages">@T("Chat:OlderMessages")</button>
+                    }
+                    @if (isLoadingMessages && messages.Count == 0)
+                    {
+                        <div class="hcs-chat__message-skeleton" role="status" aria-label="@T("Chat:LoadingMessages")">
+                            <span class="hcs-chat__message-skeleton-bubble hcs-chat__message-skeleton-bubble--wide" aria-hidden="true"></span>
+                            <span class="hcs-chat__message-skeleton-bubble hcs-chat__message-skeleton-bubble--mine" aria-hidden="true"></span>
+                            <span class="hcs-chat__message-skeleton-bubble" aria-hidden="true"></span>
+                        </div>
+                    }
+                    else if (messageError is not null && messages.Count == 0)
+                    {
+                        <div class="hcs-chat__state hcs-chat__state--error" role="alert"><p>@messageError</p><button class="btn btn-light btn-sm" type="button" @onclick="() => LoadMessagesAsync(reset: true)">@T("Chat:Retry")</button></div>
+                    }
+                    else if (messages.Count == 0)
+                    {
+                        <p class="hcs-chat__state">@T("Chat:NoMessages")</p>
+                    }
+                    else
+                    {
+                        @foreach (var message in messages)
+                        {
+                            var isMine = message.SenderUserId == currentUserId;
+                            <div class="hcs-chat__message-row @(isMine ? "hcs-chat__message-row--mine" : null) @(messageMenuId == message.Id ? "is-menu-open" : null)">
+                                @if (!isMine)
+                                {
+                                    @UserAvatar(message.SenderUserId, MemberName(message.SenderUserId), "hcs-chat__avatar--small", isOnline: !isMine ? IsUserOnline(message.SenderUserId) : null)
+                                }
+                                <div class="hcs-chat__message-stack">
+                                <article id="@MessageElementId(message.Id)" class="hcs-chat__message @(isMine ? "hcs-chat__message--mine" : null) @(highlightedMessageId == message.Id ? "hcs-chat__message--jump" : null)">
+                                    @if (!isMine)
+                                    {
+                                        <div class="hcs-chat__message-meta">
+                                            <strong>@MemberName(message.SenderUserId)</strong>
+                                            @if (message.IsPinned)
+                                            {
+                                                <i class="fa fa-thumbtack hcs-chat__pin-mark" title="@T("Chat:PinMessage")" aria-label="@T("Chat:PinMessage")"></i>
+                                            }
+                                        </div>
+                                    }
+                                    @if (message.IsDeleted)
+                                    {
+                                        <p class="hcs-chat__message-deleted">@T("Chat:DeletedMessage")</p>
+                                    }
+                                    else
+                                    {
+                                        @if (message.ReplyTo is not null || message.ReplyToMessageId is not null)
+                                        {
+                                            <button class="hcs-chat__quote" type="button" @onclick="() => JumpToMessageAsync(message.ReplyToMessageId ?? message.ReplyTo?.Id ?? Guid.Empty)">
+                                                <strong>@(message.ReplyTo is null ? T("Chat:ReplyTo") : $"{T("Chat:ReplyTo")} {MemberName(message.ReplyTo.SenderUserId)}")</strong>
+                                                <p>@(message.ReplyTo?.IsDeleted == true ? T("Chat:DeletedMessage") : PreviewText(message.ReplyTo?.Text))</p>
+                                            </button>
+                                        }
+                                        @if (message.ForwardedFrom is not null || message.ForwardedFromMessageId is not null)
+                                        {
+                                            <div class="hcs-chat__forward-preview">
+                                                <strong>@T("Chat:ForwardedMessage")</strong>
+                                                <p>@(message.ForwardedFrom?.IsDeleted == true ? T("Chat:DeletedMessage") : PreviewText(message.ForwardedFrom?.Text, message.Text))</p>
+                                            </div>
+                                        }
+                                        @if (!string.IsNullOrWhiteSpace(message.Text) && message.ForwardedFromMessageId is null)
+                                        {
+                                            <p>@message.Text</p>
+                                        }
+                                        else if (!string.IsNullOrWhiteSpace(message.Text) && message.Text != ChatModerationRules.ForwardedPlaceholder)
+                                        {
+                                            <p>@message.Text</p>
+                                        }
+                                        @if (message.Attachments.Count > 0)
+                                        {
+                                            <div class="hcs-chat__attachments">
+                                                @foreach (var attachment in message.Attachments)
+                                                {
+                                                    @if (IsImage(attachment))
+                                                    {
+                                                        <button class="hcs-chat__image" type="button" title="@T("Chat:ViewImage")" @onclick="() => OpenPreview(attachment)">
+                                                            <img src="@AttachmentUrl(attachment.Id)" crossorigin="use-credentials" alt="@attachment.FileName" />
+                                                        </button>
+                                                    }
+                                                    else
+                                                    {
+                                                        <a href="@AttachmentUrl(attachment.Id)" target="_blank" rel="noopener" title="@T("Chat:DownloadFile")"><i class="fa fa-paperclip" aria-hidden="true"></i>@attachment.FileName</a>
+                                                    }
+                                                }
+                                            </div>
+                                        }
+                                    }
+                                </article>
+                                <time class="hcs-chat__message-time" datetime="@FormatMessageTimestamp(message.CreatedAt)">@FormatMessageClock(message.CreatedAt)</time>
+                                </div>
+                                @if (!message.IsDeleted)
+                                {
+                                    <div class="hcs-chat__message-more @(messageMenuId == message.Id ? "is-open" : null)" @onclick:stopPropagation="true">
+                                        <button class="hcs-chat__message-more-trigger" type="button" aria-haspopup="true" aria-expanded="@(messageMenuId == message.Id ? "true" : "false")" aria-label="@T("Chat:MessageActions")" @onclick="() => ToggleMessageMenu(message.Id)">
+                                            <i class="fa fa-chevron-down" aria-hidden="true"></i>
+                                        </button>
+                                        @if (messageMenuId == message.Id)
+                                        {
+                                            <div class="hcs-chat__message-menu" role="menu">
+                                                <button type="button" role="menuitem" @onclick="() => ReplyFromMenu(message)"><i class="fa fa-reply" aria-hidden="true"></i>@T("Chat:Reply")</button>
+                                                <button type="button" role="menuitem" @onclick="() => ForwardFromMenu(message)"><i class="fa fa-share" aria-hidden="true"></i>@T("Chat:Forward")</button>
+                                                <button type="button" role="menuitem" disabled="@isPinningMessage" @onclick="() => ToggleMessagePinnedAsync(message)">
+                                                    <i class="fa fa-thumbtack" aria-hidden="true"></i>@(message.IsPinned ? T("Chat:UnpinMessage") : T("Chat:PinMessage"))
+                                                </button>
+                                                @if (CanDeleteMessage(message))
+                                                {
+                                                    <button class="is-danger" type="button" role="menuitem" disabled="@isDeletingMessage" @onclick="() => DeleteFromMenuAsync(message)"><i class="fa fa-trash" aria-hidden="true"></i>@T("Chat:Delete")</button>
+                                                }
+                                            </div>
+                                        }
+                                    </div>
+                                }
+                            </div>
+                        }
+                    }
+                </div>
+
+                @if (permissions?.CanSend == true)
+                {
+                    <form class="hcs-chat__composer" @onsubmit="SendAsync" @onsubmit:preventDefault>
+                        @if (replyingTo is not null)
+                        {
+                            <div class="hcs-chat__reply-preview">
+                                <div>
+                                    <strong>@T("Chat:ReplyingTo") @MemberName(replyingTo.SenderUserId)</strong>
+                                    <p>@PreviewText(replyingTo.Text)</p>
+                                </div>
+                                <button class="hcs-chat__close" type="button" aria-label="@T("Chat:CancelReply")" @onclick="CancelReply"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+                            </div>
+                        }
+                        @if (pendingFiles.Count > 0)
+                        {
+                            <div class="hcs-chat__pending-files" aria-label="@T("Chat:Attach")">
+                                @foreach (var file in pendingFiles.ToArray())
+                                {
+                                    <span>
+                                        <i class="fa fa-paperclip" aria-hidden="true"></i>@file.Name
+                                        <button type="button" aria-label="@T("Chat:RemoveAttachment")" @onclick="() => RemovePendingFile(file)"><i class="fa fa-xmark" aria-hidden="true"></i></button>
+                                    </span>
+                                }
+                            </div>
+                        }
+                        @if (messageError is not null && messages.Count > 0)
+                        {
+                            <p class="hcs-chat__composer-error" role="alert">@messageError</p>
+                        }
+                        <div class="hcs-chat__composer-row">
+                            <label class="hcs-chat__attach" title="@T("Chat:Attach")">
+                                <InputFile class="visually-hidden" OnChange="OnFilesSelected" multiple accept="image/*,.pdf,.txt,.docx,.xlsx,.mp4,.mp3" />
+                                <i class="fa fa-paperclip" aria-hidden="true"></i><span class="visually-hidden">@T("Chat:Attach")</span>
+                            </label>
+                            <div class="hcs-chat__composer-field">
+                                <i class="fa fa-comment-dots" aria-hidden="true"></i>
+                                <textarea @bind="messageText" @bind:event="oninput" @onkeydown="OnComposerKeyDown" @onkeydown:preventDefault="preventComposerDefault" rows="1" maxlength="4000" placeholder="@T("Chat:MessagePlaceholder")" aria-label="@T("Chat:MessagePlaceholder")"></textarea>
+                            </div>
+                            <button class="hcs-chat__send" type="submit" disabled="@(isSending || !CanSend)" title="@T("Chat:Send")" aria-label="@T("Chat:Send")">
+                                <i class="fa @(isSending ? "fa-spinner fa-spin" : "fa-paper-plane")" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </form>
+                }
+            }
+        </section>
+
+        <aside class="hcs-chat__info @(mobileView == MobileView.Info ? "hcs-chat__panel--mobile-active" : null)" aria-label="@T("Chat:Information")">
+            @if (selected is null)
+            {
+                <div class="hcs-chat__info-empty"><i class="fa fa-circle-info" aria-hidden="true"></i><p>@T("Chat:ChooseConversation")</p></div>
+            }
+            else
+            {
+                <header class="hcs-chat__panel-header"><div><small>@T("Chat:Information")</small><h2>@ConversationTitle(selected)</h2></div><button class="hcs-chat__icon hcs-chat__back" type="button" aria-label="@T("Chat:HideInformation")" @onclick="CloseInfo"><i class="fa fa-arrow-left" aria-hidden="true"></i></button></header>
+                <div class="hcs-chat__info-body">
+                    @ConversationAvatar(selected, "hcs-chat__avatar--large", isOnline: IsConversationOnline(selected))
+                    <p class="hcs-chat__info-type">@ConversationTypeLabel(selected.Type)</p>
+                    @if (!string.IsNullOrWhiteSpace(selected.Description))
+                    {
+                        <p class="hcs-chat__description">@selected.Description</p>
+                    }
+                    @if (permissions?.CanRename == true)
+                    {
+                        <form class="hcs-chat__rename" @onsubmit="RenameAsync" @onsubmit:preventDefault>
+                            <label for="chat-rename">@T("Chat:Rename")</label>
+                            <input id="chat-rename" @bind="renameText" maxlength="256" />
+                            <button class="btn btn-sm btn-outline-primary" type="submit" disabled="@isRenaming">@T("Chat:Save")</button>
+                        </form>
+                    }
+                    <div class="hcs-chat__info-section"><h3>@T("Chat:Members")</h3><ul>
+                        @foreach (var member in selected.Members)
+                        {
+                            <li>
+                                @UserAvatar(member.UserId, MemberName(member.UserId), "hcs-chat__avatar--small", isOnline: member.UserId != currentUserId ? IsUserOnline(member.UserId) : null)
+                                <span><strong>@MemberName(member.UserId)</strong><small>@(member.Role == ConversationMemberRole.Admin ? T("Chat:Administrator") : T("Chat:Member"))</small></span>
+                                @if (CanRemoveMember(member))
+                                {
+                                    <button class="hcs-chat__icon hcs-chat__member-remove" type="button" title="@T("Chat:RemoveMember")" aria-label="@T("Chat:RemoveMember")" @onclick="() => RemoveMemberAsync(member.UserId)" disabled="@isRemovingMember">
+                                        <i class="fa fa-user-minus" aria-hidden="true"></i>
+                                    </button>
+                                }
+                            </li>
+                        }
+                    </ul></div>
+                    @if (permissions?.CanManageMembers == true && selected.Type != ConversationType.User && AvailableMemberContacts.Any())
+                    {
+                        <div class="hcs-chat__info-section">
+                            <h3>@T("Chat:AddMembers")</h3>
+                            <div class="hcs-chat__member-picker" role="group" aria-label="@T("Chat:SelectMembers")">
+                                @foreach (var contact in AvailableMemberContacts)
+                                {
+                                    <label class="hcs-chat__contact">
+                                        <input type="checkbox" checked="@selectedMemberIds.Contains(contact.Id)" @onchange="args => ToggleMember(contact.Id, args)" />
+                                        @UserAvatar(contact.Id, contact.DisplayName, "hcs-chat__avatar--small", avatarUrl: contact.AvatarUrl)
+                                        <span><strong>@contact.DisplayName</strong><small>@@@contact.UserName</small></span>
+                                    </label>
+                                }
+                            </div>
+                            <button class="btn btn-sm btn-outline-primary" type="button" @onclick="AddMembersAsync" disabled="@(isAddingMembers || selectedMemberIds.Count == 0)">
+                                <i class="fa @(isAddingMembers ? "fa-spinner fa-spin" : "fa-user-plus")" aria-hidden="true"></i>@T("Chat:AddMembers")
+                            </button>
+                        </div>
+                    }
+                    <div class="hcs-chat__info-section">
+                        <h3>@T("Chat:SharedMedia")</h3>
+                        <div class="hcs-chat__media-actions">
+                            <button class="btn btn-outline-primary @(mediaPanel == MediaPanel.Photos ? "is-active" : null)" type="button" @onclick="() => ToggleMediaPanel(MediaPanel.Photos)">
+                                <i class="fa fa-image" aria-hidden="true"></i>@T("Chat:ViewPhotos")
+                            </button>
+                            <button class="btn btn-outline-primary @(mediaPanel == MediaPanel.Files ? "is-active" : null)" type="button" @onclick="() => ToggleMediaPanel(MediaPanel.Files)">
+                                <i class="fa fa-paperclip" aria-hidden="true"></i>@T("Chat:ViewFiles")
+                            </button>
+                        </div>
+                        @if (mediaPanel == MediaPanel.Photos)
+                        {
+                            @if (!ConversationPhotos.Any())
+                            {
+                                <p class="hcs-chat__media-empty">@T("Chat:NoPhotos")</p>
+                            }
+                            else
+                            {
+                                <ul class="hcs-chat__media-list hcs-chat__media-list--photos">
+                                    @foreach (var attachment in ConversationPhotos)
+                                    {
+                                        <li>
+                                            <button class="hcs-chat__media-photo" type="button" title="@T("Chat:ViewImage")" @onclick="() => OpenPreview(attachment)">
+                                                <img src="@AttachmentUrl(attachment.Id)" crossorigin="use-credentials" alt="@attachment.FileName" />
+                                            </button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        }
+                        else if (mediaPanel == MediaPanel.Files)
+                        {
+                            @if (!ConversationFiles.Any())
+                            {
+                                <p class="hcs-chat__media-empty">@T("Chat:NoFiles")</p>
+                            }
+                            else
+                            {
+                                <ul class="hcs-chat__media-list">
+                                    @foreach (var attachment in ConversationFiles)
+                                    {
+                                        <li>
+                                            <a class="hcs-chat__media-file" href="@AttachmentUrl(attachment.Id)" target="_blank" rel="noopener" title="@T("Chat:DownloadFile")">
+                                                <i class="fa fa-paperclip" aria-hidden="true"></i><span>@attachment.FileName</span>
+                                            </a>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        }
+                    </div>
+                    <div class="hcs-chat__info-actions">
+                        <button class="btn btn-light" type="button" @onclick="TogglePinnedAsync"><i class="fa fa-thumbtack" aria-hidden="true"></i>@(selected.IsPinned ? T("Chat:Unpin") : T("Chat:Pin"))</button>
+                        @if (permissions?.CanLeave == true)
+                        {
+                            <button class="btn btn-outline-danger" type="button" @onclick="LeaveAsync" disabled="@isLeaving"><i class="fa @(isLeaving ? "fa-spinner fa-spin" : "fa-arrow-right-from-bracket")" aria-hidden="true"></i>@T("Chat:Leave")</button>
+                        }
+                    </div>
+                </div>
+            }
+        </aside>
+    </section>
+    @if (previewAttachment is not null)
+    {
+        <div class="hcs-chat-preview" role="dialog" aria-modal="true" aria-label="@T("Chat:ViewImage")" @onclick="ClosePreview">
+            <button class="hcs-chat-preview__close" type="button" aria-label="@T("Chat:ClosePreview")" @onclick="ClosePreview" @onclick:stopPropagation><i class="fa fa-xmark" aria-hidden="true"></i></button>
+            @if (IsImage(previewAttachment))
+            {
+                <img src="@AttachmentUrl(previewAttachment.Id)" crossorigin="use-credentials" alt="@previewAttachment.FileName" @onclick:stopPropagation />
+            }
+            <a class="hcs-chat-preview__download" href="@AttachmentUrl(previewAttachment.Id)" target="_blank" rel="noopener" @onclick:stopPropagation>@previewAttachment.FileName</a>
+        </div>
+    }
+    @if (forwardingMessage is not null)
+    {
+        <div class="hcs-chat-modal" role="dialog" aria-modal="true" aria-labelledby="chat-forward-title" @onclick="CloseForward">
+            <div class="hcs-chat-modal__panel" @onclick:stopPropagation>
+                <h2 id="chat-forward-title">@T("Chat:Forward")</h2>
+                <input class="hcs-chat__contact-filter" @bind="forwardSearch" @bind:event="oninput" type="search" placeholder="@T("Chat:Search")" />
+                <div class="hcs-chat-modal__list" role="listbox" aria-label="@T("Chat:ForwardTo")">
+                    @foreach (var conversation in ForwardTargets)
+                    {
+                        <button class="hcs-chat-modal__choice @(forwardTargetId == conversation.Id ? "is-active" : null)" type="button" role="option" aria-selected="@(forwardTargetId == conversation.Id)" @onclick="() => forwardTargetId = conversation.Id">
+                            @ConversationAvatar(conversation, "hcs-chat__avatar--small")
+                            <span>@ConversationTitle(conversation)</span>
+                        </button>
+                    }
+                </div>
+                <textarea @bind="forwardComment" rows="2" maxlength="4000" placeholder="@T("Chat:ForwardCommentPlaceholder")"></textarea>
+                <div class="hcs-chat-modal__actions">
+                    <button class="btn btn-light" type="button" @onclick="CloseForward">@T("Chat:Cancel")</button>
+                    <button class="btn btn-primary" type="button" @onclick="ForwardAsync" disabled="@(isForwarding || forwardTargetId is null)">
+                        <i class="fa @(isForwarding ? "fa-spinner fa-spin" : "fa-share")" aria-hidden="true"></i>@T("Chat:Forward")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+    @if (showTransferAdmin && selected is not null)
+    {
+        <div class="hcs-chat-modal" role="dialog" aria-modal="true" aria-labelledby="chat-transfer-title" @onclick="CloseTransferAdmin">
+            <div class="hcs-chat-modal__panel" @onclick:stopPropagation>
+                <h2 id="chat-transfer-title">@T("Chat:TransferAdmin")</h2>
+                <p>@T("Chat:TransferAdminHint")</p>
+                @if (messageError is not null)
+                {
+                    <p class="hcs-chat-modal__error" role="alert">@messageError</p>
+                }
+                <div class="hcs-chat-modal__list" role="listbox" aria-label="@T("Chat:TransferAdmin")">
+                    @foreach (var member in TransferCandidates)
+                    {
+                        <button class="hcs-chat-modal__choice @(transferAdminTo == member.UserId ? "is-active" : null)" type="button" role="option" aria-selected="@(transferAdminTo == member.UserId)" @onclick="() => transferAdminTo = member.UserId">
+                            <span>@MemberName(member.UserId)</span>
+                        </button>
+                    }
+                </div>
+                <div class="hcs-chat-modal__actions">
+                    <button class="btn btn-light" type="button" @onclick="CloseTransferAdmin">@T("Chat:Cancel")</button>
+                    <button class="btn btn-outline-danger" type="button" @onclick="ConfirmTransferLeaveAsync" disabled="@(isLeaving || transferAdminTo is null)">
+                        <i class="fa @(isLeaving ? "fa-spinner fa-spin" : "fa-arrow-right-from-bracket")" aria-hidden="true"></i>@T("Chat:Leave")
+                    </button>
+                </div>
+            </div>
+        </div>
+    }
+</main>
+
+@code {
+    [Parameter] public Guid? RedirectToConversationId { get; set; }
+
+    private readonly HashSet<Guid> onlineUserIds = [];
+    private readonly HashSet<Guid> selectedContactIds = [];
+    private readonly HashSet<Guid> selectedMemberIds = [];
+    private readonly HashSet<string> avatarLoadFailures = new(StringComparer.Ordinal);
+    private readonly List<IBrowserFile> pendingFiles = [];
+    private readonly List<ChatMessageDto> messages = [];
+    private IReadOnlyList<ConversationDto> conversations = [];
+    private IReadOnlyList<ChatContactDto> contacts = [];
+    private ConversationDto? selected;
+    private ConversationPermissionDto? permissions;
+    private Guid? currentUserId;
+    private string conversationSearch = string.Empty;
+    private string contactSearch = string.Empty;
+    private string groupName = string.Empty;
+    private string messageText = string.Empty;
+    private string renameText = string.Empty;
+    private string? conversationError;
+    private string? contactsError;
+    private string? messageError;
+    private bool isLoadingConversations;
+    private bool contactsLoading;
+    private bool isLoadingMessages;
+    private bool isSending;
+    private bool isCreatingConversation;
+    private bool isRenaming;
+    private bool isAddingMembers;
+    private bool isLeaving;
+    private bool showNewConversation;
+    private LeftTab leftTab = LeftTab.Conversations;
+    private bool realtimeUnavailable;
+    private int messageSkip;
+    private long totalMessageCount;
+    private MobileView mobileView = MobileView.List;
+    private bool infoOpen;
+    private bool preventComposerDefault;
+    private MessageAttachmentDto? previewAttachment;
+    private MediaPanel mediaPanel = MediaPanel.None;
+    private ChatMessageDto? replyingTo;
+    private ChatMessageDto? forwardingMessage;
+    private Guid? highlightedMessageId;
+    private Guid? messageMenuId;
+    private Guid? jumpToMessageIdAfterRender;
+    private Guid? forwardTargetId;
+    private bool scrollToBottomAfterRender;
+    private bool isDeletingMessage;
+    private bool isPinningMessage;
+    private bool isForwarding;
+    private bool isRemovingMember;
+    private bool allowOlderScroll;
+    private bool pinnedPanelOpen;
+    private readonly List<ChatMessageDto> pinnedMessages = [];
+    private string forwardComment = string.Empty;
+    private string forwardSearch = string.Empty;
+    private bool showTransferAdmin;
+    private Guid? transferAdminTo;
+
+    private bool CanSend => !string.IsNullOrWhiteSpace(messageText) || pendingFiles.Count > 0;
+
+    private IEnumerable<MessageAttachmentDto> ConversationPhotos => ConversationAttachments.Where(IsImage);
+
+    private IEnumerable<MessageAttachmentDto> ConversationFiles => ConversationAttachments.Where(attachment => !IsImage(attachment));
+
+    private IEnumerable<MessageAttachmentDto> ConversationAttachments => messages
+        .Where(message => !message.IsDeleted)
+        .SelectMany(message => message.Attachments)
+        .GroupBy(attachment => attachment.Id)
+        .Select(group => group.First());
+
+    private IEnumerable<ConversationDto> FilteredConversations => conversations.Where(conversation =>
+        string.IsNullOrWhiteSpace(conversationSearch) ||
+        ConversationTitle(conversation).Contains(conversationSearch.Trim(), StringComparison.CurrentCultureIgnoreCase) ||
+        (conversation.LastMessage?.Contains(conversationSearch.Trim(), StringComparison.CurrentCultureIgnoreCase) ?? false))
+        .OrderByDescending(conversation => conversation.IsPinned)
+        .ThenByDescending(conversation => conversation.LastMessageAt ?? DateTime.MinValue);
+
+    private IEnumerable<ChatContactDto> FilteredContacts => contacts.Where(contact =>
+        string.IsNullOrWhiteSpace(contactSearch) ||
+        contact.DisplayName.Contains(contactSearch.Trim(), StringComparison.CurrentCultureIgnoreCase) ||
+        contact.UserName.Contains(contactSearch.Trim(), StringComparison.CurrentCultureIgnoreCase));
+
+    private IEnumerable<ChatContactDto> AvailableMemberContacts => selected is null
+        ? []
+        : contacts.Where(contact => !selected.Members.Any(member => member.UserId == contact.Id));
+
+    private IEnumerable<ConversationDto> ForwardTargets => conversations.Where(conversation =>
+        selected is not null &&
+        conversation.Id != selected.Id &&
+        (string.IsNullOrWhiteSpace(forwardSearch) ||
+         ConversationTitle(conversation).Contains(forwardSearch.Trim(), StringComparison.CurrentCultureIgnoreCase)));
+
+    private bool IsSoleAdminWithOthers =>
+        selected is not null &&
+        currentUserId is Guid me &&
+        selected.Members.Any(member => member.UserId == me && member.Role == ConversationMemberRole.Admin) &&
+        selected.Members.Count(member => member.Role == ConversationMemberRole.Admin) == 1 &&
+        selected.Members.Any(member => member.UserId != me);
+
+    private IEnumerable<ConversationMemberDto> TransferCandidates =>
+        selected?.Members.Where(member => member.UserId != currentUserId) ?? [];
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (Guid.TryParse(
+                state.User.FindFirst("sub")?.Value ??
+                state.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value,
+            out var userId))
+        {
+            currentUserId = userId;
+        }
+
+        Realtime.Changed += HandleRealtimeChangeAsync;
+        Realtime.MessageReceived += HandleMessageReceivedAsync;
+        Realtime.MessageDeleted += HandleMessageDeletedAsync;
+        Realtime.PresenceChanged += HandlePresenceChangedAsync;
+        Realtime.PresenceSnapshot += HandlePresenceSnapshotAsync;
+        Realtime.StatusChanged += HandleRealtimeStatusAsync;
+        try
+        {
+            await Realtime.EnsureStartedAsync();
+            realtimeUnavailable = !Realtime.IsConnected;
+        }
+        catch (Exception exception)
+        {
+            LogChatError(exception, "start realtime connection");
+            realtimeUnavailable = true;
+        }
+
+        await LoadContactsAsync();
+    }
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadConversationsAsync();
+        if (RedirectToConversationId is { } redirectId && conversations.FirstOrDefault(item => item.Id == redirectId) is { } target)
+        {
+            await SelectAsync(target);
+        }
+    }
+
+    private async Task LoadConversationsAsync()
+    {
+        isLoadingConversations = true;
+        conversationError = null;
+        try
+        {
+            conversations = await Client.GetConversationsAsync();
+            if (selected is not null && conversations.FirstOrDefault(item => item.Id == selected.Id) is { } current)
+            {
+                selected = current;
+            }
+        }
+        catch (Exception exception)
+        {
+            conversationError = MapChatError(exception, "Chat:LoadError");
+        }
+        finally
+        {
+            isLoadingConversations = false;
+        }
+    }
+
+    private async Task LoadContactsAsync()
+    {
+        contactsLoading = true;
+        contactsError = null;
+        try
+        {
+            contacts = await Client.GetContactsAsync(string.Empty);
+        }
+        catch (Exception exception)
+        {
+            contactsError = MapChatError(exception, "Chat:ContactsError");
+        }
+        finally
+        {
+            contactsLoading = false;
+        }
+    }
+
+    private async Task SelectAsync(ConversationDto value)
+    {
+        selected = value;
+        isLoadingMessages = true;
+        permissions = null;
+        messageError = null;
+        renameText = value.Name ?? string.Empty;
+        messages.Clear();
+        messageSkip = 0;
+        totalMessageCount = 0;
+        allowOlderScroll = false;
+        replyingTo = null;
+        forwardingMessage = null;
+        highlightedMessageId = null;
+        messageMenuId = null;
+        pinnedPanelOpen = false;
+        pinnedMessages.Clear();
+        mobileView = MobileView.Thread;
+        mediaPanel = MediaPanel.None;
+        Realtime.ActiveConversationId = value.Id;
+
+        try
+        {
+            selected = await Client.GetConversationAsync(value.Id);
+            permissions = await Client.GetPermissionsAsync(value.Id);
+            renameText = selected.Name ?? string.Empty;
+            await LoadMessagesAsync(reset: true);
+            await LoadPinnedMessagesAsync();
+            await Client.MarkReadAsync(value.Id);
+            await LoadConversationsAsync();
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:MessagesError");
+        }
+        finally
+        {
+            isLoadingMessages = false;
+        }
+    }
+
+    private async Task LoadMessagesAsync(bool reset)
+    {
+        if (selected is null)
+        {
+            return;
+        }
+
+        isLoadingMessages = true;
+        messageError = null;
+        try
+        {
+            var skip = reset ? 0 : messageSkip;
+            var response = await Client.GetMessagesAsync(selected.Id, skip, 50);
+            var incoming = response.Items.OrderBy(item => item.CreatedAt).ToList();
+            if (reset)
+            {
+                messages.Clear();
+            }
+
+            messages.InsertRange(0, incoming);
+            messageSkip += incoming.Count;
+            totalMessageCount = response.TotalCount;
+            if (reset)
+            {
+                scrollToBottomAfterRender = true;
+            }
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:MessagesError");
+        }
+        finally
+        {
+            isLoadingMessages = false;
+        }
+    }
+
+
+    private async Task SendAsync()
+    {
+        if (selected is null || isSending || !CanSend)
+        {
+            return;
+        }
+
+        isSending = true;
+        messageError = null;
+        try
+        {
+            var attachmentIds = new List<Guid>();
+            foreach (var file in pendingFiles)
+            {
+                var attachment = await Client.UploadAttachmentAsync(selected.Id, file);
+                attachmentIds.Add(attachment.Id);
+            }
+
+            var sent = await Client.SendMessageAsync(new SendMessageInput
+            {
+                ConversationId = selected.Id,
+                Text = messageText.Trim(),
+                ClientMessageId = Guid.NewGuid(),
+                ReplyToMessageId = replyingTo?.Id,
+                AttachmentIds = attachmentIds
+            });
+            UpsertMessage(sent);
+            messageSkip = messages.Count;
+            totalMessageCount = Math.Max(totalMessageCount, messages.Count);
+            messageText = string.Empty;
+            pendingFiles.Clear();
+            replyingTo = null;
+            scrollToBottomAfterRender = true;
+            await Client.MarkReadAsync(selected.Id);
+            await LoadConversationsAsync();
+        }
+        catch (CollaborationApiException exception) when (exception.StatusCode == HttpStatusCode.RequestEntityTooLarge)
+        {
+            messageError = T("Chat:AttachmentTooLarge");
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:SendError");
+        }
+        finally
+        {
+            isSending = false;
+        }
+    }
+
+    private async Task CreateConversationAsync()
+    {
+        if (currentUserId is not { } userId || selectedContactIds.Count == 0 || isCreatingConversation)
+        {
+            return;
+        }
+
+        isCreatingConversation = true;
+        conversationError = null;
+        try
+        {
+            var contactIds = selectedContactIds.ToArray();
+            var isDirect = contactIds.Length == 1;
+            var created = await Client.CreateConversationAsync(new CreateConversationInput
+            {
+                Type = isDirect ? ConversationType.User : ConversationType.Group,
+                Name = isDirect ? null : (string.IsNullOrWhiteSpace(groupName) ? T("Chat:GroupConversation") : groupName.Trim()),
+                TargetUserId = isDirect ? contactIds[0] : null,
+                MemberUserIds = [userId, .. contactIds]
+            });
+            showNewConversation = false;
+            leftTab = LeftTab.Conversations;
+            selectedContactIds.Clear();
+            groupName = string.Empty;
+            await LoadConversationsAsync();
+            await SelectAsync(created);
+        }
+        catch (Exception exception)
+        {
+            conversationError = MapChatError(exception, "Chat:LoadError");
+        }
+        finally
+        {
+            isCreatingConversation = false;
+        }
+    }
+
+    private async Task TogglePinnedAsync()
+    {
+        if (selected is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Client.SetConversationPinnedAsync(selected.Id, !selected.IsPinned);
+            await LoadConversationsAsync();
+            selected = conversations.FirstOrDefault(item => item.Id == selected.Id) ?? selected;
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:LoadError");
+        }
+    }
+
+    private async Task RenameAsync()
+    {
+        if (selected is null || string.IsNullOrWhiteSpace(renameText) || isRenaming)
+        {
+            return;
+        }
+
+        isRenaming = true;
+        try
+        {
+            await Client.RenameConversationAsync(selected.Id, renameText.Trim());
+            await LoadConversationsAsync();
+            selected = conversations.FirstOrDefault(item => item.Id == selected.Id) ?? selected;
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:LoadError");
+        }
+        finally
+        {
+            isRenaming = false;
+        }
+    }
+
+    private async Task AddMembersAsync()
+    {
+        if (selected is null || selectedMemberIds.Count == 0 || isAddingMembers)
+        {
+            return;
+        }
+
+        isAddingMembers = true;
+        try
+        {
+            await Client.AddMembersAsync(selected.Id, selectedMemberIds.ToArray());
+            selectedMemberIds.Clear();
+            selected = await Client.GetConversationAsync(selected.Id);
+            permissions = await Client.GetPermissionsAsync(selected.Id);
+            await LoadConversationsAsync();
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:LoadError");
+        }
+        finally
+        {
+            isAddingMembers = false;
+        }
+    }
+
+    private async Task LeaveAsync()
+    {
+        if (selected is null || isLeaving)
+        {
+            return;
+        }
+
+        if (IsSoleAdminWithOthers)
+        {
+            transferAdminTo = TransferCandidates.FirstOrDefault()?.UserId;
+            showTransferAdmin = true;
+            return;
+        }
+
+        if (!await UiMessageService.Confirm(T("Chat:LeaveConfirm")))
+        {
+            return;
+        }
+
+        await ExecuteLeaveAsync(null);
+    }
+
+    private Task ConfirmTransferLeaveAsync() => ExecuteLeaveAsync(transferAdminTo);
+
+    private void CloseTransferAdmin()
+    {
+        showTransferAdmin = false;
+        transferAdminTo = null;
+    }
+
+    private async Task ExecuteLeaveAsync(Guid? successorAdminId)
+    {
+        if (selected is null || isLeaving)
+        {
+            return;
+        }
+
+        isLeaving = true;
+        try
+        {
+            await Client.LeaveAsync(selected.Id, successorAdminId);
+            selected = null;
+            permissions = null;
+            messages.Clear();
+            Realtime.ActiveConversationId = null;
+            showTransferAdmin = false;
+            transferAdminTo = null;
+            await LoadConversationsAsync();
+            ShowList();
+        }
+        catch (Exception exception)
+        {
+            messageError = MapChatError(exception, "Chat:LoadError");
+        }
+        finally
+        {
+            isLeaving = false;
+        }
+    }
+
+    private void OnFilesSelected(InputFileChangeEventArgs args)
+    {
+        pendingFiles.Clear();
+        foreach (var file in args.GetMultipleFiles(20))
+        {
+            if (file.Size <= 25 * 1024 * 1024)
+            {
+                pendingFiles.Add(file);
+            }
+            else
+            {
+                messageError = T("Chat:AttachmentTooLarge");
+            }
+        }
+    }
+
+    private void RemovePendingFile(IBrowserFile file) => pendingFiles.Remove(file);
+
+    private async Task OnComposerKeyDown(KeyboardEventArgs args)
+    {
+        preventComposerDefault = args.Key == "Enter" && !args.ShiftKey;
+        if (preventComposerDefault)
+        {
+            await SendAsync();
+        }
+    }
+
+    private void ToggleContact(Guid contactId, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool boolean && boolean || string.Equals(args.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        if (isChecked)
+        {
+            selectedContactIds.Add(contactId);
+        }
+        else
+        {
+            selectedContactIds.Remove(contactId);
+        }
+    }
+
+    private void ToggleMember(Guid userId, ChangeEventArgs args)
+    {
+        var isChecked = args.Value is bool boolean && boolean || string.Equals(args.Value?.ToString(), "true", StringComparison.OrdinalIgnoreCase);
+        if (isChecked)
+        {
+            selectedMemberIds.Add(userId);
+        }
+        else
+        {
+            selectedMemberIds.Remove(userId);
+        }
+    }
+
+    private void OpenNewConversation()
+    {
+        leftTab = LeftTab.Contacts;
+        showNewConversation = true;
+        contactSearch = string.Empty;
+        selectedContactIds.Clear();
+    }
+
+    private void CloseNewConversation()
+    {
+        showNewConversation = false;
+        selectedContactIds.Clear();
+    }
+
+    private Task ShowContactsTabAsync()
+    {
+        leftTab = LeftTab.Contacts;
+        showNewConversation = false;
+        return contacts.Count == 0 ? LoadContactsAsync() : Task.CompletedTask;
+    }
+
+    private void ShowList()
+    {
+        infoOpen = false;
+        mediaPanel = MediaPanel.None;
+        messageMenuId = null;
+        pinnedPanelOpen = false;
+        mobileView = MobileView.List;
+        Realtime.ActiveConversationId = null;
+    }
+
+    private void ShowThread()
+    {
+        infoOpen = false;
+        mobileView = MobileView.Thread;
+    }
+
+    private void ToggleInfo()
+    {
+        infoOpen = !infoOpen;
+        if (!infoOpen)
+        {
+            mediaPanel = MediaPanel.None;
+        }
+        mobileView = infoOpen ? MobileView.Info : MobileView.Thread;
+    }
+
+    private void CloseInfo()
+    {
+        infoOpen = false;
+        mediaPanel = MediaPanel.None;
+        mobileView = MobileView.Thread;
+    }
+
+    private void ToggleMediaPanel(MediaPanel panel) =>
+        mediaPanel = mediaPanel == panel ? MediaPanel.None : panel;
+
+    private void OpenPreview(MessageAttachmentDto attachment) => previewAttachment = attachment;
+    private void ClosePreview() => previewAttachment = null;
+
+    private static bool IsImage(MessageAttachmentDto attachment) =>
+        attachment.Kind == AttachmentKind.Image ||
+        attachment.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+
+    private static string FormatMessageClock(DateTime value) =>
+        value.Year < 2 ? string.Empty : ToLocal(value).ToString("h:mm tt");
+
+    private static string FormatMessageTimestamp(DateTime? value) =>
+        value is not { Year: > 1 } ? string.Empty : ToLocal(value.Value).ToUniversalTime().ToString("O");
+
+    private string FormatConversationTime(DateTime? value)
+    {
+        if (value is not { Year: > 1 }) return string.Empty;
+        var local = ToLocal(value.Value);
+        var now = DateTime.Now;
+        var delta = now - local;
+        if (delta.TotalMinutes < 1) return T("Chat:JustNow");
+        if (delta.TotalHours < 1) return string.Format(T("Chat:MinutesAgo"), Math.Max(1, (int)delta.TotalMinutes));
+        if (local.Date == now.Date) return local.ToString("h:mm tt");
+        if (local.Date == now.Date.AddDays(-1)) return T("Chat:Yesterday");
+        return local.ToString("dd/MM");
+    }
+
+    private static DateTime ToLocal(DateTime value) =>
+        value.Kind == DateTimeKind.Utc ? value.ToLocalTime() : DateTime.SpecifyKind(value, DateTimeKind.Utc).ToLocalTime();
+
+    private async Task HandleRealtimeChangeAsync()
+    {
+        await InvokeAsync(async () =>
+        {
+            await LoadConversationsAsync();
+            StateHasChanged();
+        });
+    }
+
+    private async Task HandleRealtimeStatusAsync(HubConnectionState state)
+    {
+        await InvokeAsync(() =>
+        {
+            realtimeUnavailable = state != HubConnectionState.Connected;
+            if (state != HubConnectionState.Connected)
+            {
+                onlineUserIds.Clear();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task HandlePresenceChangedAsync(PresenceChangedDto change)
+    {
+        await InvokeAsync(() =>
+        {
+            if (change.IsOnline)
+            {
+                onlineUserIds.Add(change.UserId);
+            }
+            else
+            {
+                onlineUserIds.Remove(change.UserId);
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task HandlePresenceSnapshotAsync(IReadOnlyList<Guid> userIds)
+    {
+        await InvokeAsync(() =>
+        {
+            onlineUserIds.Clear();
+            foreach (var userId in userIds)
+            {
+                onlineUserIds.Add(userId);
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private bool IsUserOnline(Guid userId) => onlineUserIds.Contains(userId);
+
+    private bool IsConversationOnline(ConversationDto conversation)
+    {
+        if (conversation.Type == ConversationType.User)
+        {
+            var peer = conversation.Members.FirstOrDefault(member => member.UserId != currentUserId);
+            return peer is not null && IsUserOnline(peer.UserId);
+        }
+
+        return conversation.Members.Any(member => member.UserId != currentUserId && IsUserOnline(member.UserId));
+    }
+
+    private int OnlineMemberCount(ConversationDto conversation) =>
+        conversation.Members.Count(member => member.UserId != currentUserId && IsUserOnline(member.UserId));
+
+    private string ThreadPresenceLabel(ConversationDto conversation)
+    {
+        var typeLabel = ConversationTypeLabel(conversation.Type);
+        if (conversation.Type == ConversationType.User)
+        {
+            return $"{(IsConversationOnline(conversation) ? T("Chat:Active") : T("Chat:Offline"))} · {typeLabel}";
+        }
+
+        var onlineCount = OnlineMemberCount(conversation);
+        return onlineCount > 0
+            ? $"{string.Format(T("Chat:MembersOnline"), onlineCount)} · {typeLabel}"
+            : $"{T("Chat:Offline")} · {typeLabel}";
+    }
+
+    private string ConversationTitle(ConversationDto conversation)
+    {
+        if (!string.IsNullOrWhiteSpace(conversation.Name))
+        {
+            return conversation.Name;
+        }
+
+        if (conversation.Type == ConversationType.User)
+        {
+            var other = conversation.Members.FirstOrDefault(member => member.UserId != currentUserId);
+            return other is null ? T("Chat:DirectConversation") : MemberName(other.UserId);
+        }
+
+        return ConversationTypeLabel(conversation.Type);
+    }
+
+    private string ConversationTypeLabel(ConversationType type) => type switch
+    {
+        ConversationType.User => T("Chat:DirectConversation"),
+        ConversationType.Group => T("Chat:GroupConversation"),
+        ConversationType.Project => T("Chat:ProjectConversation"),
+        ConversationType.Task => T("Chat:TaskConversation"),
+        _ => T("Chat:UnknownConversation")
+    };
+
+    private string ConversationInitials(ConversationDto conversation) => Initials(ConversationTitle(conversation));
+
+    private Guid? DirectConversationUserId(ConversationDto conversation) =>
+        conversation.Type == ConversationType.User
+            ? conversation.Members.FirstOrDefault(member => member.UserId != currentUserId)?.UserId
+            : null;
+
+    private RenderFragment ConversationAvatar(ConversationDto conversation, string extraClass = "", bool? isOnline = null) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", AvatarWrapClass(extraClass));
+        builder.OpenElement(2, "span");
+        builder.AddAttribute(3, "class", string.IsNullOrWhiteSpace(extraClass)
+            ? "hcs-chat__avatar"
+            : $"hcs-chat__avatar {extraClass}");
+        builder.AddAttribute(4, "aria-hidden", "true");
+        var icon = ConversationTypeIcon(conversation.Type);
+        if (icon is null)
+        {
+            var userId = DirectConversationUserId(conversation);
+            AppendAvatarImageOrInitials(
+                builder,
+                5,
+                userId is { } id ? ResolveAvatarUrl(id) : null,
+                ConversationInitials(conversation));
+        }
+        else
+        {
+            builder.OpenElement(6, "i");
+            builder.AddAttribute(7, "class", $"fa {icon}");
+            builder.AddAttribute(8, "aria-hidden", "true");
+            builder.CloseElement();
+        }
+
+        builder.CloseElement();
+        if (isOnline is { } online)
+        {
+            AppendPresenceBadge(builder, 9, online);
+        }
+
+        builder.CloseElement();
+    };
+
+    private RenderFragment UserAvatar(
+        Guid userId,
+        string displayName,
+        string extraClass = "",
+        bool? isOnline = null,
+        string? avatarUrl = null) => builder =>
+    {
+        builder.OpenElement(0, "span");
+        builder.AddAttribute(1, "class", AvatarWrapClass(extraClass));
+        builder.OpenElement(2, "span");
+        builder.AddAttribute(3, "class", string.IsNullOrWhiteSpace(extraClass)
+            ? "hcs-chat__avatar"
+            : $"hcs-chat__avatar {extraClass}");
+        builder.AddAttribute(4, "aria-hidden", "true");
+        AppendAvatarImageOrInitials(builder, 5, ResolveAvatarUrl(userId, avatarUrl), Initials(displayName));
+        builder.CloseElement();
+        if (isOnline is { } online)
+        {
+            AppendPresenceBadge(builder, 6, online);
+        }
+
+        builder.CloseElement();
+    };
+
+    private string? ResolveAvatarUrl(Guid userId, string? avatarUrl = null)
+    {
+        if (!string.IsNullOrWhiteSpace(avatarUrl))
+        {
+            return avatarUrl;
+        }
+
+        var contact = contacts.FirstOrDefault(contact => contact.Id == userId);
+        return contact is not null
+            ? contact.AvatarUrl
+            : userId == Guid.Empty ? null : $"/api/identity/users/{userId:D}/avatar";
+    }
+
+    private void AppendAvatarImageOrInitials(
+        Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder,
+        int sequence,
+        string? avatarUrl,
+        string initials)
+    {
+        if (!string.IsNullOrWhiteSpace(avatarUrl) && !avatarLoadFailures.Contains(avatarUrl))
+        {
+            builder.OpenElement(sequence, "img");
+            builder.AddAttribute(sequence + 1, "class", "hcs-chat__avatar-image");
+            builder.AddAttribute(sequence + 2, "src", avatarUrl);
+            builder.AddAttribute(sequence + 3, "alt", "");
+            builder.AddAttribute(sequence + 4, "aria-hidden", "true");
+            builder.AddAttribute(
+                sequence + 5,
+                "onerror",
+                EventCallback.Factory.Create(this, () => MarkAvatarLoadFailure(avatarUrl)));
+            builder.CloseElement();
+            return;
+        }
+
+        builder.AddContent(sequence, initials);
+    }
+
+    private void MarkAvatarLoadFailure(string avatarUrl) => avatarLoadFailures.Add(avatarUrl);
+
+    private static string AvatarWrapClass(string extraClass) =>
+        extraClass.Contains("hcs-chat__avatar--large", StringComparison.Ordinal)
+            ? "hcs-chat__avatar-wrap hcs-chat__avatar-wrap--large"
+            : extraClass.Contains("hcs-chat__avatar--small", StringComparison.Ordinal)
+                ? "hcs-chat__avatar-wrap hcs-chat__avatar-wrap--small"
+                : "hcs-chat__avatar-wrap";
+
+    private void AppendPresenceBadge(
+        Microsoft.AspNetCore.Components.Rendering.RenderTreeBuilder builder,
+        int sequence,
+        bool isOnline,
+        bool inline = false)
+    {
+        var label = isOnline ? T("Chat:Active") : T("Chat:Offline");
+        var css = isOnline
+            ? (inline ? "hcs-chat__presence hcs-chat__presence--inline" : "hcs-chat__presence")
+            : (inline
+                ? "hcs-chat__presence hcs-chat__presence--inline hcs-chat__presence--offline"
+                : "hcs-chat__presence hcs-chat__presence--offline");
+        builder.OpenElement(sequence, "span");
+        builder.AddAttribute(sequence + 1, "class", css);
+        builder.AddAttribute(sequence + 2, "title", label);
+        builder.AddAttribute(sequence + 3, "aria-label", label);
+        builder.CloseElement();
+    }
+
+    private static string? ConversationTypeIcon(ConversationType type) => type switch
+    {
+        ConversationType.Group => "fa-user-group",
+        ConversationType.Project => "fa-folder",
+        ConversationType.Task => "fa-square-check",
+        _ => null
+    };
+
+    private string MemberName(Guid userId)
+    {
+        if (userId == currentUserId)
+        {
+            return T("Chat:CurrentUser");
+        }
+
+        return contacts.FirstOrDefault(contact => contact.Id == userId)?.DisplayName
+            ?? $"{userId.ToString()[..8]}…";
+    }
+
+    private static string Initials(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return "HC";
+        }
+
+        var parts = value.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        return string.Concat(parts.Take(2).Select(part => char.ToUpperInvariant(part[0])));
+    }
+
+    private string AttachmentUrl(Guid id) => ChatAttachmentUrlBuilder.Build(Configuration, id);
+    private string T(string key) => Localizer[key];
+
+    private string MapChatError(Exception exception, string fallbackKey)
+    {
+        LogChatError(exception, fallbackKey);
+        return ChatErrorMapper.From(Localizer, exception, fallbackKey);
+    }
+
+    private void LogChatError(Exception exception, string operation)
+    {
+        var statusCode = exception is CollaborationApiException apiException
+            ? apiException.StatusCode.ToString()
+            : null;
+        Logger.LogError(
+            exception,
+            "Chat operation {Operation} failed. Culture={Culture}; StatusCode={StatusCode}",
+            operation,
+            CultureInfo.CurrentUICulture.Name,
+            statusCode ?? "n/a");
+    }
+
+    public ValueTask DisposeAsync()
+    {
+        Realtime.Changed -= HandleRealtimeChangeAsync;
+        Realtime.MessageReceived -= HandleMessageReceivedAsync;
+        Realtime.MessageDeleted -= HandleMessageDeletedAsync;
+        Realtime.PresenceChanged -= HandlePresenceChangedAsync;
+        Realtime.PresenceSnapshot -= HandlePresenceSnapshotAsync;
+        Realtime.StatusChanged -= HandleRealtimeStatusAsync;
+        if (Realtime.ActiveConversationId == selected?.Id)
+        {
+            Realtime.ActiveConversationId = null;
+        }
+
+        return ValueTask.CompletedTask;
+    }
+
+    private enum MobileView
+    {
+        List,
+        Thread,
+        Info
+    }
+
+    private enum MediaPanel
+    {
+        None,
+        Photos,
+        Files
+    }
+
+    private enum LeftTab
+    {
+        Conversations,
+        Contacts
+    }
+}

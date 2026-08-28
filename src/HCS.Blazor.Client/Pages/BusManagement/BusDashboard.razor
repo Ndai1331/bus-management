@@ -1,0 +1,114 @@
+@page "/bus-management"
+@attribute [Authorize(Policy = "HCS.BusManagement.Reports")]
+@inherits HCSComponentBase
+@using HCS.BusManagementService.Contracts
+@using Microsoft.AspNetCore.Authorization
+@inject BusManagementClient BusClient
+
+<PageTitle>Quản lý bến xe · HCS</PageTitle>
+
+<section class="hcs-feature bus-dashboard" aria-labelledby="bus-dashboard-title">
+    <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <p class="text-muted mb-1">HCS Bus Management</p>
+            <h1 id="bus-dashboard-title" class="mb-1">Dashboard bến xe</h1>
+            <p class="text-muted mb-0">Tổng hợp vận hành, doanh thu và đối soát theo ngày nghiệp vụ.</p>
+        </div>
+        <button class="btn btn-outline-primary" @onclick="RefreshAsync" disabled="@isLoading">
+            <i class="fa fa-rotate me-1" aria-hidden="true"></i> Làm mới
+        </button>
+    </header>
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info" role="status">Đang tải dữ liệu bến xe…</div>
+    }
+    else if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+    else if (dashboard is not null)
+    {
+        <div class="row g-3 mb-4">
+            @Metric("Doanh thu", $"{dashboard.TotalRevenue:N0} đ", "fa-money-bill-wave")
+            @Metric("Chi phí", $"{dashboard.TotalExpense:N0} đ", "fa-receipt")
+            @Metric("Chuyến xe", dashboard.DepartureCount.ToString("N0"), "fa-bus")
+            @Metric("Ca chưa chốt", dashboard.UnreconciledShiftCount.ToString("N0"), "fa-clipboard-check")
+        </div>
+
+        <div class="row g-3">
+            <div class="col-12 col-xl-8">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5">Doanh thu theo nguồn</h2>
+                        @if (revenueRows.Count == 0)
+                        {
+                            <p class="text-muted mb-0">Chưa có số liệu trong kỳ.</p>
+                        }
+                        else
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-sm align-middle mb-0">
+                                    <thead><tr><th>Nguồn thu</th><th class="text-end">Số phiếu</th><th class="text-end">Tổng tiền</th></tr></thead>
+                                    <tbody>
+                                    @foreach (var row in revenueRows)
+                                    {
+                                        <tr><td>@row.SourceType</td><td class="text-end">@row.ReceiptCount</td><td class="text-end">@row.TotalAmount.ToString("N0") đ</td></tr>
+                                    }
+                                    </tbody>
+                                </table>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+            <div class="col-12 col-xl-4">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h2 class="h5">Cảnh báo vận hành</h2>
+                        <p class="mb-2"><i class="fa fa-file-circle-exclamation text-warning me-2"></i>Hồ sơ sắp hết hạn: <strong>@dashboard.ExpiringDocumentCount</strong></p>
+                        <p class="mb-0"><i class="fa fa-clock text-secondary me-2"></i>Cập nhật: @dashboard.AsOfUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</section>
+
+@code {
+    private DashboardSummaryDto? dashboard;
+    private IReadOnlyList<RevenueReportRowDto> revenueRows = [];
+    private bool isLoading;
+    private string? error;
+
+    protected override async Task OnInitializedAsync() => await RefreshAsync();
+
+    private async Task RefreshAsync()
+    {
+        isLoading = true; error = null;
+        try
+        {
+            var to = DateTime.Now.Date;
+            var from = new DateTime(to.Year, to.Month, 1);
+            dashboard = await BusClient.GetDashboardAsync(from, to) ?? throw new InvalidOperationException("Gateway returned an empty dashboard.");
+            revenueRows = await BusClient.GetRevenueReportAsync(from, to) ?? [];
+        }
+        catch (Exception exception) { error = exception.Message; }
+        finally { isLoading = false; }
+    }
+
+}
+
+@* Keep the metric markup local so this first vertical slice does not introduce a shared UI dependency. *@
+@code {
+    private RenderFragment Metric(string Title, string Value, string Icon) => builder =>
+    {
+        builder.OpenElement(0, "div"); builder.AddAttribute(1, "class", "col-12 col-sm-6 col-xl-3");
+        builder.OpenElement(2, "div"); builder.AddAttribute(3, "class", "card h-100"); builder.OpenElement(4, "div"); builder.AddAttribute(5, "class", "card-body");
+        builder.OpenElement(6, "div"); builder.AddAttribute(7, "class", "d-flex align-items-center justify-content-between");
+        builder.OpenElement(8, "div"); builder.OpenElement(9, "div"); builder.AddAttribute(10, "class", "text-muted small"); builder.AddContent(11, Title); builder.CloseElement();
+        builder.OpenElement(12, "div"); builder.AddAttribute(13, "class", "h4 mb-0"); builder.AddContent(14, Value); builder.CloseElement(); builder.CloseElement();
+        builder.OpenElement(15, "i"); builder.AddAttribute(16, "class", $"fa {Icon} fa-2x text-primary"); builder.AddAttribute(17, "aria-hidden", "true"); builder.CloseElement();
+        builder.CloseElement(); builder.CloseElement(); builder.CloseElement(); builder.CloseElement();
+    };
+}

@@ -1,0 +1,65 @@
+@inherits HCSComponentBase
+
+@if (Items.Count == 0)
+{
+    <small class="text-muted">@EmptyMessage</small>
+}
+else
+{
+    <div class="hcs-department-tree border rounded p-2" style="max-height: 280px; overflow-y: auto;">
+        <button type="button" class="btn btn-link btn-sm px-0" @onclick="ExpandAll">@L["Work:ExpandAll"]</button>
+        @foreach (var node in Items)
+        {
+            @RenderNode(node, 0)
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public List<DepartmentTreeNode> Items { get; set; } = [];
+    [Parameter] public IReadOnlyList<Guid> SelectedIds { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> SelectedIdsChanged { get; set; }
+    [Parameter] public string EmptyMessage { get; set; } = string.Empty;
+
+    private RenderFragment RenderNode(DepartmentTreeNode node, int depth) => __builder =>
+    {
+        <div class="d-flex align-items-center gap-2 py-1" style="@($"padding-left:{depth * 1.1}rem")">
+            @if (node.HasChildren)
+            {
+                <button type="button" class="btn btn-link btn-sm p-0" @onclick="() => Toggle(node)">
+                    <i class="fa @(node.Collapsed ? "fa-chevron-right" : "fa-chevron-down")"></i>
+                </button>
+            }
+            else
+            {
+                <span style="width:1rem"></span>
+            }
+            <input type="checkbox" class="form-check-input" checked="@SelectedIds.Contains(node.Id)"
+                   @onchange="args => OnToggleAsync(node.Id, args.Value is true)" />
+            <span><i class="fa fa-sitemap me-1"></i>@node.Name</span>
+        </div>
+        if (!node.Collapsed)
+        {
+            foreach (var child in node.Children)
+            {
+                @RenderNode(child, depth + 1)
+            }
+        }
+    };
+
+    private void ExpandAll()
+    {
+        DepartmentTreeSelectHelper.ExpandAll(Items);
+        StateHasChanged();
+    }
+
+    private void Toggle(DepartmentTreeNode node) => node.Collapsed = !node.Collapsed;
+
+    private async Task OnToggleAsync(Guid id, bool selected)
+    {
+        var next = SelectedIds.ToHashSet();
+        if (selected) next.Add(id);
+        else next.Remove(id);
+        await SelectedIdsChanged.InvokeAsync(next.ToList());
+    }
+}

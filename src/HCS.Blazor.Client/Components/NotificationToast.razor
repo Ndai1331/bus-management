@@ -1,0 +1,318 @@
+@inherits HCSComponentBase
+@implements IAsyncDisposable
+@inject CollaborationClient Chat
+@inject ChatRealtimeConnection Realtime
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+@using HCS.Blazor.Client.Collaboration
+@using HCS.CollaborationService.Contracts
+@using System.Threading
+
+<div class="hcs-notification-toast-container">
+    @foreach (var item in chatToasts)
+    {
+        <div class="hcs-notification-toast" role="status">
+            <div class="hcs-notification-toast__header">
+                <i class="fa fa-comments" aria-hidden="true"></i>
+                <strong>@L["Chat:NewMessage"]</strong>
+                <small>@FormatClock(item.Message.CreatedAt)</small>
+                <button type="button" class="hcs-notification-toast__close" aria-label="@L["Catalog:Cancel"]" @onclick="() => DismissChat(item.Id)">
+                    <i class="fa fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="hcs-notification-toast__body">
+                <p>@ChatPreview(item.Message)</p>
+                <button class="btn btn-sm btn-primary" type="button" @onclick="() => OpenChatAsync(item)">@L["Work:ViewDetail"]</button>
+            </div>
+        </div>
+    }
+    @foreach (var item in toasts)
+    {
+        <div class="hcs-notification-toast" role="alert">
+            <div class="hcs-notification-toast__header">
+                <i class="fa fa-bell" aria-hidden="true"></i>
+                <strong>@NotificationText.Localize(L, item.Title)</strong>
+                <small>@NotificationText.FormatLocal(item.CreatedAt, "HH:mm")</small>
+                <button type="button" class="hcs-notification-toast__close" aria-label="@L["Catalog:Cancel"]" @onclick="() => DismissAsync(item)">
+                    <i class="fa fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <div class="hcs-notification-toast__body">
+                <p>@NotificationText.Localize(L, item.Body)</p>
+                <a class="btn btn-sm btn-primary" href="@NotificationText.ResolveLink(item)" @onclick="() => DismissAsync(item)">@L["Work:ViewDetail"]</a>
+            </div>
+        </div>
+    }
+</div>
+
+@if (panelOpen)
+{
+    <div class="hcs-notification-panel">
+        <header class="hcs-notification-panel__header">
+            <strong>@L["Notifications:Title"]</strong>
+            <div class="hcs-notification-panel__header-actions">
+                <a class="hcs-notification-panel__view-all" href="/notifications" @onclick="ClosePanel">
+                    @L["Notifications:ViewAll"]
+                </a>
+                <button type="button" class="btn-close" @onclick="ClosePanel"></button>
+            </div>
+        </header>
+        @if (recent.Count == 0)
+        {
+            <p class="hcs-notification-panel__empty">@L["Work:NoRecentNotifications"]</p>
+        }
+        else
+        {
+            <ul class="hcs-notification-panel__list">
+                @foreach (var item in recent)
+                {
+                    <li>
+                        <a class="hcs-notification-panel__item @(item.IsRead ? null : "is-unread")"
+                           href="@NotificationText.ResolveLink(item)"
+                           @onclick="() => DismissAsync(item)">
+                            <span class="hcs-notification-panel__dot @(item.IsRead ? "is-empty" : null)" aria-hidden="true"></span>
+                            <span class="hcs-notification-panel__content">
+                                <strong class="hcs-notification-panel__title">@NotificationText.Localize(L, item.Title)</strong>
+                                <span class="hcs-notification-panel__detail">@NotificationText.Localize(L, item.Body)</span>
+                            </span>
+                        </a>
+                    </li>
+                }
+            </ul>
+            <footer class="hcs-notification-panel__footer">
+                <button type="button" class="hcs-notification-panel__mark-all" @onclick="MarkAllReadAsync">
+                    @L["Notifications:MarkAllAsRead"]
+                </button>
+            </footer>
+        }
+    </div>
+}
+
+@code {
+    [Parameter] public EventCallback<int> UnreadCountChanged { get; set; }
+    [Parameter] public EventCallback<int> ChatUnreadCountChanged { get; set; }
+
+    private readonly List<NotificationDto> toasts = [];
+    private readonly List<NotificationDto> recent = [];
+    private readonly List<ChatIncomingToast> chatToasts = [];
+    private readonly HashSet<Guid> seen = [];
+    private CancellationTokenSource? pollCts;
+    private DotNetObjectReference<NotificationToast>? outsideClickRef;
+    private bool outsideClickBound;
+    private bool panelOpen;
+    private int unreadCount;
+    private int chatUnreadCount;
+
+    public int UnreadCount => unreadCount;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        outsideClickRef = DotNetObjectReference.Create(this);
+        await Js.InvokeVoidAsync("hcsNotifications.bindOutsideClick", outsideClickRef);
+        outsideClickBound = true;
+    }
+
+    public async Task TogglePanelAsync()
+    {
+        panelOpen = !panelOpen;
+        if (panelOpen) await RefreshAsync(showToasts: false);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    [JSInvokable]
+    public async Task ClosePanelFromOutsideAsync()
+    {
+        if (!panelOpen)
+        {
+            return;
+        }
+
+        panelOpen = false;
+        await InvokeAsync(StateHasChanged);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        Realtime.MessageReceived += OnChatMessageAsync;
+        pollCts = new CancellationTokenSource();
+        try { await Realtime.EnsureStartedAsync(); }
+        catch { /* polling still covers workflow notifications */ }
+        _ = PollAsync(pollCts.Token);
+    }
+
+    private async Task OnChatMessageAsync(ChatMessageDto message)
+    {
+        if (Realtime.ActiveConversationId == message.ConversationId)
+        {
+            return;
+        }
+
+        await InvokeAsync(() =>
+        {
+            var toast = new ChatIncomingToast(Guid.NewGuid(), message);
+            chatToasts.Insert(0, toast);
+            if (chatToasts.Count > 4)
+            {
+                chatToasts.RemoveRange(4, chatToasts.Count - 4);
+            }
+
+            StateHasChanged();
+            _ = AutoDismissChatAsync(toast.Id);
+            _ = RefreshChatUnreadAsync();
+        });
+    }
+
+    private async Task PollAsync(CancellationToken cancellationToken)
+    {
+        while (!cancellationToken.IsCancellationRequested)
+        {
+            try { await RefreshAsync(showToasts: true); }
+            catch { /* keep polling */ }
+            try { await Task.Delay(TimeSpan.FromSeconds(15), cancellationToken); }
+            catch (OperationCanceledException) { return; }
+        }
+    }
+
+    private async Task RefreshAsync(bool showToasts)
+    {
+        IReadOnlyList<NotificationDto> items;
+        int nextCount;
+        try
+        {
+            items = await Chat.GetNotificationsAsync(unreadOnly: true, skip: 0, take: 20);
+            nextCount = await Chat.GetNotificationUnreadCountAsync();
+        }
+        catch { return; }
+
+        recent.Clear();
+        recent.AddRange(items.OrderByDescending(x => x.CreatedAt).ThenByDescending(x => x.Id).Take(8));
+        if (nextCount != unreadCount)
+        {
+            unreadCount = nextCount;
+            await UnreadCountChanged.InvokeAsync(unreadCount);
+        }
+
+        await RefreshChatUnreadAsync();
+
+        if (showToasts)
+        {
+            foreach (var item in items)
+            {
+                if (!seen.Add(item.Id)) continue;
+                // SignalR already surfaces incoming chat; skip the persisted duplicate popup.
+                if (ChatNotificationRules.IsChatLink(item.Link)) continue;
+                toasts.Insert(0, item);
+                _ = AutoDismissAsync(item.Id);
+            }
+            if (toasts.Count > 5) toasts.RemoveRange(5, toasts.Count - 5);
+        }
+        else
+        {
+            foreach (var item in items) seen.Add(item.Id);
+        }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task RefreshChatUnreadAsync()
+    {
+        int nextCount;
+        try { nextCount = await Chat.GetUnreadCountAsync(); }
+        catch { return; }
+
+        if (nextCount == chatUnreadCount)
+        {
+            return;
+        }
+
+        chatUnreadCount = nextCount;
+        await ChatUnreadCountChanged.InvokeAsync(chatUnreadCount);
+    }
+
+    private async Task AutoDismissAsync(Guid id)
+    {
+        try { await Task.Delay(8000, pollCts?.Token ?? CancellationToken.None); }
+        catch (OperationCanceledException) { return; }
+        var match = toasts.FirstOrDefault(x => x.Id == id);
+        if (match is not null) toasts.Remove(match);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task DismissAsync(NotificationDto item)
+    {
+        toasts.RemoveAll(x => x.Id == item.Id);
+        try { await Chat.MarkNotificationReadAsync(item.Id); } catch { }
+        recent.RemoveAll(x => x.Id == item.Id);
+        unreadCount = Math.Max(0, unreadCount - 1);
+        await UnreadCountChanged.InvokeAsync(unreadCount);
+        panelOpen = false;
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        try { await Chat.MarkAllNotificationsReadAsync(); } catch { return; }
+        toasts.Clear();
+        recent.Clear();
+        unreadCount = 0;
+        await UnreadCountChanged.InvokeAsync(unreadCount);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void ClosePanel() => panelOpen = false;
+
+    private async Task AutoDismissChatAsync(Guid id)
+    {
+        try { await Task.Delay(6000, pollCts?.Token ?? CancellationToken.None); }
+        catch (OperationCanceledException) { return; }
+        chatToasts.RemoveAll(item => item.Id == id);
+        await InvokeAsync(StateHasChanged);
+    }
+
+    private void DismissChat(Guid id) => chatToasts.RemoveAll(item => item.Id == id);
+
+    private Task OpenChatAsync(ChatIncomingToast toast)
+    {
+        DismissChat(toast.Id);
+        Navigation.NavigateTo($"/chat/{toast.Message.ConversationId:D}");
+        return Task.CompletedTask;
+    }
+
+    private string ChatPreview(ChatMessageDto message)
+    {
+        if (!string.IsNullOrWhiteSpace(message.Text))
+        {
+            return message.Text.Length <= 80 ? message.Text : message.Text[..80] + "…";
+        }
+
+        return message.Attachments.FirstOrDefault()?.FileName ?? L["Chat:NewMessage"];
+    }
+
+    private static string FormatClock(DateTime value) =>
+        value.Year < 2 ? string.Empty : value.ToLocalTime().ToString("HH:mm");
+
+    public async ValueTask DisposeAsync()
+    {
+        Realtime.MessageReceived -= OnChatMessageAsync;
+        if (outsideClickBound)
+        {
+            try { await Js.InvokeVoidAsync("hcsNotifications.unbindOutsideClick"); }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+        }
+        outsideClickRef?.Dispose();
+
+        if (pollCts is not null)
+        {
+            await pollCts.CancelAsync();
+            pollCts.Dispose();
+            pollCts = null;
+        }
+    }
+
+    private sealed record ChatIncomingToast(Guid Id, ChatMessageDto Message);
+}

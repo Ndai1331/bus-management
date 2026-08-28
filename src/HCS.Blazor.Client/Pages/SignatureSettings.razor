@@ -1,0 +1,340 @@
+@page "/signature-settings"
+@attribute [Authorize(Policy = "Documents.Signing.Configure")]
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>@L["Menu:SignatureSettings"] · HCS</PageTitle>
+<section class="hcs-catalog-page" aria-labelledby="provider-settings-title">
+    <header class="hcs-catalog-titlebar">
+        <div class="min-w-0">
+            <p class="hcs-catalog-titlebar__eyebrow">@L["Feature:ProviderSettings"]</p>
+            <h1 id="provider-settings-title">@L["Menu:SignatureSettings"]</h1>
+            <p class="text-muted mb-0">@L["Feature:ProviderSettingsHint"]</p>
+        </div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreateAsync" Disabled="@isLoading">
+                <Icon Name="@IconName.Add" /> @L["Feature:AddProvider"]
+            </Button>
+        </div>
+    </header>
+
+    @if (isLoading)
+    {
+        <Card Class="hcs-catalog-grid-card">
+            <CardBody>
+                <div class="hcs-loading py-5" role="status" aria-live="polite">
+                    <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                    <span>@L["Catalog:Loading"]</span>
+                </div>
+            </CardBody>
+        </Card>
+    }
+    else if (loadFailed)
+    {
+        <Card Class="hcs-catalog-grid-card">
+            <CardBody>
+                <div class="alert alert-danger mb-3" role="alert">
+                    <strong>@L["Feature:ProviderLoadFailed"]</strong>
+                    <div>@L["Feature:ProviderLoadFailedHint"]</div>
+                </div>
+                <div class="hcs-catalog-page__actions">
+                    <Button Color="Color.Light" Outline="true" Clicked="LoadAsync">
+                        <i class="fa fa-rotate me-1" aria-hidden="true"></i>@L["Catalog:Retry"]
+                    </Button>
+                </div>
+            </CardBody>
+        </Card>
+    }
+    else if (credentials.Count == 0)
+    {
+        <Card Class="hcs-catalog-grid-card">
+            <CardBody>
+                <div class="hcs-empty py-5">
+                    <i class="fa fa-plug" aria-hidden="true"></i>
+                    <h2>@L["Feature:NoProviders"]</h2>
+                    <p>@L["Feature:NoProvidersHint"]</p>
+                    <div class="hcs-catalog-page__actions justify-content-center mt-3">
+                        <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreateAsync">
+                            <Icon Name="@IconName.Add" /> @L["Feature:AddProvider"]
+                        </Button>
+                    </div>
+                </div>
+            </CardBody>
+        </Card>
+    }
+    else
+    {
+        <div class="row g-3 hcs-provider-grid">
+            @foreach (var item in credentials)
+            {
+                <article class="col-xl-4 col-md-6">
+                    <Card Class="h-100 hcs-provider-card">
+                        <CardBody Class="d-flex flex-column gap-3">
+                            <div class="d-flex justify-content-between gap-2">
+                                <div>
+                                    <span class="badge text-bg-light"><i class="fa fa-plug me-1" aria-hidden="true"></i>@KindName(item.Kind)</span>
+                                    <h2 class="h5 mt-2 mb-0 text-break">@(string.IsNullOrWhiteSpace(item.ProviderCode) ? KindName(item.Kind) : item.ProviderCode)</h2>
+                                </div>
+                                <span class="badge text-bg-light">@item.MaskedSecret</span>
+                            </div>
+                            <dl class="row small mb-0">
+                                <dt class="col-5">@L["Feature:SigningEndpoint"]</dt><dd class="col-7 text-break">@item.Endpoint</dd>
+                                <dt class="col-5">@L["Feature:LayoutImage"]</dt><dd class="col-7">@(item.HasLayoutImage ? L["Feature:Configured"] : L["Feature:NotConfigured"])</dd>
+                                <dt class="col-5">@L["Feature:SigningTimeout"]</dt><dd class="col-7">@item.ApiTimeoutSeconds s</dd>
+                            </dl>
+                            <div class="mt-auto d-flex justify-content-end">
+                                <Button Color="Color.Primary" Outline="true" Size="Size.Small" Class="hcs-action-button hcs-action-button--edit" Clicked="() => OpenEditAsync(item)">
+                                    <Icon Name="@IconName.Edit" /> @L["Catalog:Edit"]
+                                </Button>
+                            </div>
+                        </CardBody>
+                    </Card>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+<Modal @ref="providerModal" Size="ModalSize.Default">
+    <ModalContent Centered="true" Class="hcs-catalog-modal">
+        <form novalidate @onsubmit="SaveAsync" @onsubmit:preventDefault>
+            <ModalHeader Class="hcs-catalog-modal__header">
+                <ModalTitle>@(isCreating ? L["Feature:AddProvider"] : L["Feature:EditProvider"])</ModalTitle>
+                <CloseButton Clicked="CloseModalAsync" />
+            </ModalHeader>
+            <ModalBody Class="hcs-catalog-modal__body">
+                <div class="hcs-catalog-form">
+                    <Field>
+                        <label class="field-label form-label" for="provider-kind">@L["Feature:Kind"]</label>
+                        <select id="provider-kind" class="form-select hcs-catalog-select" @bind="form.Kind" @bind:after="ApplyProviderDefaults" disabled="@(!isCreating)">
+                            <option value="0">@L["Feature:Electronic"]</option>
+                            <option value="1">@L["Feature:RemoteCa"]</option>
+                            <option value="2">@L["Feature:Hsm"]</option>
+                            <option value="3">@L["Feature:UsbToken"]</option>
+                        </select>
+                    </Field>
+                    <Field>
+                        <label class="field-label form-label" for="provider-code">@L["Feature:ProviderCode"] @(form.Kind != 0 ? "*" : string.Empty)</label>
+                        <input id="provider-code" class="form-control hcs-catalog-input" @bind="form.ProviderCode" maxlength="256" list="signing-provider-codes" required="@(form.Kind != 0)" />
+                        <datalist id="signing-provider-codes">
+                            @foreach (var provider in providerDefinitions)
+                            {
+                                <option value="@provider.Code">@provider.DisplayName</option>
+                            }
+                        </datalist>
+                    </Field>
+                    <Field>
+                        <label class="field-label form-label" for="provider-endpoint">@L["Feature:SigningEndpoint"] *</label>
+                        <input id="provider-endpoint" class="form-control hcs-catalog-input" type="url" @bind="form.Endpoint" required />
+                    </Field>
+                    <Field>
+                        <label class="field-label form-label" for="provider-secret">@L["Feature:SigningSecret"] @(isCreating ? "*" : string.Empty)</label>
+                        <input id="provider-secret" class="form-control hcs-catalog-input" type="password" @bind="form.Secret" autocomplete="new-password" required="@isCreating" />
+                        @if (!isCreating) { <FieldHelp>@L["Feature:SecretKeepHint"]</FieldHelp> }
+                    </Field>
+                    <Field>
+                        <label class="field-label form-label" for="provider-layout">@L["Feature:LayoutImage"]</label>
+                        <InputFile @key="layoutInputKey" id="provider-layout" class="form-control hcs-catalog-input" accept="image/jpeg,image/png,image/webp,image/gif" OnChange="SelectLayoutAsync" />
+                        @if (!string.IsNullOrWhiteSpace(layoutFileName)) { <FieldHelp><i class="fa fa-image me-1" aria-hidden="true"></i>@layoutFileName</FieldHelp> }
+                        @if (!isCreating && editingCredential?.HasLayoutImage == true && layoutFile is null) { <FieldHelp>@L["Feature:ExistingLayoutKept"]</FieldHelp> }
+                    </Field>
+                    <div class="hcs-form-row">
+                        <Field><label class="field-label form-label" for="provider-timeout">@L["Feature:SigningTimeout"]</label><input id="provider-timeout" class="form-control hcs-catalog-input" type="number" min="5" max="600" @bind="form.ApiTimeoutSeconds" /></Field>
+                        <Field><label class="field-label form-label" for="provider-width">@L["Feature:SigningWidth"]</label><input id="provider-width" class="form-control hcs-catalog-input" type="number" min="40" max="1000" @bind="form.SignWidth" /></Field>
+                    </div>
+                    <div class="hcs-form-row">
+                        <Field><label class="field-label form-label" for="provider-height">@L["Feature:SigningHeight"]</label><input id="provider-height" class="form-control hcs-catalog-input" type="number" min="20" max="1000" @bind="form.SignHeight" /></Field>
+                        <div></div>
+                    </div>
+                    <div class="d-flex flex-wrap gap-3">
+                        <Check TValue="bool" @bind-Checked="form.AllowElectronicSign">@L["Feature:AllowElectronicSign"]</Check>
+                        <Check TValue="bool" @bind-Checked="form.AllowDigitalSign">@L["Feature:AllowDigitalSign"]</Check>
+                        <Check TValue="bool" @bind-Checked="form.RequireOtp">@L["Feature:RequireOtp"]</Check>
+                    </div>
+                </div>
+            </ModalBody>
+            <ModalFooter Class="hcs-catalog-modal__footer">
+                <Button Type="ButtonType.Button" Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="CloseModalAsync" Disabled="@isSaving">@L["Catalog:Cancel"]</Button>
+                <Button Type="ButtonType.Submit" Color="Color.Primary" Class="hcs-catalog-save" Loading="@isSaving" Disabled="@isSaving">
+                    @L["Catalog:SaveChanges"]
+                </Button>
+            </ModalFooter>
+        </form>
+    </ModalContent>
+</Modal>
+
+@code {
+    private readonly List<SigningCredentialDto> credentials = [];
+    private readonly List<SigningProviderDefinitionDto> providerDefinitions = [];
+    private readonly ProviderForm form = new();
+    private SigningCredentialDto? editingCredential;
+    private IBrowserFile? layoutFile;
+    private string? layoutFileName;
+    private bool isLoading = true;
+    private bool loadFailed;
+    private bool isSaving;
+    private bool isCreating;
+    private Modal? providerModal;
+    private int layoutInputKey;
+    private const long MaxLayoutImageSize = 3 * 1024 * 1024;
+
+    protected override async Task OnInitializedAsync() => await LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        try
+        {
+            credentials.Clear();
+            credentials.AddRange(await Documents.GetCredentialsAsync());
+            providerDefinitions.Clear();
+            providerDefinitions.AddRange(await Documents.GetSigningProviderDefinitionsAsync());
+        }
+        catch (Exception ex)
+        {
+            loadFailed = true;
+            await NotifyErrorAsync(ex);
+        }
+        finally { isLoading = false; }
+    }
+
+    private async Task OpenCreateAsync()
+    {
+        isCreating = true;
+        editingCredential = new SigningCredentialDto(Guid.Empty, 1, "", "", "", 30, 150, 70, true, true, false, DateTime.UtcNow);
+        form.Reset();
+        ApplyProviderDefaults();
+        layoutFile = null;
+        layoutFileName = null;
+        layoutInputKey++;
+        if (providerModal is not null) await providerModal.Show();
+    }
+
+    private async Task OpenEditAsync(SigningCredentialDto item)
+    {
+        isCreating = false;
+        editingCredential = item;
+        form.Apply(item);
+        layoutFile = null;
+        layoutFileName = null;
+        layoutInputKey++;
+        if (providerModal is not null) await providerModal.Show();
+    }
+
+    private async Task CloseModalAsync()
+    {
+        if (isSaving) return;
+        if (providerModal is not null) await providerModal.Hide();
+        editingCredential = null;
+        layoutFile = null;
+        layoutFileName = null;
+    }
+
+    private void SelectLayoutAsync(InputFileChangeEventArgs args)
+    {
+        layoutFile = args.File;
+        layoutFileName = args.File.Name;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (editingCredential is null || isSaving) return;
+
+        // Native browser validation can stop the submit event without invoking
+        // Blazor (for example TAG has no default endpoint). Validate explicitly
+        // so the user receives the normal localized validation error instead of
+        // the generic save failure.
+        if (!IsFormValid() || layoutFile?.Size > MaxLayoutImageSize)
+        {
+            await NotifyErrorAsync(L["Catalog:ValidationError"]);
+            return;
+        }
+
+        isSaving = true;
+        try
+        {
+            var request = new ConfigureSigningCredentialRequest(form.Kind, form.Endpoint.Trim(), form.Secret,
+                form.ProviderCode.Trim(), null, form.ApiTimeoutSeconds, form.SignWidth, form.SignHeight,
+                form.AllowElectronicSign, form.AllowDigitalSign, form.RequireOtp);
+            await Documents.ConfigureCredentialWithLayoutAsync(request, layoutFile);
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+            if (providerModal is not null) await providerModal.Hide();
+            editingCredential = null;
+            layoutFile = null;
+            layoutFileName = null;
+            await LoadAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+
+    private bool IsFormValid()
+    {
+        if (form.Kind == (int)SigningKind.Electronic)
+            return true;
+
+        if (string.IsNullOrWhiteSpace(form.ProviderCode)
+            || (isCreating && string.IsNullOrWhiteSpace(form.Secret)))
+            return false;
+
+        return Uri.TryCreate(form.Endpoint?.Trim(), UriKind.Absolute, out var endpoint)
+            && endpoint.Scheme is "http" or "https";
+    }
+
+    private string KindName(int kind) => kind switch
+    {
+        1 => L["Feature:RemoteCa"].Value,
+        2 => L["Feature:Hsm"].Value,
+        3 => L["Feature:UsbToken"].Value,
+        _ => L["Feature:Electronic"].Value
+    };
+
+    private void ApplyProviderDefaults()
+    {
+        if (!isCreating) return;
+
+        var definition = providerDefinitions.FirstOrDefault(item =>
+            item.SupportedKinds.Contains((SigningKind)form.Kind));
+        if (definition is null) return;
+
+        if (string.IsNullOrWhiteSpace(form.ProviderCode) || IsNamedProvider(form.ProviderCode))
+            form.ProviderCode = definition.Code;
+        if (string.IsNullOrWhiteSpace(form.Endpoint) || IsNamedProvider(form.ProviderCode))
+            form.Endpoint = definition.DefaultEndpoint ?? string.Empty;
+        form.ApiTimeoutSeconds = definition.DefaultApiTimeoutSeconds;
+        form.SignWidth = definition.DefaultSignWidth;
+        form.SignHeight = definition.DefaultSignHeight;
+    }
+
+    private bool IsNamedProvider(string? providerCode) =>
+        providerDefinitions.Any(item => string.Equals(item.Code, providerCode?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    private sealed class ProviderForm
+    {
+        public int Kind { get; set; } = 1;
+        public string ProviderCode { get; set; } = "";
+        public string Endpoint { get; set; } = "";
+        public string Secret { get; set; } = "";
+        public int ApiTimeoutSeconds { get; set; } = 30;
+        public int SignWidth { get; set; } = 150;
+        public int SignHeight { get; set; } = 70;
+        public bool AllowElectronicSign { get; set; } = true;
+        public bool AllowDigitalSign { get; set; } = true;
+        public bool RequireOtp { get; set; }
+
+        public void Reset()
+        {
+            Kind = 1; ProviderCode = ""; Endpoint = ""; Secret = ""; ApiTimeoutSeconds = 30;
+            SignWidth = 150; SignHeight = 70; AllowElectronicSign = true; AllowDigitalSign = true; RequireOtp = false;
+        }
+
+        public void Apply(SigningCredentialDto item)
+        {
+            Kind = item.Kind; ProviderCode = item.ProviderCode; Endpoint = item.Endpoint; Secret = "";
+            ApiTimeoutSeconds = item.ApiTimeoutSeconds; SignWidth = item.SignWidth; SignHeight = item.SignHeight;
+            AllowElectronicSign = item.AllowElectronicSign; AllowDigitalSign = item.AllowDigitalSign; RequireOtp = item.RequireOtp;
+        }
+    }
+}

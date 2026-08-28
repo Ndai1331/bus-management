@@ -1,0 +1,40 @@
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hcs-public
+  annotations: {{- toYaml .Values.ingress.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls: [{ hosts: [{{ .Values.ingress.host | quote }}], secretName: {{ .Values.ingress.tlsSecretName }} }]
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend: { service: { name: web-gateway, port: { name: http } } }
+          - path: /bff
+            pathType: Prefix
+            backend: { service: { name: web-gateway, port: { name: http } } }
+          - path: /hubs
+            pathType: Prefix
+            backend: { service: { name: web-gateway, port: { name: http } } }
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: blazor, port: { name: http } } }
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata: { name: hcs-auth }
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  tls: [{ hosts: [{{ .Values.ingress.authHost | quote }}], secretName: {{ .Values.ingress.tlsSecretName }} }]
+  rules:
+    - host: {{ .Values.ingress.authHost }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend: { service: { name: auth-server, port: { name: http } } }
+{{- end }}

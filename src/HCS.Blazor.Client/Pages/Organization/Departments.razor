@@ -1,0 +1,6 @@
+@page "/departments"
+@attribute [Authorize(Policy = "HCS.Organization.Departments")]
+@inherits HCSComponentBase
+
+<PageTitle>@L["Catalog:DepartmentTitle"] · HCS</PageTitle>
+<OrganizationCatalog Kind="OrganizationCatalogKind.Department" />

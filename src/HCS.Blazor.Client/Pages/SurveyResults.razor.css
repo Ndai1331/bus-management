@@ -1,0 +1,113 @@
+.hcs-survey-tabs {
+    display: flex;
+    gap: 1.25rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid #e5edf2;
+}
+
+.hcs-survey-tabs button {
+    padding: .45rem 0 .7rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    background: transparent;
+    color: #355770;
+    font-weight: 650;
+}
+
+.hcs-survey-tabs button.is-active {
+    border-bottom-color: #d4356b;
+    color: #d4356b;
+}
+
+.hcs-survey-charts {
+    display: grid;
+    gap: .75rem;
+}
+
+.hcs-survey-bar {
+    align-items: center;
+    display: grid;
+    gap: .75rem;
+    grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr) 3rem;
+}
+
+.hcs-survey-bar__label {
+    color: #355770;
+    font-size: .9rem;
+}
+
+.hcs-survey-bar__track {
+    background: #eef3f6;
+    height: .65rem;
+}
+
+.hcs-survey-bar__fill {
+    background: #2f6f62;
+    height: 100%;
+}
+
+.hcs-survey-bar__value {
+    color: #193b57;
+    font-weight: 700;
+    text-align: right;
+}
+
+.hcs-survey-results__location-filter {
+    flex: 1 1 20rem;
+    max-width: 32rem;
+}
+
+.hcs-survey-results__headline {
+    align-items: baseline;
+    background: #f5f8fa;
+    border-radius: .65rem;
+    display: flex;
+    gap: .75rem;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+    padding: 1rem 1.25rem;
+}
+
+.hcs-survey-results__headline span {
+    color: #355770;
+    font-weight: 600;
+}
+
+.hcs-survey-results__headline strong {
+    color: #d4356b;
+    font-size: 1.75rem;
+}
+
+.hcs-survey-results__section {
+    border-top: 1px solid #e5edf2;
+    margin-top: 1.5rem;
+    padding-top: 1.25rem;
+}
+
+.hcs-survey-results__section h2 {
+    color: #193b57;
+    font-size: 1rem;
+    margin-bottom: 1rem;
+}
+
+.hcs-survey-results__pager {
+    align-items: center;
+    border-top: 1px solid #e5edf2;
+    color: #355770;
+    display: flex;
+    justify-content: space-between;
+    margin-top: 1rem;
+    padding-top: 1rem;
+}
+
+@media (max-width: 767.98px) {
+    .hcs-survey-bar {
+        grid-template-columns: minmax(4rem, 7rem) minmax(0, 1fr) 2.5rem;
+    }
+
+    .hcs-survey-results__pager {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: .75rem;
+    }
+}

@@ -1,0 +1,61 @@
+@page "/administration/languages"
+@page "/administration/language-texts"
+@attribute [Authorize(Roles = "admin")]
+@using Microsoft.AspNetCore.Components.Routing
+@inject NavigationManager Navigation
+@implements IDisposable
+
+<PageTitle>@feature.Title · HCS</PageTitle>
+<GatewayDataPanel @key="@routeKey"
+                  Title="@feature.Title"
+                  Description="@feature.Description"
+                  Endpoint="@feature.Endpoint"
+                  Icon="@feature.Icon" />
+
+@code {
+    private FeatureDefinition feature = default!;
+    private string routeKey = "";
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        ApplyRoute();
+    }
+
+    protected override void OnParametersSet() => ApplyRoute();
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var previousRoute = routeKey;
+        ApplyRoute();
+        if (!string.Equals(previousRoute, routeKey, StringComparison.Ordinal))
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ApplyRoute()
+    {
+        routeKey = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/');
+        feature = routeKey switch
+        {
+            "administration/languages" => new(
+                "Ngôn ngữ",
+                "Bật, tắt và chọn ngôn ngữ mặc định của hệ thống.",
+                "/api/language-management/languages",
+                "fa fa-language"),
+            "administration/language-texts" => new(
+                "Bản dịch runtime",
+                "Tra cứu và quản lý nội dung dịch theo resource và culture.",
+                "/api/language-management/language-texts",
+                "fa fa-spell-check"),
+            _ => new(
+                "Ngôn ngữ",
+                "Bật, tắt và chọn ngôn ngữ mặc định của hệ thống.",
+                "/api/language-management/languages",
+                "fa fa-language")
+        };
+    }
+
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+}

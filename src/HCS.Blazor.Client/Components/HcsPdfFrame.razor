@@ -1,0 +1,18 @@
+@namespace HCS.Blazor.Client.Components
+
+@if (!string.IsNullOrWhiteSpace(Source))
+{
+    <div class="hcs-pdf-frame hcs-pdf-frame--fill" title="@Title">
+        <PdfViewerContainer Height="EffectiveHeight">
+            <PdfViewerToolbar ShowDownloading="false" />
+            <PdfViewer @key="Source" Source="@Source" />
+        </PdfViewerContainer>
+    </div>
+}
+@code {
+    [Parameter] public string? Source { get; set; }
+    [Parameter] public string Title { get; set; } = "";
+    [Parameter] public IFluentSizing? ViewerHeight { get; set; }
+
+    private IFluentSizing EffectiveHeight => ViewerHeight ?? Height.Rem(50);
+}

@@ -1,0 +1,451 @@
+@inherits LayoutComponentBase
+@using HCS.Blazor.Client.Account
+@using HCS.Localization
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.AspNetCore.Components.Routing
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.Localization
+@using Volo.Abp.BlazoriseUI.Components
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject IStringLocalizer<HCSResource> Localizer
+@inject AccountProfileClient Account
+@implements IDisposable
+
+<div class="hcs-app-shell @(mobileNavOpen ? "hcs-app-shell--nav-open" : null)" @onkeydown="HandleKeyDown">
+    <a class="hcs-skip-link" href="#main-content" inert="@mobileNavOpen" aria-hidden="@mobileNavOpen.ToString().ToLowerInvariant()">@Localizer["Menu:SkipToContent"]</a>
+    <header class="hcs-header">
+        <div class="hcs-header__top">
+            <a class="hcs-brand" href="/workspace" aria-label="HCS - @Localizer["Menu:Workspace"]" inert="@mobileNavOpen" aria-hidden="@mobileNavOpen.ToString().ToLowerInvariant()">
+                <span class="hcs-brand__mark" aria-hidden="true"><img src="/images/logo/logo.png" alt="" width="100" height="70" /></span>
+                <span class="hcs-brand__text"><strong>HCS</strong><small>@Localizer["Brand:Subtitle"]</small></span>
+            </a>
+
+            <button class="hcs-nav-toggle"
+                    @ref="navToggle"
+                    type="button"
+                    aria-controls="hcs-primary-nav"
+                    aria-expanded="@mobileNavOpen.ToString().ToLowerInvariant()"
+                    aria-label="@(mobileNavOpen ? Localizer["Menu:CloseNav"] : Localizer["Menu:OpenNav"])"
+                    @onclick="ToggleMobileNav">
+                <i class="fa @(mobileNavOpen ? "fa-xmark" : "fa-bars")" aria-hidden="true"></i>
+            </button>
+
+            <div class="hcs-header__actions" inert="@mobileNavOpen" aria-hidden="@mobileNavOpen.ToString().ToLowerInvariant()">
+                <CultureSelector />
+                <button class="hcs-icon-button" type="button" data-hcs-notification-trigger="true" aria-label='@Localizer["Notifications:Title"]' @onclick="ToggleNotificationsAsync">
+                    <i class="fa fa-bell" aria-hidden="true"></i>
+                    @if (unreadNotifications > 0)
+                    {
+                        <span class="hcs-icon-badge">@unreadNotifications</span>
+                    }
+                </button>
+                <AuthorizeView Policy="Collaboration.Chat">
+                    <Authorized>
+                        <a class="hcs-icon-button hcs-icon-link" href="/chat" aria-label='@Localizer["Chat:HeaderShortcut"]'>
+                            <i class="fa fa-comments" aria-hidden="true"></i>
+                            @if (unreadChat > 0)
+                            {
+                                <span class="hcs-icon-badge">@unreadChat</span>
+                            }
+                        </a>
+                    </Authorized>
+                </AuthorizeView>
+                <AuthorizeView Context="authenticationState">
+                    <Authorized>
+                        <details class="hcs-user-menu" open="@userMenuOpen">
+                            <summary aria-label='@Localizer["Auth:OpenAccountMenu"]'
+                                     @onclick="ToggleUserMenu"
+                                     @onclick:preventDefault="true">
+                                <span class="hcs-user-menu__copy">
+                                    <strong>@DisplayName(authenticationState.User)</strong>
+                                    <small>@RoleName(authenticationState.User)</small>
+                                </span>
+                                @AvatarMarkup(authenticationState.User, large: false)
+                                <i class="fa fa-chevron-down" aria-hidden="true"></i>
+                            </summary>
+                            <div class="hcs-user-menu__panel">
+                                <div class="hcs-user-menu__identity">
+                                    @AvatarMarkup(authenticationState.User, large: true)
+                                    <span>
+                                        <strong>@DisplayName(authenticationState.User)</strong>
+                                        <small>@Email(authenticationState.User)</small>
+                                    </span>
+                                </div>
+                                <a href="/account" @onclick="CloseUserMenu"><i class="fa fa-user-gear" aria-hidden="true"></i> @Localizer["Auth:ManageAccount"]</a>
+                                <button class="hcs-user-menu__action hcs-user-menu__action--danger" type="button" @onclick="Logout" disabled="@isLoggingOut">
+                                    <i class="fa @(isLoggingOut ? "fa-spinner fa-spin" : "fa-right-from-bracket")" aria-hidden="true"></i>
+                                    @(isLoggingOut ? Localizer["Auth:LogoutProgress"] : Localizer["Auth:Logout"])
+                                </button>
+                                @if (!string.IsNullOrWhiteSpace(logoutError))
+                                {
+                                    <p class="hcs-user-menu__error" role="alert">@logoutError</p>
+                                }
+                            </div>
+                        </details>
+                    </Authorized>
+                </AuthorizeView>
+            </div>
+        </div>
+
+        <nav id="hcs-primary-nav"
+             class="hcs-top-nav @(mobileNavOpen ? "hcs-top-nav--open" : null)"
+             aria-label="@Localizer["Menu:PrimaryNav"]">
+            <NavLink class="hcs-top-nav__link" href="/workspace" Match="NavLinkMatch.All" @onclick="CloseMobileNav">
+                <i class="fa fa-house" aria-hidden="true"></i><span>@Localizer["Menu:Workspace"]</span>
+            </NavLink>
+
+            <div class="hcs-nav-menu @(IsExpanded("documents") ? "hcs-nav-menu--expanded" : null)"
+                 @onpointerenter="@(() => OnMenuPointerEnter("documents"))">
+                <button class="hcs-nav-menu__trigger" type="button"
+                        aria-expanded="@IsExpanded("documents").ToString().ToLowerInvariant()"
+                        aria-haspopup="true" @onmousedown:preventDefault
+                        @onclick="@(() => ToggleSection("documents"))">
+                    <i class="fa fa-file-lines" aria-hidden="true"></i><span>@Localizer["Menu:Documents"]</span>
+                    <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
+                </button>
+                <div class="hcs-nav-menu__panel" role="menu">
+                    <AuthorizeView Policy="Documents.View">
+                        <Authorized>
+                            <NavLink href="/manage-documents?sourceType=0" @onclick="CloseMobileNav"><i class="fa fa-folder-open" aria-hidden="true"></i>@Localizer["Menu:DocumentList"]</NavLink>
+                            <NavLink href="/manage-documents?sourceType=1" @onclick="CloseMobileNav"><i class="fa fa-user" aria-hidden="true"></i>@Localizer["Menu:MyDocuments"]</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <AuthorizeView Policy="Documents.Assign" Context="canAssignDocuments">
+                        <Authorized>
+                            <AuthorizeView Policy="Documents.View" Context="canViewDocuments">
+                                <Authorized><NavLink href="/manage-documents?sourceType=2" @onclick="CloseMobileNav"><i class="fa fa-inbox" aria-hidden="true"></i>@Localizer["Menu:DocumentsSentToMe"]</NavLink></Authorized>
+                            </AuthorizeView>
+                        </Authorized>
+                    </AuthorizeView>
+                    <AuthorizeView Policy="Documents.Signing.Execute">
+                        <Authorized><NavLink href="/document-signing" @onclick="CloseMobileNav"><i class="fa fa-signature" aria-hidden="true"></i>@Localizer["Menu:DocumentSigning"]</NavLink></Authorized>
+                    </AuthorizeView>
+                </div>
+            </div>
+
+            @Menu("workflows", "fa-arrow-trend-up", Localizer["Menu:Workflows"].Value,
+                ("/workflow-definitions", "fa-diagram-project", Localizer["Menu:WorkflowDefinitions"].Value),
+                ("/workflow-lists", "fa-code-branch", Localizer["Menu:WorkflowList"].Value),
+                ("/document-workflow-instances", "fa-folder-open", Localizer["Menu:WorkflowInstances"].Value))
+
+            @Menu("projects", "fa-diagram-project", Localizer["Menu:ProjectsAndTasks"].Value,
+                ("/projects", "fa-briefcase", Localizer["Menu:ProjectList"].Value),
+                ("/tasks", "fa-list-check", Localizer["Menu:Tasks"].Value))
+
+            <NavLink class="hcs-top-nav__link" href="/calendar-events" @onclick="CloseMobileNav">
+                <i class="fa fa-calendar-days" aria-hidden="true"></i><span>@Localizer["Menu:CalendarEvents"]</span>
+            </NavLink>
+
+            @Menu("surveys", "fa-chart-line", Localizer["Menu:Surveys"].Value,
+                ("/survey-sessions", "fa-clipboard-list", Localizer["Menu:SurveySessions"].Value),
+                ("/survey-results", "fa-square-poll-vertical", Localizer["Menu:SurveyResults"].Value))
+
+            <div class="hcs-nav-menu hcs-nav-menu--catalog @(IsExpanded("catalog") ? "hcs-nav-menu--expanded" : null)"
+                 @onpointerenter="@(() => OnMenuPointerEnter("catalog"))">
+                <button class="hcs-nav-menu__trigger"
+                        type="button"
+                        aria-expanded="@IsExpanded("catalog").ToString().ToLowerInvariant()"
+                        aria-haspopup="true"
+                        @onmousedown:preventDefault
+                        @onclick="@(() => ToggleSection("catalog"))">
+                    <i class="fa fa-layer-group" aria-hidden="true"></i><span>@Localizer["Menu:Catalogs"]</span>
+                    <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
+                </button>
+                <div class="hcs-nav-menu__panel hcs-nav-menu__panel--wide" role="menu">
+                    <AuthorizeView Policy="HCS.Organization.MasterData">
+                        <Authorized>
+                            <p class="hcs-nav-menu__label">@Localizer["Menu:DocumentCatalogs"]</p>
+                            <NavLink href="/document-types" @onclick="CloseMobileNav"><i class="fa fa-file-lines" aria-hidden="true"></i>@Localizer["Menu:DocumentTypes"]</NavLink>
+                            <NavLink href="/sectors" @onclick="CloseMobileNav"><i class="fa fa-folder-tree" aria-hidden="true"></i>@Localizer["Menu:Sectors"]</NavLink>
+                            <NavLink href="/urgency-levels" @onclick="CloseMobileNav"><i class="fa fa-bolt" aria-hidden="true"></i>@Localizer["Menu:UrgencyLevels"]</NavLink>
+                            <NavLink href="/confidentiality-levels" @onclick="CloseMobileNav"><i class="fa fa-lock" aria-hidden="true"></i>@Localizer["Menu:ConfidentialityLevels"]</NavLink>
+                            <NavLink href="/processing-methods" @onclick="CloseMobileNav"><i class="fa fa-gears" aria-hidden="true"></i>@Localizer["Menu:ProcessingMethods"]</NavLink>
+                            <NavLink href="/document-status" @onclick="CloseMobileNav"><i class="fa fa-circle-check" aria-hidden="true"></i>@Localizer["Menu:DocumentStatus"]</NavLink>
+                            <NavLink href="/signing-methods" @onclick="CloseMobileNav"><i class="fa fa-pen-nib" aria-hidden="true"></i>@Localizer["Menu:SigningMethods"]</NavLink>
+                            <NavLink href="/signature-settings" @onclick="CloseMobileNav"><i class="fa fa-key" aria-hidden="true"></i>@Localizer["Menu:SignatureSettings"]</NavLink>
+                            <NavLink href="/event-types" @onclick="CloseMobileNav"><i class="fa fa-star-o" aria-hidden="true"></i>@Localizer["Menu:EventTypes"]</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <AuthorizeView Policy="HCS.Organization.Departments">
+                        <Authorized>
+                            <p class="hcs-nav-menu__label">@Localizer["Menu:OrganizationCatalogs"]</p>
+                            <NavLink href="/departments" @onclick="CloseMobileNav"><i class="fa fa-building" aria-hidden="true"></i>@Localizer["Menu:Departments"]</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <AuthorizeView Policy="HCS.Organization.Units">
+                        <Authorized>
+                            <NavLink href="/unit-lists" @onclick="CloseMobileNav"><i class="fa fa-sitemap" aria-hidden="true"></i>@Localizer["Menu:Units"]</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <AuthorizeView Policy="HCS.Organization.Positions">
+                        <Authorized>
+                            <NavLink href="/positions" @onclick="CloseMobileNav"><i class="fa fa-id-badge" aria-hidden="true"></i>@Localizer["Menu:Positions"]</NavLink>
+                        </Authorized>
+                    </AuthorizeView>
+                    <p class="hcs-nav-menu__label">@Localizer["Menu:SurveyCatalogs"]</p>
+                    <NavLink href="/survey-locations" @onclick="CloseMobileNav"><i class="fa fa-location-dot" aria-hidden="true"></i>@Localizer["Menu:SurveyLocations"]</NavLink>
+                    <NavLink href="/survey-criterias" @onclick="CloseMobileNav"><i class="fa fa-list-ol" aria-hidden="true"></i>@Localizer["Menu:SurveyCriterias"]</NavLink>
+                    <p class="hcs-nav-menu__label">@Localizer["Menu:Reports"]</p>
+                    <NavLink href="/reports" @onclick="CloseMobileNav"><i class="fa fa-chart-column" aria-hidden="true"></i>@Localizer["Menu:Reports"]</NavLink>
+                </div>
+            </div>
+
+            <AuthorizeView Roles="admin">
+                <Authorized>
+                    @Menu("admin", "fa-screwdriver-wrench", Localizer["Menu:Administration"].Value,
+                        ("/administration", "fa-users-gear", Localizer["Menu:Users"].Value),
+                        ("/administration/roles", "fa-shield-halved", Localizer["Menu:Roles"].Value),
+                        ("/administration/languages", "fa-language", Localizer["Menu:Languages"].Value),
+                        ("/administration/audit-logs", "fa-clipboard-list", Localizer["Menu:AuditLogs"].Value))
+                </Authorized>
+            </AuthorizeView>
+
+            <AuthorizeView Policy="Collaboration.Chat">
+                <Authorized>
+                    <NavLink class="hcs-top-nav__link" href="/chat" @onclick="CloseMobileNav">
+                        <i class="fa fa-comments" aria-hidden="true"></i><span>@Localizer["Menu:Chat"]</span>
+                    </NavLink>
+                </Authorized>
+            </AuthorizeView>
+        </nav>
+
+    </header>
+
+    @if (mobileNavOpen || expandedSection is not null || userMenuOpen)
+    {
+        <button class="hcs-nav-backdrop @(mobileNavOpen ? "hcs-nav-backdrop--drawer" : "hcs-nav-backdrop--menu")" type="button" aria-label="@Localizer["Menu:CloseNav"]" @onclick="CloseMobileNavAndFocus"></button>
+    }
+
+    <main id="main-content" class="hcs-main-content" inert="@mobileNavOpen" aria-hidden="@mobileNavOpen.ToString().ToLowerInvariant()">@Body</main>
+    <div class="hcs-app-shell__notifications" inert="@mobileNavOpen" aria-hidden="@mobileNavOpen.ToString().ToLowerInvariant()">
+        <AuthorizeView>
+            <Authorized>
+                <NotificationToast @ref="notificationToast" UnreadCountChanged="OnUnreadChanged" ChatUnreadCountChanged="OnChatUnreadChanged" />
+            </Authorized>
+        </AuthorizeView>
+        <UiNotificationAlert />
+        <UiMessageAlert />
+    </div>
+</div>
+
+@code {
+    private bool mobileNavOpen;
+    private ElementReference navToggle;
+    private bool userMenuOpen;
+    private string? expandedSection;
+    private bool isLoggingOut;
+    private string? logoutError;
+    private NotificationToast? notificationToast;
+    private int unreadNotifications;
+    private int unreadChat;
+    private string? avatarDataUrl;
+
+    protected override void OnInitialized()
+    {
+        Navigation.LocationChanged += OnLocationChanged;
+        Account.AvatarChanged += OnAvatarChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await ReloadAvatarQuietAsync();
+        }
+    }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        userMenuOpen = false;
+        var wasMobileNavOpen = mobileNavOpen;
+        mobileNavOpen = false;
+        expandedSection = null;
+        _ = ReloadAvatarQuietAsync();
+        _ = InvokeAsync(async () =>
+        {
+            if (wasMobileNavOpen)
+            {
+                await navToggle.FocusAsync();
+            }
+
+            StateHasChanged();
+        });
+    }
+
+    private async Task ReloadAvatarQuietAsync()
+    {
+        try
+        {
+            var content = await Account.TryGetAvatarAsync();
+            avatarDataUrl = content?.ToDataUrl();
+            await InvokeAsync(StateHasChanged);
+        }
+        catch
+        {
+            // Keep initials fallback when avatar cannot be loaded.
+        }
+    }
+
+    public void Dispose()
+    {
+        Navigation.LocationChanged -= OnLocationChanged;
+        Account.AvatarChanged -= OnAvatarChanged;
+    }
+
+    private void OnAvatarChanged(object? sender, EventArgs args) => _ = ReloadAvatarQuietAsync();
+
+    private void ToggleUserMenu() => userMenuOpen = !userMenuOpen;
+
+    private void CloseUserMenu() => userMenuOpen = false;
+
+    private RenderFragment AvatarMarkup(System.Security.Claims.ClaimsPrincipal user, bool large) => __builder =>
+    {
+        var css = large ? "hcs-avatar hcs-avatar--large" : "hcs-avatar";
+        if (!string.IsNullOrWhiteSpace(avatarDataUrl))
+        {
+            <img class="@css hcs-avatar--image" src="@avatarDataUrl" alt="" aria-hidden="true" />
+        }
+        else
+        {
+            <span class="@css" aria-hidden="true">@Initials(user)</span>
+        }
+    };
+
+    private RenderFragment Menu(string key, string icon, string label, params (string Href, string Icon, string Text)[] items) => __builder =>
+    {
+        <div class="hcs-nav-menu @(IsExpanded(key) ? "hcs-nav-menu--expanded" : null)"
+             @onpointerenter="@(() => OnMenuPointerEnter(key))">
+            <button class="hcs-nav-menu__trigger"
+                    type="button"
+                    aria-expanded="@IsExpanded(key).ToString().ToLowerInvariant()"
+                    aria-haspopup="true"
+                    @onmousedown:preventDefault
+                    @onclick="@(() => ToggleSection(key))">
+                <i class="fa @icon" aria-hidden="true"></i><span>@label</span>
+                <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
+            </button>
+            <div class="hcs-nav-menu__panel" role="menu">
+                @foreach (var item in items)
+                {
+                    <a href="@item.Href" class="@(IsMenuHrefActive(item.Href) ? "active" : null)" @onclick="CloseMobileNav">
+                        <i class="fa @item.Icon" aria-hidden="true"></i>@item.Text
+                    </a>
+                }
+            </div>
+        </div>
+    };
+
+    private bool IsExpanded(string key) => string.Equals(expandedSection, key, StringComparison.Ordinal);
+
+    private void ToggleSection(string key) =>
+        expandedSection = IsExpanded(key) ? null : key;
+
+    private void OnMenuPointerEnter(string key)
+    {
+        // Close a previously click-expanded sibling when hovering another parent.
+        if (expandedSection != null && !IsExpanded(key))
+        {
+            expandedSection = null;
+        }
+    }
+
+    private Task ToggleNotificationsAsync() => notificationToast?.TogglePanelAsync() ?? Task.CompletedTask;
+    private void OnUnreadChanged(int count)
+    {
+        unreadNotifications = count;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void OnChatUnreadChanged(int count)
+    {
+        unreadChat = count;
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void ToggleMobileNav()
+    {
+        mobileNavOpen = !mobileNavOpen;
+        if (!mobileNavOpen)
+        {
+            expandedSection = null;
+        }
+    }
+
+    private async Task CloseMobileNav()
+    {
+        var wasMobileNavOpen = mobileNavOpen;
+        userMenuOpen = false;
+        mobileNavOpen = false;
+        expandedSection = null;
+
+        if (wasMobileNavOpen)
+        {
+            await navToggle.FocusAsync();
+        }
+    }
+
+    private async Task HandleKeyDown(KeyboardEventArgs args)
+    {
+        if (!string.Equals(args.Key, "Escape", StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        if (mobileNavOpen || expandedSection is not null || userMenuOpen)
+        {
+            await CloseMobileNav();
+        }
+    }
+
+    private async Task CloseMobileNavAndFocus()
+    {
+        await CloseMobileNav();
+    }
+
+    private bool IsMenuHrefActive(string href)
+    {
+        var current = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('#')[0];
+        if (href.Contains("sourceType=", StringComparison.OrdinalIgnoreCase))
+        {
+            if (current.Contains("/my-documents", StringComparison.OrdinalIgnoreCase))
+                return href.Contains("sourceType=1", StringComparison.OrdinalIgnoreCase);
+            return string.Equals(current, href, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var hrefPath = href.Split('?', '#')[0].TrimEnd('/');
+        var currentPath = current.Split('?', '#')[0].TrimEnd('/');
+        return string.Equals(currentPath, hrefPath, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void Logout()
+    {
+        if (isLoggingOut)
+        {
+            return;
+        }
+
+        isLoggingOut = true;
+        logoutError = null;
+        try
+        {
+            var loginUrl = new Uri(new Uri(Navigation.BaseUri, UriKind.Absolute), "login").AbsoluteUri;
+            Navigation.NavigateTo(BffLogoutUrlBuilder.Build(Configuration, loginUrl), forceLoad: true);
+        }
+        catch
+        {
+            isLoggingOut = false;
+            logoutError = Localizer["Auth:LogoutError"];
+        }
+    }
+
+    private string DisplayName(System.Security.Claims.ClaimsPrincipal user) =>
+        user.Identity?.Name ?? user.FindFirst("preferred_username")?.Value ?? Localizer["Auth:UserFallback"];
+    private string Email(System.Security.Claims.ClaimsPrincipal user) => user.FindFirst("email")?.Value ?? Localizer["Auth:AccountFallback"];
+    private string RoleName(System.Security.Claims.ClaimsPrincipal user) => user.IsInRole("admin") ? Localizer["Auth:AdminRole"] : Localizer["Auth:UserRole"];
+    private string Initials(System.Security.Claims.ClaimsPrincipal user)
+    {
+        var value = DisplayName(user).Trim();
+        return string.IsNullOrEmpty(value) ? "HC" : value[..Math.Min(2, value.Length)].ToUpperInvariant();
+    }
+}

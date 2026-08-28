@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="HCS.WorkManagementService.Contracts/HCS.WorkManagementService.Contracts.csproj" />
+    <Project Path="HCS.WorkManagementService/HCS.WorkManagementService.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="HCS.WorkManagementService.Tests/HCS.WorkManagementService.Tests.csproj" />
+  </Folder>
+</Solution>

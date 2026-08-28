@@ -1,0 +1,37 @@
+@inherits HCSComponentBase
+
+<div class="hcs-wizard-footer">
+    <Button Color="Color.Secondary" Clicked="Previous" Disabled="@IsFirst">
+        <i class="fa fa-arrow-left me-1"></i> @L["Work:Previous"]
+    </Button>
+    <AuthorizeView Policy="Documents.Workflow.Manage">
+        <Authorized>
+            <Button Color="Color.Success" Clicked="SaveAsync" Disabled="@SaveDisabled">
+                <i class="fa fa-save me-1"></i> @L["Catalog:SaveChanges"]
+            </Button>
+        </Authorized>
+    </AuthorizeView>
+    <Button Color="Color.Primary" Clicked="Next" Disabled="@IsLast">
+        @L["Work:Next"] <i class="fa fa-arrow-right ms-1"></i>
+    </Button>
+</div>
+@code {
+    [Parameter] public string SelectedStep { get; set; } = "step1";
+    [Parameter] public EventCallback<string> SelectedStepChanged { get; set; }
+    [Parameter] public EventCallback OnSave { get; set; }
+    [Parameter] public bool SaveDisabled { get; set; }
+
+    private static readonly string[] Steps = ["step1", "step2", "step3"];
+    private bool IsFirst => SelectedStep == "step1";
+    private bool IsLast => SelectedStep == "step3";
+
+    private Task Previous() => Move(-1);
+    private Task Next() => Move(1);
+    private Task SaveAsync() => OnSave.InvokeAsync();
+    private Task Move(int delta)
+    {
+        var index = Array.IndexOf(Steps, SelectedStep);
+        var next = Math.Clamp(index + delta, 0, Steps.Length - 1);
+        return SelectedStepChanged.InvokeAsync(Steps[next]);
+    }
+}

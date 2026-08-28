@@ -1,0 +1,53 @@
+name: hcs-infra
+
+# Baota Panel: /www/server/panel/data/compose/hcs-infra
+# Redis + RabbitMQ trên server apps (10.17.227.58).
+#
+# Chạy TRƯỚC hcs/ nếu tách 2 project Baota. Khi đó trong hcs/.env:
+#   HCS_REDIS_HOST=host.docker.internal
+#   HCS_RABBITMQ_HOST=host.docker.internal
+#
+# Khuyến nghị: dùng redis+rabbit gộp trong hcs/docker-compose.yml (một project).
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${HCS_REDIS_PASSWORD:?set HCS_REDIS_PASSWORD}
+      - --protected-mode
+      - "yes"
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${HCS_REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${HCS_RABBITMQ_USER:?set HCS_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${HCS_RABBITMQ_PASSWORD:?set HCS_RABBITMQ_PASSWORD}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  redis-data:
+  rabbitmq-data:

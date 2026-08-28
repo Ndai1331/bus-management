@@ -1,0 +1,51 @@
+@typeparam TValue
+@namespace HCS.Blazor.Client.Components
+
+<Addons Class="hcs-datepicker">
+    <Addon AddonType="AddonType.Body">
+        <DatePicker @ref="picker"
+                    TValue="TValue"
+                    Value="Value"
+                    ValueChanged="ValueChanged"
+                    InputMode="InputMode"
+                    SelectionMode="SelectionMode"
+                    DisplayFormat="@ResolvedDisplayFormat"
+                    TimeAs24hr="ResolvedTimeAs24hr"
+                    ShowTodayButton="ShowTodayButton"
+                    ShowClearButton="ShowClearButton"
+                    Disabled="Disabled" />
+    </Addon>
+</Addons>
+
+@code {
+    private const string DefaultDateTimeDisplayFormat = "dd/MM/yyyy HH:mm";
+
+    private DatePicker<TValue>? picker;
+
+    [Parameter] public TValue? Value { get; set; }
+    [Parameter] public EventCallback<TValue> ValueChanged { get; set; }
+    [Parameter] public DateInputMode InputMode { get; set; } = DateInputMode.Date;
+    [Parameter] public DateInputSelectionMode SelectionMode { get; set; } = DateInputSelectionMode.Single;
+    [Parameter] public string? DisplayFormat { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public bool Disabled { get; set; }
+    [Parameter] public bool ShowTodayButton { get; set; }
+    [Parameter] public bool ShowClearButton { get; set; }
+    /// <summary>When null, defaults to true for DateTime mode.</summary>
+    [Parameter] public bool? TimeAs24hr { get; set; }
+
+    private string? ResolvedDisplayFormat =>
+        DisplayFormat
+        ?? (InputMode == DateInputMode.DateTime ? DefaultDateTimeDisplayFormat : null);
+
+    private bool ResolvedTimeAs24hr =>
+        TimeAs24hr ?? InputMode == DateInputMode.DateTime;
+
+    private async Task OpenAsync()
+    {
+        if (picker is not null)
+        {
+            await picker.ToggleAsync();
+        }
+    }
+}

@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="HCS.OrganizationService/HCS.OrganizationService.csproj" />
+  <Project Path="HCS.OrganizationService.Host/HCS.OrganizationService.Host.csproj" />
+  <Project Path="HCS.OrganizationService.Tests/HCS.OrganizationService.Tests.csproj" />
+</Solution>

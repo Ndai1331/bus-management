@@ -1,0 +1,6 @@
+@page "/unit-lists"
+@attribute [Authorize(Policy = "HCS.Organization.Units")]
+@inherits HCSComponentBase
+
+<PageTitle>@L["Catalog:UnitTitle"] · HCS</PageTitle>
+<OrganizationCatalog Kind="OrganizationCatalogKind.Unit" />

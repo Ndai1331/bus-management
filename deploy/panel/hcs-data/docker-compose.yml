@@ -1,0 +1,93 @@
+name: hcs-data
+
+# Baota Panel: /www/server/panel/data/compose/hcs-data
+#   docker compose --env-file .env up -d
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${HCS_POSTGRES_USER:-hcs}
+      POSTGRES_PASSWORD: ${HCS_POSTGRES_PASSWORD:?set HCS_POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    command:
+      - postgres
+      - -c
+      - listen_addresses=*
+      - -c
+      - hba_file=/etc/hcs/pg_hba.conf
+    ports:
+      - "${HCS_DATA_HOST}:5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./postgres/pg_hba.conf:/etc/hcs/pg_hba.conf:ro
+      - ./postgres/init-databases.sql:/docker-entrypoint-initdb.d/10-hcs-databases.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HCS_POSTGRES_USER:-hcs} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${HCS_REDIS_PASSWORD:?set HCS_REDIS_PASSWORD}
+      - --protected-mode
+      - "yes"
+    ports:
+      - "${HCS_DATA_HOST}:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${HCS_REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${HCS_RABBITMQ_USER:?set HCS_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${HCS_RABBITMQ_PASSWORD:?set HCS_RABBITMQ_PASSWORD}
+    ports:
+      - "${HCS_DATA_HOST}:5672:5672"
+      - "${HCS_DATA_HOST}:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${HCS_MINIO_ROOT_USER:?set HCS_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${HCS_MINIO_ROOT_PASSWORD:?set HCS_MINIO_ROOT_PASSWORD}
+    ports:
+      - "${HCS_DATA_HOST}:9000:9000"
+      - "${HCS_DATA_HOST}:9001:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:

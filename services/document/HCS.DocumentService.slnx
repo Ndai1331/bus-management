@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="HCS.DocumentService.Contracts/HCS.DocumentService.Contracts.csproj" />
+    <Project Path="HCS.DocumentService/HCS.DocumentService.csproj" />
+  </Folder>
+  <Folder Name="/test/">
+    <Project Path="HCS.DocumentService.Tests/HCS.DocumentService.Tests.csproj" />
+  </Folder>
+</Solution>

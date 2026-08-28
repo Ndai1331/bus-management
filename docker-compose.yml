@@ -1,0 +1,242 @@
+name: hcs-community
+
+x-hcs-image: &hcs-image
+  build:
+    context: .
+    dockerfile: deploy/docker/Dockerfile
+  restart: unless-stopped
+  volumes: &certificate-volumes
+    - ${HCS_OPENIDDICT_PFX}:/var/run/hcs-certs/openiddict.pfx:ro
+    - ${HCS_DATAPROTECTION_PFX}:/var/run/hcs-certs/dataprotection.pfx:ro
+  environment: &common-env
+    ASPNETCORE_ENVIRONMENT: Production
+    ASPNETCORE_URLS: http://+:8080
+    ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    Urls: http://+:8080
+    ConnectionStrings__Default: Host=postgres;Port=5432;Database=hcs_identity;Username=hcs;Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__Organization: Host=postgres;Port=5432;Database=hcs_organization;Username=hcs;Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__DocumentService: Host=postgres;Port=5432;Database=hcs_document;Username=hcs;Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__WorkManagement: Host=postgres;Port=5432;Database=hcs_work;Username=hcs;Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__Collaboration: Host=postgres;Port=5432;Database=hcs_collaboration;Username=hcs;Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__BusManagement: Host=postgres;Port=5432;Database=hcs_bus_management;Username=hcs;Password=${HCS_POSTGRES_PASSWORD}
+    Redis__Configuration: redis:6379
+    DataProtection__Redis: redis:6379
+    DataProtection__Certificate__Path: /var/run/hcs-certs/dataprotection.pfx
+    DataProtection__Certificate__Password: ${HCS_DATAPROTECTION_PFX_PASSWORD}
+    DataProtection__CertificatePath: /var/run/hcs-certs/dataprotection.pfx
+    DataProtection__CertificatePassword: ${HCS_DATAPROTECTION_PFX_PASSWORD}
+    AuthServer__CertificatePath: /var/run/hcs-certs/openiddict.pfx
+    AuthServer__CertificatePassword: ${HCS_OPENIDDICT_PFX_PASSWORD}
+    RabbitMQ__Connections__Default__HostName: rabbitmq
+    RabbitMQ__Connections__Default__UserName: ${HCS_RABBITMQ_USER}
+    RabbitMQ__Connections__Default__Password: ${HCS_RABBITMQ_PASSWORD}
+    Minio__EndPoint: minio:9000
+    Minio__AccessKey: ${HCS_MINIO_ROOT_USER}
+    Minio__SecretKey: ${HCS_MINIO_ROOT_PASSWORD}
+    Minio__WithSSL: "false"
+    Minio__CreateBucketIfNotExists: "true"
+  depends_on:
+    postgres: { condition: service_healthy }
+    redis: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
+    minio: { condition: service_healthy }
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: hcs
+      POSTGRES_PASSWORD: ${HCS_POSTGRES_PASSWORD}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./etc/docker-compose/postgres/init-databases.sql:/docker-entrypoint-initdb.d/10-hcs-databases.sql:ro
+    healthcheck: { test: ["CMD-SHELL", "pg_isready -U hcs -d postgres"], interval: 5s, timeout: 5s, retries: 30 }
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes: ["redis-data:/data"]
+    healthcheck: { test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 3s, retries: 30 }
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${HCS_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${HCS_RABBITMQ_PASSWORD}
+    volumes: ["rabbitmq-data:/var/lib/rabbitmq"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"], interval: 10s, timeout: 5s, retries: 30 }
+
+  minio:
+    image: minio/minio:RELEASE.2025-07-23T15-54-02Z
+    restart: unless-stopped
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${HCS_MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${HCS_MINIO_ROOT_PASSWORD}
+    volumes: ["minio-data:/data"]
+    healthcheck: { test: ["CMD", "mc", "ready", "local"], interval: 5s, timeout: 5s, retries: 30 }
+
+  db-migrator:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: src/HCS.DbMigrator/HCS.DbMigrator.csproj, APP_DLL: HCS.DbMigrator.dll } }
+    restart: "no"
+    environment:
+      <<: *common-env
+      Identity__AdminPassword: ${HCS_ADMIN_PASSWORD}
+      OpenIddict__Applications__HCS_App__ClientSecret: ${HCS_GATEWAY_CLIENT_SECRET}
+      OpenIddict__Applications__HCS_App__RootUrl: https://hcs.localhost/
+      OpenIddict__Applications__HCS_App__PostLogoutRootUrl: https://hcs.localhost/
+
+  auth-server:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: apps/auth-server/HCS.AuthServer/HCS.AuthServer.csproj, APP_DLL: HCS.AuthServer.dll } }
+    environment:
+      <<: *common-env
+      App__SelfUrl: https://auth.hcs.localhost
+      App__ClientUrl: https://hcs.localhost
+      App__RedirectAllowedUrls: https://hcs.localhost,https://auth.hcs.localhost
+      AuthServer__Authority: https://auth.hcs.localhost
+      # Token refresh is sent by WebGateway over the private Docker network.
+      # Public browser traffic remains terminated as HTTPS by Caddy.
+      AuthServer__RequireHttpsMetadata: "false"
+      Authentication__Keycloak__Enabled: "true"
+      # Browser OIDC redirects must use localhost; metadata is fetched via host.docker.internal.
+      Authentication__Keycloak__Authority: http://localhost:5110/realms/bd
+      Authentication__Keycloak__MetadataAddress: http://host.docker.internal:5110/realms/bd/.well-known/openid-configuration
+      Authentication__Keycloak__ClientId: hcs-free-auth
+      Authentication__Keycloak__ClientSecret: ${HCS_KEYCLOAK_CLIENT_SECRET}
+      Authentication__Keycloak__RequireHttpsMetadata: "false"
+    extra_hosts: ["host.docker.internal:host-gateway"]
+
+  web-gateway:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: gateways/web/HCS.WebGateway/HCS.WebGateway.csproj, APP_DLL: HCS.WebGateway.dll } }
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    environment:
+      <<: *common-env
+      Authentication__Authority: https://auth.hcs.localhost
+      Authentication__TokenEndpoint: http://auth-server:8080/connect/token
+      Authentication__ClientId: HCS_App
+      Authentication__ClientSecret: ${HCS_GATEWAY_CLIENT_SECRET}
+      Authentication__RequireHttpsMetadata: "true"
+      Authentication__AllowUntrustedBackchannelCertificate: "true"
+      Bff__PublicOrigin: https://hcs.localhost
+      App__CorsOrigins__0: https://hcs.localhost
+      ReverseProxy__Clusters__Platform__Destinations__primary__Address: http://platform:8080/
+      ReverseProxy__Clusters__Organization__Destinations__primary__Address: http://organization:8080/
+      ReverseProxy__Clusters__Document__Destinations__primary__Address: http://document:8080/
+      ReverseProxy__Clusters__WorkManagement__Destinations__primary__Address: http://work-management:8080/
+      ReverseProxy__Clusters__Collaboration__Destinations__primary__Address: http://collaboration:8080/
+      ReverseProxy__Clusters__BusManagement__Destinations__primary__Address: http://bus-management:8080/
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+
+  blazor:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: src/HCS.Blazor/HCS.Blazor.csproj, APP_DLL: HCS.Blazor.dll, PUBLISH_PROPERTIES: /p:BlazorEnableCompression=false } }
+    environment:
+      <<: *common-env
+      App__SelfUrl: https://hcs.localhost
+      Bff__PublicOrigin: https://hcs.localhost
+      RemoteServices__Default__BaseUrl: http://web-gateway:8080/
+      DataProtection__Redis: redis:6379
+
+  platform:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/platform/HCS.PlatformService/HCS.PlatformService.csproj, APP_DLL: HCS.PlatformService.dll } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://auth.hcs.localhost
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "true"
+      RabbitMQ__EventBus__ClientName: HCS.PlatformService
+      RabbitMQ__EventBus__ExchangeName: hcs
+  organization:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/organization/HCS.OrganizationService.Host/HCS.OrganizationService.Host.csproj, APP_DLL: HCS.OrganizationService.Host.dll } }
+    environment:
+      <<: *common-env
+      # Tokens are issued with the public issuer. Resolve discovery through Caddy
+      # as well, so JWT issuer validation uses the same canonical address.
+      AuthServer__Authority: https://auth.hcs.localhost
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "true"
+      RabbitMQ__EventBus__ClientName: HCS.OrganizationService
+      RabbitMQ__EventBus__ExchangeName: hcs
+  document:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/document/HCS.DocumentService/HCS.DocumentService.csproj, APP_DLL: HCS.DocumentService.dll, INSTALL_LIBREOFFICE: "true" } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://auth.hcs.localhost
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "true"
+      DataProtection__KeysPath: /var/lib/hcs-data-protection
+      Services__Platform__BaseUrl: http://platform:8080/
+      Services__Organization__BaseUrl: http://organization:8080/
+    volumes:
+      - ${HCS_OPENIDDICT_PFX}:/var/run/hcs-certs/openiddict.pfx:ro
+      - ${HCS_DATAPROTECTION_PFX}:/var/run/hcs-certs/dataprotection.pfx:ro
+      - document-data-protection:/var/lib/hcs-data-protection
+  work-management:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/work-management/HCS.WorkManagementService/HCS.WorkManagementService.csproj, APP_DLL: HCS.WorkManagementService.dll } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://auth.hcs.localhost
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "true"
+  collaboration:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/collaboration/HCS.CollaborationService/HCS.CollaborationService.csproj, APP_DLL: HCS.CollaborationService.dll } }
+    environment:
+      <<: *common-env
+      # Tokens are issued with the public issuer. Resolve discovery through Caddy
+      # so JWT issuer validation matches https://auth.hcs.localhost/ on the token.
+      AuthServer__Authority: https://auth.hcs.localhost
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "true"
+      App__CorsOrigins: https://hcs.localhost
+      RabbitMQ__EventBus__ClientName: HCS_Collaboration
+      RabbitMQ__EventBus__ExchangeName: hcs
+
+  bus-management:
+    <<: *hcs-image
+    build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj, APP_DLL: HCS.BusManagementService.dll } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://auth.hcs.localhost
+      AuthServer__Audience: HCS.BusManagementService
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "true"
+      RabbitMQ__EventBus__ClientName: HCS.BusManagementService
+      RabbitMQ__EventBus__ExchangeName: hcs
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    depends_on: { web-gateway: { condition: service_started }, blazor: { condition: service_started }, auth-server: { condition: service_started } }
+    ports: ["443:443"]
+    volumes:
+      - ./deploy/docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      default:
+        aliases: [auth.hcs.localhost]
+
+volumes:
+  postgres-data:
+  redis-data:
+  rabbitmq-data:
+  minio-data:
+  caddy-data:
+  caddy-config:
+  document-data-protection:

@@ -1,0 +1,247 @@
+name: hcs-apps
+
+# Baota Panel: /www/server/panel/data/compose/hcs
+# Pull-only images from Docker Hub (no repo build context).
+
+x-hcs-image: &hcs-image
+  restart: unless-stopped
+  extra_hosts: &public-hosts
+    - "host.docker.internal:host-gateway"
+    - "${HCS_PUBLIC_HOST}:host-gateway"
+    - "${HCS_API_PUBLIC_HOST}:host-gateway"
+    - "${HCS_AUTH_PUBLIC_HOST}:host-gateway"
+    - "${HCS_SSO_PUBLIC_HOST}:host-gateway"
+  volumes: &certificate-volumes
+    - ${HCS_OPENIDDICT_PFX}:/var/run/hcs-certs/openiddict.pfx:ro
+    - ${HCS_DATAPROTECTION_PFX}:/var/run/hcs-certs/dataprotection.pfx:ro
+  environment: &common-env
+    ASPNETCORE_ENVIRONMENT: Production
+    ASPNETCORE_URLS: http://+:8080
+    ASPNETCORE_FORWARDEDHEADERS_ENABLED: "true"
+    Urls: http://+:8080
+    ConnectionStrings__Default: Host=${HCS_POSTGRES_HOST:-${HCS_DATA_HOST}};Port=5432;Database=hcs_identity;Username=${HCS_POSTGRES_USER:-hcs};Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__Organization: Host=${HCS_POSTGRES_HOST:-${HCS_DATA_HOST}};Port=5432;Database=hcs_organization;Username=${HCS_POSTGRES_USER:-hcs};Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__DocumentService: Host=${HCS_POSTGRES_HOST:-${HCS_DATA_HOST}};Port=5432;Database=hcs_document;Username=${HCS_POSTGRES_USER:-hcs};Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__WorkManagement: Host=${HCS_POSTGRES_HOST:-${HCS_DATA_HOST}};Port=5432;Database=hcs_work;Username=${HCS_POSTGRES_USER:-hcs};Password=${HCS_POSTGRES_PASSWORD}
+    ConnectionStrings__Collaboration: Host=${HCS_POSTGRES_HOST:-${HCS_DATA_HOST}};Port=5432;Database=hcs_collaboration;Username=${HCS_POSTGRES_USER:-hcs};Password=${HCS_POSTGRES_PASSWORD}
+    Redis__Configuration: ${HCS_REDIS_HOST:-redis}:6379,password=${HCS_REDIS_PASSWORD},ssl=False
+    DataProtection__Redis: ${HCS_REDIS_HOST:-redis}:6379,password=${HCS_REDIS_PASSWORD},ssl=False
+    DataProtection__Certificate__Path: /var/run/hcs-certs/dataprotection.pfx
+    DataProtection__Certificate__Password: ${HCS_DATAPROTECTION_PFX_PASSWORD}
+    DataProtection__CertificatePath: /var/run/hcs-certs/dataprotection.pfx
+    DataProtection__CertificatePassword: ${HCS_DATAPROTECTION_PFX_PASSWORD}
+    AuthServer__CertificatePath: /var/run/hcs-certs/openiddict.pfx
+    AuthServer__CertificatePassword: ${HCS_OPENIDDICT_PFX_PASSWORD}
+    RabbitMQ__Connections__Default__HostName: ${HCS_RABBITMQ_HOST:-rabbitmq}
+    RabbitMQ__Connections__Default__UserName: ${HCS_RABBITMQ_USER}
+    RabbitMQ__Connections__Default__Password: ${HCS_RABBITMQ_PASSWORD}
+    Minio__EndPoint: ${HCS_MINIO_HOST:-${HCS_DATA_HOST}}:9000
+    Minio__AccessKey: ${HCS_MINIO_ROOT_USER}
+    Minio__SecretKey: ${HCS_MINIO_ROOT_PASSWORD}
+    Minio__WithSSL: "false"
+    Minio__CreateBucketIfNotExists: "true"
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${HCS_REDIS_PASSWORD:?set HCS_REDIS_PASSWORD}
+      - --protected-mode
+      - "yes"
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${HCS_REDIS_PASSWORD}", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  rabbitmq:
+    image: rabbitmq:4.1-management-alpine
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: ${HCS_RABBITMQ_USER:?set HCS_RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${HCS_RABBITMQ_PASSWORD:?set HCS_RABBITMQ_PASSWORD}
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  db-migrator:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:db-migrator
+    restart: "no"
+    depends_on:
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+    environment:
+      <<: *common-env
+      Identity__AdminPassword: ${HCS_ADMIN_PASSWORD}
+      OpenIddict__Applications__HCS_App__ClientSecret: ${HCS_GATEWAY_CLIENT_SECRET}
+      OpenIddict__Applications__HCS_App__RootUrl: https://${HCS_API_PUBLIC_HOST}
+      OpenIddict__Applications__HCS_App__PostLogoutRootUrl: https://${HCS_PUBLIC_HOST}
+
+  auth-server:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:auth-server
+    ports: ["127.0.0.1:8083:8080"]
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      App__SelfUrl: https://${HCS_AUTH_PUBLIC_HOST}
+      App__ClientUrl: https://${HCS_PUBLIC_HOST}
+      App__RedirectAllowedUrls: https://${HCS_PUBLIC_HOST},https://${HCS_API_PUBLIC_HOST},https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__RequireHttpsMetadata: "false"
+      Authentication__Keycloak__Enabled: "true"
+      Authentication__Keycloak__Authority: https://${HCS_SSO_PUBLIC_HOST}/realms/bd
+      Authentication__Keycloak__ClientId: hcs-free-auth
+      Authentication__Keycloak__ClientSecret: ${HCS_KEYCLOAK_CLIENT_SECRET}
+      Authentication__Keycloak__RequireHttpsMetadata: "true"
+
+  web-gateway:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:web-gateway
+    ports: ["127.0.0.1:8082:8080"]
+    environment:
+      <<: *common-env
+      Authentication__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      Authentication__TokenEndpoint: http://auth-server:8080/connect/token
+      Authentication__ClientId: HCS_App
+      Authentication__ClientSecret: ${HCS_GATEWAY_CLIENT_SECRET}
+      Authentication__RequireHttpsMetadata: "true"
+      Authentication__AllowUntrustedBackchannelCertificate: "false"
+      Bff__PublicOrigin: https://${HCS_API_PUBLIC_HOST}
+      Bff__CookieDomain: ${Bff__CookieDomain}
+      App__CorsOrigins__0: https://${HCS_PUBLIC_HOST}
+      App__CorsOrigins__1: https://${HCS_API_PUBLIC_HOST}
+      ReverseProxy__Clusters__Platform__Destinations__primary__Address: http://platform:8080/
+      ReverseProxy__Clusters__Organization__Destinations__primary__Address: http://organization:8080/
+      ReverseProxy__Clusters__Document__Destinations__primary__Address: http://document:8080/
+      ReverseProxy__Clusters__WorkManagement__Destinations__primary__Address: http://work-management:8080/
+      ReverseProxy__Clusters__Collaboration__Destinations__primary__Address: http://collaboration:8080/
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+
+  blazor:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:blazor
+    ports: ["127.0.0.1:8081:8080"]
+    volumes:
+      - ./config/blazor-client.appsettings.json:/app/wwwroot/_content/HCS.Blazor.Client/appsettings.json:ro
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      App__SelfUrl: https://${HCS_PUBLIC_HOST}
+      Bff__PublicOrigin: https://${HCS_API_PUBLIC_HOST}
+      Bff__CookieDomain: ${Bff__CookieDomain}
+      RemoteServices__Default__BaseUrl: https://${HCS_API_PUBLIC_HOST}/
+      DataProtection__Redis: ${HCS_REDIS_HOST:-redis}:6379,password=${HCS_REDIS_PASSWORD},ssl=False
+
+  platform:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:platform
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "false"
+
+  organization:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:organization
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "false"
+      RabbitMQ__EventBus__ClientName: HCS.OrganizationService
+      RabbitMQ__EventBus__ExchangeName: hcs
+
+  document:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:document
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "false"
+      DataProtection__KeysPath: /var/lib/hcs-data-protection
+      Services__Platform__BaseUrl: http://platform:8080/
+      Services__Organization__BaseUrl: http://organization:8080/
+    volumes:
+      - ${HCS_OPENIDDICT_PFX}:/var/run/hcs-certs/openiddict.pfx:ro
+      - ${HCS_DATAPROTECTION_PFX}:/var/run/hcs-certs/dataprotection.pfx:ro
+      - document-data-protection:/var/lib/hcs-data-protection
+
+  work-management:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:work-management
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "false"
+
+  collaboration:
+    <<: *hcs-image
+    image: ${HCS_DOCKER_REGISTRY:-longnguyen1331/hanhchinhso}:collaboration
+    depends_on: { db-migrator: { condition: service_completed_successfully } }
+    environment:
+      <<: *common-env
+      AuthServer__Authority: https://${HCS_AUTH_PUBLIC_HOST}
+      AuthServer__Audience: HCS
+      AuthServer__RequireHttpsMetadata: "true"
+      AuthServer__AllowUntrustedBackchannelCertificate: "false"
+      App__CorsOrigins: https://${HCS_PUBLIC_HOST}
+      RabbitMQ__EventBus__ClientName: HCS_Collaboration
+      RabbitMQ__EventBus__ExchangeName: hcs
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.3
+    restart: unless-stopped
+    command: ["start", "--http-port=8080"]
+    extra_hosts: *public-hosts
+    ports: ["127.0.0.1:8084:8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${HCS_KEYCLOAK_ADMIN:?set HCS_KEYCLOAK_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${HCS_KEYCLOAK_ADMIN_PASSWORD:?set HCS_KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://${HCS_POSTGRES_HOST:-${HCS_DATA_HOST}}:5432/hcs_keycloak
+      KC_DB_USERNAME: ${HCS_POSTGRES_USER:-hcs}
+      KC_DB_PASSWORD: ${HCS_POSTGRES_PASSWORD}
+      KC_HOSTNAME: https://${HCS_SSO_PUBLIC_HOST}
+      KC_HOSTNAME_STRICT: "true"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY_HEADERS: xforwarded
+      KC_HEALTH_ENABLED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+
+volumes:
+  redis-data:
+  rabbitmq-data:
+  document-data-protection:

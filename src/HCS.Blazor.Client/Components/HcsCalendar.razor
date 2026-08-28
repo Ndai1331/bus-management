@@ -1,0 +1,78 @@
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+@using System.Globalization
+
+<div id="@elementId" class="hcs-fc"></div>
+
+@code {
+    private readonly string elementId = "hcs-fc-" + Guid.NewGuid().ToString("n");
+    private DotNetObjectReference<HcsCalendar>? dotNetRef;
+    private bool initialized;
+    private string lastSignature = "";
+
+    [Parameter] public IReadOnlyList<HcsCalendarJsEvent> Events { get; set; } = [];
+    [Parameter] public string InitialView { get; set; } = "dayGridMonth";
+    [Parameter] public EventCallback<string> EventClicked { get; set; }
+    [Parameter] public EventCallback<HcsCalendarRange> DatesChanged { get; set; }
+
+    [JSInvokable]
+    public Task OnEventClick(string id) => EventClicked.InvokeAsync(id);
+
+    [JSInvokable]
+    public Task OnDatesSet(string start, string end, string currentStart, string viewType) =>
+        DatesChanged.InvokeAsync(new HcsCalendarRange(start, end, currentStart, viewType));
+
+    public Task PrevAsync() => Invoke("prev");
+    public Task NextAsync() => Invoke("next");
+    public Task TodayAsync() => Invoke("today");
+    public Task ChangeViewAsync(string view) => Invoke("changeView", view);
+    public Task GotoDateAsync(string iso) => Invoke("gotoDate", iso);
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            lastSignature = Signature();
+            await Js.InvokeVoidAsync("hcsCalendar.init", elementId, new
+            {
+                initialView = InitialView,
+                locale = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName,
+                events = Events
+            }, dotNetRef);
+            initialized = true;
+            return;
+        }
+
+        if (!initialized) return;
+        var signature = Signature();
+        if (signature == lastSignature) return;
+        lastSignature = signature;
+        await Js.InvokeVoidAsync("hcsCalendar.setEvents", elementId, Events);
+    }
+
+    private string Signature() => string.Join("|", Events.Select(x => $"{x.Id}:{x.Start}:{x.End}:{x.Title}:{x.ClassNames.FirstOrDefault()}"));
+
+    private async Task Invoke(string method)
+    {
+        if (!initialized) return;
+        await Js.InvokeVoidAsync("hcsCalendar." + method, elementId);
+    }
+
+    private async Task Invoke(string method, string arg)
+    {
+        if (!initialized) return;
+        await Js.InvokeVoidAsync("hcsCalendar." + method, elementId, arg);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (initialized) await Js.InvokeVoidAsync("hcsCalendar.destroy", elementId);
+        }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+        dotNetRef?.Dispose();
+    }
+}

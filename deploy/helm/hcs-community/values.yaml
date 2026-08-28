@@ -1,0 +1,35 @@
+namespace: hcs
+imagePullPolicy: IfNotPresent
+runtimeSecretName: hcs-runtime
+certificateSecretName: hcs-certificates
+deploymentNonce: ""
+ingress:
+  enabled: true
+  className: nginx
+  host: hcs.example.local
+  authHost: auth.hcs.example.local
+  tlsSecretName: hcs-tls
+  annotations: {}
+  # Optional ClusterIP used only by the BFF Gateway to resolve the public
+  # AuthServer issuer from inside a local Kubernetes cluster.
+  internalControllerIp: ""
+resources:
+  requests: { cpu: 100m, memory: 256Mi }
+  limits: { cpu: "1", memory: 1Gi }
+images:
+  authServer: { repository: hcs/auth-server, tag: dev }
+  webGateway: { repository: hcs/web-gateway, tag: dev }
+  blazor: { repository: hcs/blazor, tag: dev }
+  platform: { repository: hcs/platform, tag: dev }
+  organization: { repository: hcs/organization, tag: dev }
+  document: { repository: hcs/document, tag: dev }
+  workManagement: { repository: hcs/work-management, tag: dev }
+  collaboration: { repository: hcs/collaboration, tag: dev }
+  busManagement: { repository: hcs/bus-management, tag: dev }
+  dbMigrator: { repository: hcs/db-migrator, tag: dev }
+infrastructure:
+  enabled: true
+  postgres: { image: postgres:17-alpine, storage: 10Gi }
+  redis: { image: redis:7.4-alpine, storage: 2Gi }
+  rabbitmq: { image: rabbitmq:4.1-management-alpine, storage: 5Gi }
+  minio: { image: minio/minio:RELEASE.2025-07-23T15-54-02Z, storage: 20Gi }

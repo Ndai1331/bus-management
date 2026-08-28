@@ -1,0 +1,37 @@
+@page "/"
+@inherits HCSComponentBase
+@inject NavigationManager Navigation
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>HCS · Trao đổi</PageTitle>
+
+@if (!isRedirecting)
+{
+    <section class="hcs-feature" aria-labelledby="welcome-title">
+        <header class="hcs-feature__header">
+            <div class="hcs-feature__icon" aria-hidden="true"><i class="fa fa-comments"></i></div>
+            <div>
+                <p class="hcs-feature__eyebrow">HCS Digital Workspace</p>
+                <h1 id="welcome-title">Chào mừng bạn</h1>
+                <p>Trao đổi là chức năng nghiệp vụ hiện đã sẵn sàng trong bản Community.</p>
+                <a class="btn btn-primary hcs-touch-target" href="/chat">
+                    <i class="fa fa-comments me-2" aria-hidden="true"></i>Mở Trao đổi
+                </a>
+            </div>
+        </header>
+    </section>
+}
+
+@code {
+    private bool isRedirecting;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        if (state.User.Identity?.IsAuthenticated == true)
+        {
+            isRedirecting = true;
+            Navigation.NavigateTo("/workspace", replace: true);
+        }
+    }
+}

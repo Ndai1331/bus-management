@@ -1,0 +1,132 @@
+@inherits HCSComponentBase
+@implements IAsyncDisposable
+<select id="@selectId" class="@CssClass form-select" multiple="@Multiple"></select>
+<style>
+    select.hcs-catalog-select2 + .select2-container { width: 100% !important; }
+    select.hcs-catalog-select2 + .select2-container .select2-selection--single {
+        box-sizing: border-box;
+        border-radius: 5px !important;
+        height: var(--hcs-control-height) !important;
+        max-height: var(--hcs-control-height) !important;
+        min-height: var(--hcs-control-height) !important;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+    }
+    select.hcs-catalog-select2 + .select2-container .select2-selection--single .select2-selection__rendered {
+        align-items: center;
+        display: flex;
+        height: 100%;
+        line-height: 1 !important;
+        min-width: 0;
+        overflow: hidden;
+        padding: 0 2.2rem 0 0.65rem !important;
+        width: 100%;
+    }
+    select.hcs-catalog-select2 + .select2-container .select2-selection--multiple {
+        min-height: 38px;
+        border-radius: 5px;
+    }
+</style>
+@code {
+    private readonly string selectId = "hcs-cs2-" + Guid.NewGuid().ToString("n");
+    private DotNetObjectReference<CatalogSelect2>? dotNetRef;
+    private bool initialized;
+    private string lastSignature = "";
+
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+
+    [Parameter] public Guid? Value { get; set; }
+    [Parameter] public EventCallback<Guid?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<Guid> Values { get; set; } = [];
+    [Parameter] public EventCallback<IReadOnlyList<Guid>> ValuesChanged { get; set; }
+    [Parameter] public bool Multiple { get; set; }
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? SelectedText { get; set; }
+    [Parameter] public IReadOnlyList<string>? SelectedTexts { get; set; }
+    [Parameter] public CatalogSelect2Item? SelectedItem { get; set; }
+    [Parameter] public IReadOnlyList<CatalogSelect2Item>? SelectedItems { get; set; }
+    [Parameter] public bool UserTemplate { get; set; }
+    [Parameter] public string CssClass { get; set; } = "hcs-catalog-select2";
+    [Parameter] public Func<string, int, Task<CatalogSelect2SearchResponse>> Search { get; set; } = default!;
+
+    [JSInvokable]
+    public Task<CatalogSelect2SearchResponse> SearchAsync(string term, int page) =>
+        Search.Invoke(CatalogSelect2Text.NormalizeSearch(term), page <= 0 ? 1 : page);
+
+    [JSInvokable]
+    public async Task OnSelectionChangeAsync(string[]? rawIds)
+    {
+        var ids = (rawIds ?? [])
+            .Select(x => Guid.TryParse(x, out var id) ? id : (Guid?)null)
+            .Where(x => x.HasValue)
+            .Select(x => x!.Value)
+            .ToList();
+        var signature = SignatureOf(ids);
+        if (signature == lastSignature) return;
+        lastSignature = signature;
+        if (Multiple)
+        {
+            await ValuesChanged.InvokeAsync(ids);
+            return;
+        }
+        await ValueChanged.InvokeAsync(ids.Count > 0 ? ids[0] : null);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            lastSignature = CurrentSignature();
+            await Js.InvokeVoidAsync("hcsCatalogSelect2.init", selectId, dotNetRef, new
+            {
+                placeholder = string.IsNullOrWhiteSpace(Placeholder) ? L["Catalog:ChooseValue"].Value : Placeholder,
+                minimumInputLength = 0,
+                multiple = Multiple,
+                userTemplate = UserTemplate
+            }, InitialItems());
+            initialized = true;
+            return;
+        }
+
+        if (!initialized) return;
+        var signature = CurrentSignature();
+        if (signature == lastSignature) return;
+        lastSignature = signature;
+        await Js.InvokeVoidAsync("hcsCatalogSelect2.setSelection", selectId, InitialItems());
+    }
+
+    private string CurrentSignature() => Multiple
+        ? SignatureOf(Values)
+        : (Value?.ToString("N") ?? "");
+
+    private static string SignatureOf(IEnumerable<Guid> ids) =>
+        string.Join(",", ids.Select(x => x.ToString("N")).OrderBy(x => x, StringComparer.Ordinal));
+
+    private List<CatalogSelect2Item> InitialItems()
+    {
+        if (Multiple)
+        {
+            if (SelectedItems is { Count: > 0 }) return SelectedItems.ToList();
+            var texts = SelectedTexts ?? [];
+            return Values.Select((id, i) =>
+                new CatalogSelect2Item(id.ToString(), i < texts.Count && !string.IsNullOrWhiteSpace(texts[i]) ? texts[i] : id.ToString())).ToList();
+        }
+        if (Value is not { } id) return [];
+        if (SelectedItem is not null) return [SelectedItem];
+        var text = string.IsNullOrWhiteSpace(SelectedText) ? id.ToString() : SelectedText;
+        return [new CatalogSelect2Item(id.ToString(), text)];
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (initialized)
+        {
+            try { await Js.InvokeVoidAsync("hcsCatalogSelect2.destroy", selectId); }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+        }
+        dotNetRef?.Dispose();
+    }
+}

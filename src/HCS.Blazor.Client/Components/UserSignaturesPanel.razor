@@ -1,0 +1,455 @@
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+@inject IUiMessageService UiMessage
+@using System.Globalization
+@using System.IO
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+
+<section class="hcs-signatures-panel" aria-labelledby="personal-signatures-title" aria-busy="@isSaving">
+    <div class="hcs-signatures-panel__toolbar">
+        <div>
+            <p class="hcs-account-eyebrow">@L["Account:SignaturesEyebrow"]</p>
+            <h2 id="personal-signatures-title">@L["Account:SignatureSection"]</h2>
+            <p class="hcs-form-note">@L["Feature:SignatureImage"]</p>
+        </div>
+        <button type="button" class="hcs-signature-button hcs-signature-button--primary" @onclick="OpenCreate" disabled="@isSaving">
+            <i class="fa fa-plus" aria-hidden="true"></i>@L["Account:AddSignature"]
+        </button>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="hcs-signature-grid" aria-live="polite">
+            @for (var index = 0; index < 3; index++)
+            {
+                <div class="hcs-signature-card hcs-signature-card--skeleton" aria-hidden="true">
+                    <span></span><span></span><span></span>
+                </div>
+            }
+            <span class="visually-hidden">@L["Catalog:Loading"]</span>
+        </div>
+    }
+    else if (loadFailed)
+    {
+        <div class="hcs-signatures-empty hcs-signatures-empty--error" role="alert">
+            <i class="fa fa-triangle-exclamation" aria-hidden="true"></i>
+            <h3>@L["Account:SignaturesLoadFailed"]</h3>
+            <p>@L["Account:SignaturesLoadFailedHint"]</p>
+            <button type="button" class="hcs-signature-button hcs-signature-button--primary" @onclick="LoadAsync">
+                <i class="fa fa-rotate-right" aria-hidden="true"></i>@L["Catalog:Retry"]
+            </button>
+        </div>
+    }
+    else if (items.Count == 0)
+    {
+        <div class="hcs-signatures-empty">
+            <span class="hcs-signatures-empty__icon"><i class="fa fa-signature" aria-hidden="true"></i></span>
+            <h3>@L["Account:NoSignatures"]</h3>
+            <p>@L["Account:NoSignaturesHint"]</p>
+            <button type="button" class="hcs-signature-button hcs-signature-button--primary" @onclick="OpenCreate">
+                <i class="fa fa-plus" aria-hidden="true"></i>@L["Account:AddSignature"]
+            </button>
+        </div>
+        @if (isSaving)
+        {
+            <span class="visually-hidden" role="status" aria-live="polite">@L["Account:Saving"]</span>
+        }
+    }
+    else
+    {
+        <div class="hcs-signature-grid">
+            @foreach (var item in items)
+            {
+                <article class="hcs-signature-card @(item.IsDefault ? "is-default" : null)">
+                    <div class="hcs-signature-card__preview">
+                        @if (previews.TryGetValue(item.Id, out var preview))
+                        {
+                            <img src="@preview" alt='@string.Format(L["Account:SignaturePreviewAlt"].Value, item.FileName)' loading="lazy" />
+                        }
+                        else
+                        {
+                            <span class="hcs-signature-card__preview-fallback"><i class="fa fa-image" aria-hidden="true"></i>@L["Account:PreviewUnavailable"]</span>
+                        }
+                        @if (item.IsDefault)
+                        {
+                            <span class="hcs-signature-card__badge"><i class="fa fa-star" aria-hidden="true"></i>@L["Feature:DefaultSignature"]</span>
+                        }
+                    </div>
+                    <div class="hcs-signature-card__body">
+                        <div class="hcs-signature-card__title-row">
+                            <h3 title="@item.FileName">@item.FileName</h3>
+                            <span class="hcs-signature-card__type">@item.ContentType.Replace("image/", "", StringComparison.OrdinalIgnoreCase).ToUpperInvariant()</span>
+                        </div>
+                        <span class="hcs-signature-card__kind"><i class="fa fa-fingerprint" aria-hidden="true"></i>@SignatureTypeLabel(item.Type)</span>
+                        @if (!string.IsNullOrWhiteSpace(item.ProviderCode)) { <span class="hcs-signature-card__kind">@item.ProviderCode @(item.IsActive ? "· Active" : "· Inactive")</span> }
+                        @if (item.HasSealImage) { <span class="hcs-signature-card__kind"><i class="fa fa-stamp" aria-hidden="true"></i>@L["Account:SealImage"]</span> }
+                        <dl class="hcs-signature-card__meta">
+                            <div><dt>@L["Account:SignatureSize"]</dt><dd>@FormatSize(item.Size)</dd></div>
+                            <div><dt>@L["Account:SignatureCreated"]</dt><dd>@FormatDate(item.CreationTime)</dd></div>
+                        </dl>
+                        <div class="hcs-signature-card__actions">
+                            @if (!item.IsDefault)
+                            {
+                                <button type="button" class="hcs-signature-button hcs-signature-button--quiet" @onclick="() => SetDefaultAsync(item)" disabled="@isSaving">
+                                    <i class="fa fa-star" aria-hidden="true"></i>@L["Account:SetDefault"]
+                                </button>
+                            }
+                            <button type="button" class="hcs-signature-icon-button" @onclick="() => OpenEdit(item)" aria-label='@string.Format(L["Account:EditSignature"].Value, item.FileName)' title='@L["Catalog:Edit"]' disabled="@isSaving">
+                                <i class="fa fa-pen" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="hcs-signature-icon-button hcs-signature-icon-button--danger" @onclick="() => DeleteAsync(item)" aria-label='@string.Format(L["Account:DeleteSignature"].Value, item.FileName)' title='@L["Catalog:Delete"]' disabled="@isSaving">
+                                <i class="fa fa-trash" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </article>
+            }
+        </div>
+    }
+</section>
+
+@if (editingSignature is not null || isCreateOpen)
+{
+    <div class="hcs-signature-dialog-backdrop" role="presentation" @onclick="CloseEdit">
+        <section class="hcs-signature-dialog" role="dialog" aria-modal="true" aria-labelledby="edit-signature-title" tabindex="-1"
+                 @onclick:stopPropagation @onkeydown="HandleDialogKeyDown">
+            <div class="hcs-signature-dialog__header">
+                <div>
+                    <p class="hcs-account-eyebrow">@L["Account:SignaturesEyebrow"]</p>
+                    <h2 id="edit-signature-title">@(isCreateOpen ? L["Account:AddSignature"] : L["Account:EditSignatureTitle"])</h2>
+                </div>
+                <button type="button" class="hcs-signature-icon-button" @onclick="CloseEdit" aria-label='@L["Catalog:Close"]' title='@L["Catalog:Close"]'>
+                    <i class="fa fa-xmark" aria-hidden="true"></i>
+                </button>
+            </div>
+            <form class="hcs-signature-dialog__form" @onsubmit="SaveEditAsync" @onsubmit:preventDefault>
+                <div>
+                    <label class="form-label" for="signature-file-name">@L["Account:SignatureFileName"]</label>
+                    <input id="signature-file-name" class="form-control" @bind="editForm.FileName" maxlength="256" required autofocus />
+                    <p class="hcs-form-note">@L["Account:SignatureFileNameHint"]</p>
+                </div>
+                <div>
+                    <label class="form-label" for="signature-type">@L["Account:SignatureType"]</label>
+                    <select id="signature-type" class="form-control" value="@editForm.Type" @onchange="HandleTypeChanged">
+                        <option value="@UserSignatureType.Electronic">@L["Account:ElectronicSignature"]</option>
+                        <option value="@UserSignatureType.Digital">@L["Account:DigitalSignature"]</option>
+                    </select>
+                </div>
+                @if (editForm.Type == UserSignatureType.Digital)
+                {
+                    <div>
+                        <label class="form-label">@L["Account:SelectProvider"]</label>
+                        <ProviderSelect2 Value="editForm.ProviderCode" ValueChanged="SetProviderCode" Items="ProviderItems"
+                                         Search="SearchProvidersAsync" Placeholder='@L["Account:SelectProvider"]' />
+                        @if (ProviderItems.Count == 0) { <p class="hcs-form-note text-danger">@L["Account:ProviderNotConfigured"]</p> }
+                    </div>
+                    <div>
+                        <label class="form-label">@L["Account:TokenApi"]</label>
+                        <input class="form-control" @bind="editForm.TokenRef" required="@isCreateOpen" placeholder='@L["Account:TokenKeepHint"]' />
+                    </div>
+                    <div><label class="form-label">@L["Feature:SigningSecret"]</label><input class="form-control" type="password" @bind="editForm.Secret" autocomplete="new-password" required="@isCreateOpen" /></div>
+                    <div>
+                        <label class="form-label">@L["Account:SealImage"]</label>
+                        <InputFile @key="sealInputKey" class="form-control" accept="image/jpeg,image/png,image/webp" OnChange="SelectSealAsync" required="@(isCreateOpen && IsSealImageRequired)" />
+                        @if (sealFile is not null) { <p class="hcs-form-note"><i class="fa fa-stamp" aria-hidden="true"></i>@sealFile.Name</p> }
+                    </div>
+                }
+                else
+                {
+                    <p class="hcs-form-note">@L["Account:ElectronicSignatureHint"]</p>
+                }
+                <div>
+                    <label class="form-label" for="signature-replacement-file">@(isCreateOpen ? L["Account:SignatureImage"] : L["Account:ReplaceSignatureImage"])</label>
+                    <InputFile @key="editInputKey" id="signature-replacement-file" class="form-control" accept="image/jpeg,image/png,image/webp,image/gif" OnChange="SelectReplacementFile" required="@isCreateOpen" />
+                    @if (replacementFile is not null)
+                    {
+                        <p class="hcs-form-note"><i class="fa fa-paperclip" aria-hidden="true"></i>@replacementFile.Name</p>
+                    }
+                </div>
+                <div class="row g-2">
+                    <div class="col-md-6"><label class="form-label">@L["Account:ValidFrom"]</label><input class="form-control" type="datetime-local" @bind="editForm.ValidFrom" /></div>
+                    <div class="col-md-6"><label class="form-label">@L["Account:ValidTo"]</label><input class="form-control" type="datetime-local" @bind="editForm.ValidTo" /></div>
+                </div>
+                <label><input type="checkbox" @bind="editForm.IsActive" /> @L["Account:IsActive"]</label>
+                <div class="hcs-signature-dialog__actions">
+                    <button type="button" class="btn btn-secondary hcs-catalog-cancel" @onclick="CloseEdit" disabled="@isSaving">@L["Catalog:Cancel"]</button>
+                    <button type="submit" class="btn btn-primary hcs-catalog-save" disabled="@isSaving">
+                        <i class="fa @(isSaving ? "fa-spinner fa-spin" : "fa-floppy-disk")" aria-hidden="true"></i>@L["Catalog:SaveChanges"]
+                    </button>
+                </div>
+            </form>
+        </section>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid? UserId { get; set; }
+    [Parameter] public EventCallback OnChanged { get; set; }
+
+    private readonly List<UserSignatureDto> items = [];
+    private readonly List<SigningCredentialDto> providerCredentials = [];
+    private readonly Dictionary<Guid, string> previews = new();
+    private readonly EditSignatureModel editForm = new();
+    private UserSignatureDto? editingSignature;
+    private IBrowserFile? replacementFile;
+    private IBrowserFile? sealFile;
+    private bool isLoading = true;
+    private bool loadFailed;
+    private bool isSaving;
+    private bool isCreateOpen;
+    private int editInputKey;
+    private int sealInputKey;
+
+    protected override Task OnParametersSetAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        loadFailed = false;
+        try
+        {
+            items.Clear();
+            providerCredentials.Clear();
+            previews.Clear();
+            providerCredentials.AddRange(await Documents.GetCredentialsAsync(UserId));
+            items.AddRange(await Documents.GetSignaturesAsync(UserId));
+            foreach (var item in items)
+            {
+                try
+                {
+                    var content = await Documents.GetSignatureContentAsync(item.Id, UserId);
+                    previews[item.Id] = $"data:{content.ContentType};base64,{Convert.ToBase64String(content.Bytes)}";
+                }
+                catch
+                {
+                    // Keep the metadata card visible when a preview is unavailable.
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            loadFailed = true;
+            await NotifyErrorAsync(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void OpenCreate()
+    {
+        isCreateOpen = true;
+        editingSignature = null;
+        editForm.Reset();
+        replacementFile = null;
+        sealFile = null;
+        editInputKey++;
+        sealInputKey++;
+    }
+
+    private void OpenEdit(UserSignatureDto item)
+    {
+        editingSignature = item;
+        isCreateOpen = false;
+        editForm.FileName = item.FileName;
+        editForm.Type = item.Type;
+        editForm.ProviderCode = item.ProviderCode;
+        editForm.TokenRef = item.TokenRef;
+        editForm.Secret = "";
+        sealFile = null;
+        editForm.ValidFrom = item.ValidFrom?.ToLocalTime();
+        editForm.ValidTo = item.ValidTo?.ToLocalTime();
+        editForm.IsActive = item.IsActive;
+        replacementFile = null;
+        editInputKey++;
+    }
+
+    private void CloseEdit()
+    {
+        if (isSaving) return;
+        editingSignature = null;
+        isCreateOpen = false;
+        replacementFile = null;
+        sealFile = null;
+    }
+
+    private void SelectReplacementFile(InputFileChangeEventArgs args) => replacementFile = args.File;
+
+    private async Task SelectSealAsync(InputFileChangeEventArgs args)
+    {
+        sealFile = args.File;
+    }
+
+    private void HandleTypeChanged(ChangeEventArgs args)
+    {
+        if (!Enum.TryParse<UserSignatureType>(args.Value?.ToString(), out var type)) return;
+        editForm.Type = type;
+        if (type == UserSignatureType.Electronic)
+        {
+            editForm.ProviderCode = "";
+            editForm.TokenRef = "";
+            editForm.Secret = "";
+            sealFile = null;
+        }
+    }
+
+    private void SetProviderCode(string? value) => editForm.ProviderCode = value ?? "";
+
+    private void HandleDialogKeyDown(KeyboardEventArgs args)
+    {
+        if (string.Equals(args.Key, "Escape", StringComparison.Ordinal))
+        {
+            CloseEdit();
+        }
+    }
+
+    private async Task SaveEditAsync()
+    {
+        if ((!isCreateOpen && editingSignature is null) || string.IsNullOrWhiteSpace(editForm.FileName)) return;
+        if (isCreateOpen && replacementFile is null) return;
+        var creating = isCreateOpen;
+        isSaving = true;
+        try
+        {
+            var providerCode = editForm.Type == UserSignatureType.Digital ? editForm.ProviderCode : null;
+            var tokenRef = editForm.Type == UserSignatureType.Digital ? editForm.TokenRef : null;
+            var secret = editForm.Type == UserSignatureType.Digital ? editForm.Secret : null;
+            var sealImage = editForm.Type == UserSignatureType.Digital ? sealFile : null;
+            if (isCreateOpen)
+            {
+                await Documents.UploadSignatureAsync(replacementFile!, UserId, type: editForm.Type,
+                    providerCode: providerCode, tokenRef: tokenRef, secret: secret, sealImage: sealImage,
+                    validFrom: editForm.ValidFrom?.ToUniversalTime(), validTo: editForm.ValidTo?.ToUniversalTime(), isActive: editForm.IsActive);
+            }
+            else
+            {
+                await Documents.UpdateSignatureAsync(editingSignature!.Id, editForm.FileName.Trim(), replacementFile, UserId, type: editForm.Type,
+                    providerCode: providerCode, tokenRef: tokenRef, secret: secret, sealImage: sealImage,
+                    validFrom: editForm.ValidFrom?.ToUniversalTime(), validTo: editForm.ValidTo?.ToUniversalTime(), isActive: editForm.IsActive);
+            }
+            editingSignature = null;
+            isCreateOpen = false;
+            replacementFile = null;
+            sealFile = null;
+            await NotifySuccessAsync(L[creating ? "Catalog:Created" : "Account:SignatureUpdated"]);
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task SetDefaultAsync(UserSignatureDto item)
+    {
+        isSaving = true;
+        try
+        {
+            await Documents.SetDefaultSignatureAsync(item.Id, UserId);
+            await NotifySuccessAsync(L["Account:DefaultSignatureUpdated"]);
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task DeleteAsync(UserSignatureDto item)
+    {
+        if (!await UiMessage.Confirm(string.Format(L["Catalog:DeleteConfirmation"], item.FileName))) return;
+        isSaving = true;
+        try
+        {
+            await Documents.DeleteSignatureAsync(item.Id, UserId);
+            await NotifySuccessAsync(L["Catalog:Deleted"]);
+            await LoadAsync();
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Delete);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private static string FormatSize(long size)
+    {
+        if (size < 1024) return $"{size} B";
+        if (size < 1024 * 1024) return $"{size / 1024d:0.#} KB";
+        return $"{size / (1024d * 1024):0.##} MB";
+    }
+
+    private static string FormatDate(DateTime value) => value.ToLocalTime().ToString("dd/MM/yyyy", CultureInfo.CurrentCulture);
+
+    private IReadOnlyList<CatalogSelect2Item> ProviderItems => providerCredentials
+        .Where(x => x.Kind != 0 && !string.IsNullOrWhiteSpace(x.ProviderCode))
+        .Select(x => new CatalogSelect2Item(x.ProviderCode, $"{x.ProviderCode} · {KindName(x.Kind)}", x.Endpoint))
+        .GroupBy(x => x.Id, StringComparer.OrdinalIgnoreCase)
+        .Select(x => x.First())
+        .ToList();
+
+    private bool IsSealImageRequired =>
+        editForm.Type == UserSignatureType.Digital
+        && providerCredentials.FirstOrDefault(credential =>
+            string.Equals(credential.ProviderCode, editForm.ProviderCode, StringComparison.OrdinalIgnoreCase))?.Kind
+            is 2 or 3;
+
+    private Task<CatalogSelect2SearchResponse> SearchProvidersAsync(string term, int page)
+    {
+        var query = term.Trim();
+        var results = ProviderItems
+            .Where(x => string.IsNullOrWhiteSpace(query)
+                || x.Id.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || x.Text.Contains(query, StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        return Task.FromResult(new CatalogSelect2SearchResponse(results, false));
+    }
+
+    private string KindName(int kind) => kind switch
+    {
+        1 => L["Feature:RemoteCa"].Value,
+        2 => L["Feature:Hsm"].Value,
+        3 => L["Feature:UsbToken"].Value,
+        _ => L["Feature:Electronic"].Value
+    };
+
+    private string SignatureTypeLabel(UserSignatureType type) => type switch
+    {
+        UserSignatureType.Digital => L["Account:DigitalSignature"].Value,
+        _ => L["Account:ElectronicSignature"].Value
+    };
+
+    private sealed class EditSignatureModel
+    {
+        public string FileName { get; set; } = "";
+        public UserSignatureType Type { get; set; } = UserSignatureType.Electronic;
+        public string ProviderCode { get; set; } = "";
+        public string TokenRef { get; set; } = "";
+        public string Secret { get; set; } = "";
+        public DateTime? ValidFrom { get; set; }
+        public DateTime? ValidTo { get; set; }
+        public bool IsActive { get; set; } = true;
+
+        public void Reset()
+        {
+            FileName = ""; Type = UserSignatureType.Electronic; ProviderCode = ""; TokenRef = "";
+            Secret = ""; ValidFrom = null; ValidTo = null; IsActive = true;
+        }
+    }
+}

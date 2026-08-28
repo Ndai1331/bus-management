@@ -1,0 +1,719 @@
+@page "/workflow-detail"
+@page "/workflow-detail/{Id:guid}"
+@attribute [Authorize(Policy = "Documents.Workflow.View")]
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+@inject CollaborationClient Chat
+@inject OrganizationCatalogClient Catalog
+@inject IdentityAdminClient Identity
+@inject IUiMessageService UiMessage
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+@using Microsoft.AspNetCore.Components.Forms
+
+<PageTitle>@L["Feature:WorkflowDetail"] · HCS</PageTitle>
+<section class="hcs-document-page">
+    <header class="hcs-document-page__header">
+        <div>
+            <h1>@(string.IsNullOrWhiteSpace(form.Name) ? L["Feature:WorkflowDetail"] : form.Name)</h1>
+        </div>
+        <Button Color="Color.Primary" Outline="true" Clicked="GoBackToList">@L["Feature:BackToList"]</Button>
+    </header>
+
+    <Steps SelectedStep="@selectedStep" SelectedStepChanged="OnStepChanged">
+        <Items>
+            <Step Name="step1" Completed="Id.HasValue"><Marker><Icon Name="IconName.FileAlt" /></Marker><Caption>@L["Work:CreateWorkflow"]</Caption></Step>
+            <Step Name="step2" Completed="template is not null"><Marker><Icon Name="IconName.File" /></Marker><Caption>@L["Work:CreateTemplate"]</Caption></Step>
+            <Step Name="step3" Completed="form.Steps.Any(x => x.HasAssignment)"><Marker><Icon Name="IconName.List" /></Marker><Caption>@L["Work:StepsAndAssignees"]</Caption></Step>
+        </Items>
+        <Content>
+            <StepPanel Name="step1">
+                <Card><CardBody>
+                    <div class="hcs-catalog-form">
+                        <Field><FieldLabel>@L["Work:Kind"]</FieldLabel>
+                            <CatalogSelect2 Value="form.KindId"
+                                            ValueChanged="value => form.KindId = value"
+                                            Placeholder="@L["Work:Kind"]"
+                                            SelectedText="@KindName(form.KindId)"
+                                            Search="SearchKindsAsync" />
+                        </Field>
+                        <div class="hcs-form-row">
+                            <Field><FieldLabel>@L["Catalog:Code"]</FieldLabel><HcsIsolatedTextInput @bind-Value="form.Code" Name="hcsWorkflowCode" MaxLength="64" Disabled="@(Id.HasValue)" /></Field>
+                            <Field><FieldLabel>@L["Catalog:Name"]</FieldLabel><HcsIsolatedTextInput @bind-Value="form.Name" Name="hcsWorkflowName" /></Field>
+                        </div>
+                        <Field><FieldLabel>@L["Work:Description"]</FieldLabel><textarea class="form-control" rows="3" @bind="form.Description"></textarea></Field>
+                        <Field><FieldLabel>@L["Work:SignMode"]</FieldLabel>
+                            <Select TValue="string" @bind-Value="form.SignMode">
+                                <SelectItem Value="@("SEQUENTIAL")">@L["Work:SignMode.SEQUENTIAL"]</SelectItem>
+                                <SelectItem Value="@("PARALLEL")">@L["Work:SignMode.PARALLEL"]</SelectItem>
+                            </Select>
+                        </Field>
+                        <Field><Check TValue="bool" @bind-Checked="form.IsActive">@L["Work:IsActive"]</Check></Field>
+                        <AuthorizeView Policy="Documents.Workflow.Manage">
+                            <Authorized>
+                                <WizardFooter SelectedStep="@selectedStep" SelectedStepChanged="OnStepChanged" OnSave="SaveWorkflowAsync" SaveDisabled="@isSaving" />
+                            </Authorized>
+                        </AuthorizeView>
+                    </div>
+                </CardBody></Card>
+            </StepPanel>
+            <StepPanel Name="step2">
+                @if (Id is null)
+                {
+                    <p class="text-muted mb-0">@L["Work:SaveWorkflowFirst"]</p>
+                }
+                else
+                {
+                    <div class="row g-3 hcs-template-split">
+                        <div class="col-lg-6">
+                            <Card><CardBody>
+                                <div class="hcs-catalog-form">
+                                    <div class="hcs-form-row">
+                                        <Field><FieldLabel>@L["Catalog:Code"]</FieldLabel><HcsIsolatedTextInput @bind-Value="templateForm.Code" Name="hcsTemplateCode" MaxLength="64" /></Field>
+                                        <Field><FieldLabel>@L["Catalog:Name"]</FieldLabel><HcsIsolatedTextInput @bind-Value="templateForm.Name" Name="hcsTemplateName" /></Field>
+                                    </div>
+                                    <div class="hcs-form-row hcs-form-row--equal">
+                                        <Field><FieldLabel>@L["Work:OutputFormat"]</FieldLabel>
+                                            <Select TValue="string" @bind-Value="templateForm.OutputFormat">
+                                                <SelectItem Value="@("PDF")">PDF</SelectItem>
+                                            </Select>
+                                        </Field>
+                                        <Field><FieldLabel>@L["Work:SignMode"]</FieldLabel>
+                                            <Select TValue="string" @bind-Value="form.SignMode">
+                                                <SelectItem Value="@("SEQUENTIAL")">@L["Work:SignMode.SEQUENTIAL"]</SelectItem>
+                                                <SelectItem Value="@("PARALLEL")">@L["Work:SignMode.PARALLEL"]</SelectItem>
+                                            </Select>
+                                        </Field>
+                                    </div>
+                                    <Field><FieldLabel>@L["Work:ContentSchema"]</FieldLabel>
+                                        <textarea class="form-control" rows="6" @bind="templateForm.TemplateJson"></textarea>
+                                    </Field>
+                                    <Field><FieldLabel>@L["Work:UploadWord"]</FieldLabel>
+                                        <div class="hcs-dropzone">
+                                            <InputFile class="form-control" OnChange="UploadWordAsync" accept=".docx" />
+                                            <p class="hcs-dropzone__hint mb-0">@L["Work:DropFileHere"]</p>
+                                        </div>
+                                        @if (!string.IsNullOrWhiteSpace(template?.WordFileName))
+                                        {
+                                            <p class="text-muted small mt-2 mb-0">workflow-templates/@template.WordFileName</p>
+                                        }
+                                    </Field>
+                                    <AuthorizeView Policy="Documents.Workflow.Manage">
+                                        <Authorized>
+                                            <Button Color="Color.Success" Clicked="SaveTemplateAsync" Disabled="@isSaving">@L["Catalog:SaveChanges"]</Button>
+                                            @if (template is not null)
+                                            {
+                                                <Button Color="Color.Light" Class="ms-2" Clicked="SetActiveAsync" Disabled="@(template.IsActive)">@L["Work:SetTemplateActive"]</Button>
+                                            }
+                                        </Authorized>
+                                    </AuthorizeView>
+                                </div>
+                            </CardBody></Card>
+                        </div>
+                        <div class="col-lg-6 hcs-pdf-pane">
+                            @if (!string.IsNullOrWhiteSpace(pdfUrl))
+                            {
+                                <HcsPdfFrame Source="@pdfUrl" Title="@L["Work:PdfPreview"]" ViewerHeight="Height.Rem(45)" />
+                            }
+                            else
+                            {
+                                <Card><CardBody><p class="text-muted mb-0">@L["Work:PreviewPdfOnly"]</p></CardBody></Card>
+                            }
+                        </div>
+                    </div>
+                    <WizardFooter SelectedStep="@selectedStep" SelectedStepChanged="OnStepChanged" OnSave="SaveTemplateAsync" />
+                }
+            </StepPanel>
+            <StepPanel Name="step3">
+                @if (Id is null)
+                {
+                    <p class="text-muted mb-0">@L["Work:SaveWorkflowFirst"]</p>
+                }
+                else
+                {
+                    <Card><CardBody>
+                        <Button Color="Color.Primary" Class="mb-3" Clicked="AddStep"><Icon Name="@IconName.Add" /> @L["Work:AddStep"]</Button>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0 hcs-catalog-grid"><thead><tr>
+                                <th>@L["Work:Order"]</th>
+                                <th>@L["Catalog:Name"]</th>
+                                <th>@L["Work:StepType"]</th>
+                                <th>@L["Work:Assignee"]</th>
+                                <th>@L["Work:SlaDays"]</th>
+                                <th>@L["Work:AllowReturn"]</th>
+                                <th>@L["Catalog:Actions"]</th>
+                            </tr></thead>
+                            <tbody>
+                            @foreach (var (step, index) in form.Steps.Select((s, i) => (s, i)))
+                            {
+                                <tr @key="step.Key">
+                                    <td>@(index + 1)</td>
+                                    <td>@step.Name</td>
+                                    <td>@L[$"Work:StepType.{step.Type}"]</td>
+                                    <td>@AssigneePills(step)</td>
+                                    <td>@(step.SlaDays?.ToString() ?? "—")</td>
+                                    <td>@BoolIcon(step.AllowReturn)</td>
+                                    <td>
+                                        <Button Size="Size.Small" Color="Color.Primary" Outline="true" Clicked="() => EditStep(step)"><i class="fa fa-pen"></i></Button>
+                                        <Button Size="Size.Small" Color="Color.Danger" Outline="true" Clicked="() => RemoveStep(step)" Disabled="@(form.Steps.Count <= 1)"><i class="fa fa-trash"></i></Button>
+                                    </td>
+                                </tr>
+                            }
+                            </tbody></table>
+                        </div>
+                    </CardBody></Card>
+                    <WizardFooter SelectedStep="@selectedStep" SelectedStepChanged="OnStepChanged" OnSave="SaveStepsAsync" SaveDisabled="@isSaving" />
+                }
+            </StepPanel>
+        </Content>
+    </Steps>
+</section>
+
+<Modal @ref="stepModal"><ModalContent Centered Class="hcs-catalog-modal">
+    <ModalHeader Class="hcs-catalog-modal__header"><ModalTitle>@L["Work:AddStep"]</ModalTitle><CloseButton /></ModalHeader>
+    <ModalBody Class="hcs-catalog-modal__body">
+        @if (editingStep is not null)
+        {
+            <div class="hcs-catalog-form">
+                <div class="hcs-form-row">
+                    <Field><FieldLabel>@L["Feature:StepCode"]</FieldLabel><HcsIsolatedTextInput @bind-Value="editingStep.Code" Name="hcsStepCode" MaxLength="64" /></Field>
+                    <Field><FieldLabel>@L["Feature:StepName"]</FieldLabel><HcsIsolatedTextInput @bind-Value="editingStep.Name" Name="hcsStepName" /></Field>
+                </div>
+                <div class="hcs-form-row hcs-workflow-step-meta-row">
+                    <Field><FieldLabel>@L["Work:StepType"]</FieldLabel>
+                        <Select TValue="string" Value="@editingStep.Type" ValueChanged="@OnStepTypeChanged">
+                            <SelectItem Value="@("PROCESS")">@L["Work:StepType.PROCESS"]</SelectItem>
+                            <SelectItem Value="@("SIGN")">@L["Work:StepType.SIGN"]</SelectItem>
+                            <SelectItem Value="@("VIEW")">@L["Work:StepType.VIEW"]</SelectItem>
+                        </Select>
+                    </Field>
+                    <Field><FieldLabel>@L["Work:SlaDays"]</FieldLabel>
+                        <NumericPicker TValue="int?" @bind-Value="editingStep.SlaDays" Min="1" Max="365" Decimals="0" Step="1" />
+                    </Field>
+                </div>
+                <Field Class="hcs-allow-return">
+                    <Check TValue="bool" @bind-Checked="editingStep.AllowReturn">@L["Work:AllowReturn"]</Check>
+                </Field>
+                @if (editingStep.Type == "VIEW")
+                {
+                    <Field><FieldLabel>@L["Work:FilterDepartment"]</FieldLabel>
+                        <DepartmentTreeSelect Items="departmentTree" SelectedIds="editingStep.DepartmentIds"
+                                              SelectedIdsChanged="ids => editingStep.DepartmentIds = ids.ToList()"
+                                              EmptyMessage="@L["Catalog:EmptyTitle"]" />
+                    </Field>
+                    <Field><FieldLabel>@L["Work:Assignee"]</FieldLabel>
+                        <UserSelect2 Multiple="true" Values="editingStep.UserIds"
+                                     ValuesChanged="ids => editingStep.UserIds = ids.ToList()"
+                                     SelectedItems="@ContactItems(editingStep.UserIds)"
+                                     SelectedTexts="@UserNames(editingStep.UserIds)"
+                                     Placeholder="@L["Chat:SelectContacts"]"
+                                     Search="SearchContactsAsync" />
+                    </Field>
+                    <Field><FieldLabel>@L["Feature:Role"]</FieldLabel>
+                        <CatalogSelect2 Value="editingStep.RoleId"
+                                        ValueChanged="value => editingStep.RoleId = value"
+                                        Placeholder="@L["Feature:Role"]"
+                                        SelectedText="@RoleName(editingStep.RoleId)"
+                                        Search="SearchRolesAsync" />
+                    </Field>
+                }
+                else
+                {
+                    <Field>
+                        <FieldLabel>@L["Work:AssigneeType"]</FieldLabel>
+                        <div class="hcs-assignee-type">
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="@AssigneeTypeRadioName"
+                                       checked="@(!IsRoleAssignee)"
+                                       @onchange="() => SetAssigneeTypeAsync(SpecificUserAssignee)" />
+                                <span class="form-check-label">@L["Work:AssigneeType.SpecificUser"]</span>
+                            </label>
+                            <label class="form-check">
+                                <input class="form-check-input" type="radio" name="@AssigneeTypeRadioName"
+                                       checked="@IsRoleAssignee"
+                                       @onchange="() => SetAssigneeTypeAsync(RoleInSubmitterOuAssignee)" />
+                                <span class="form-check-label">@L["Work:AssigneeType.RoleInSubmitterOu"]</span>
+                            </label>
+                        </div>
+                    </Field>
+                    @if (IsRoleAssignee)
+                    {
+                        <Field @key="@($"role-{AssigneeSelectKey}")"><FieldLabel>@L["Feature:Role"]</FieldLabel>
+                            <CatalogSelect2 Value="@editingStep.RoleId"
+                                            ValueChanged="@(value => editingStep.RoleId = value)"
+                                            Placeholder="@L["Feature:Role"]"
+                                            SelectedText="@RoleName(editingStep.RoleId)"
+                                            Search="SearchRolesAsync" />
+                        </Field>
+                    }
+                    else
+                    {
+                        <Field @key="@($"user-{AssigneeSelectKey}")"><FieldLabel>@L["Work:Assignee"]</FieldLabel>
+                            <UserSelect2 Value="@editingStep.AssigneeUserId"
+                                         ValueChanged="@(value => editingStep.AssigneeUserId = value)"
+                                         SelectedItem="@ContactItem(editingStep.AssigneeUserId)"
+                                         Placeholder="@L["Chat:SelectContacts"]"
+                                         SelectedText="@ContactName(editingStep.AssigneeUserId)"
+                                         Search="SearchContactsAsync" />
+                        </Field>
+                    }
+                }
+            </div>
+        }
+    </ModalBody>
+    <ModalFooter Class="hcs-catalog-modal__footer">
+        <Button Color="Color.Secondary" Clicked="() => stepModal!.Hide()">@L["Catalog:Cancel"]</Button>
+        <Button Color="Color.Primary" Clicked="CloseStepModal">@L["Catalog:SaveChanges"]</Button>
+    </ModalFooter>
+</ModalContent></Modal>
+@code {
+    [Parameter] public Guid? Id { get; set; }
+    private readonly WorkflowForm form = new();
+    private readonly List<ChatContactDto> contacts = [];
+    private readonly List<WorkflowKindDto> kinds = [];
+    private readonly List<IdentityAdminRoleDto> roles = [];
+    private List<DepartmentTreeNode> departmentTree = [];
+    private WorkflowTemplateDto? template;
+    private readonly TemplateForm templateForm = new();
+    private StepDraft? editingStep;
+    private Modal? stepModal;
+    private string selectedStep = "step1";
+    private string? pdfUrl;
+    private bool isSaving, loaded, isNewStep;
+    private Guid? loadedDefinitionId;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            if (contacts.Count == 0) contacts.AddRange(await Chat.GetContactsAsync(null, 50));
+            if (kinds.Count == 0) kinds.AddRange(await Documents.GetKindsAsync());
+            if (roles.Count == 0) roles.AddRange(await LoadRolesAsync());
+            if (departmentTree.Count == 0)
+            {
+                var departments = await Catalog.GetDepartmentLookupAsync();
+                departmentTree = DepartmentTreeSelectHelper.Build(departments);
+            }
+            if (Id is { } id)
+            {
+                if (loaded && loadedDefinitionId == id)
+                    return;
+                loadedDefinitionId = id;
+                await LoadDefinitionAsync(id);
+            }
+            else if (loaded)
+            {
+                loadedDefinitionId = null;
+                form.Reset();
+                template = null;
+                templateForm.Reset();
+                await RevokePdfAsync();
+            }
+            loaded = true;
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+    }
+
+    // Users without the identity admin listing permission fall back to their assignable roles.
+    private async Task<IReadOnlyList<IdentityAdminRoleDto>> LoadRolesAsync()
+    {
+        try { return (await Identity.GetRolesAsync(maxResultCount: 100)).Items; }
+        catch { }
+        try { return await Identity.GetAssignableRolesAsync(); }
+        catch { return []; } // Role picker stays empty; save still validates RoleId.
+    }
+
+    private async Task OnStepChanged(string name)
+    {
+        if (name is "step2" or "step3" && Id is null)
+        {
+            await NotifyErrorAsync(L["Work:SaveWorkflowFirst"]);
+            return;
+        }
+        selectedStep = name;
+    }
+    private async Task LoadDefinitionAsync(Guid id)
+    {
+        var definition = await Documents.GetDefinitionAsync(id);
+        form.Code = definition.Code;
+        form.Name = definition.Name;
+        form.KindId = definition.KindId;
+        form.Description = definition.Description ?? "";
+        form.IsActive = definition.IsActive;
+        form.SignMode = string.IsNullOrWhiteSpace(definition.SignMode) ? "SEQUENTIAL" : definition.SignMode;
+        form.Steps.Clear();
+        foreach (var step in definition.Steps.OrderBy(x => x.Order))
+            form.Steps.Add(StepDraft.From(step));
+        var templates = await Documents.GetTemplatesAsync();
+        template = templates.Where(x => x.DefinitionId == id).OrderByDescending(x => x.IsActive).ThenByDescending(x => x.Version).FirstOrDefault();
+        BindTemplateForm();
+        await LoadPdfAsync();
+    }
+    private UpdateWorkflowDefinitionRequest DefinitionRequest() =>
+        new(form.Name.Trim(), MapSteps(), form.KindId, form.Description, form.IsActive, form.SignMode);
+    private async Task SaveWorkflowAsync()
+    {
+        isSaving = true;
+        try
+        {
+            if (Id is { } id)
+            {
+                await Documents.UpdateDefinitionAsync(id, DefinitionRequest());
+                await NotifySuccessAsync(L["Catalog:Updated"]);
+                return;
+            }
+            var created = await Documents.CreateDefinitionAsync(new CreateWorkflowDefinitionRequest(
+                form.Code.Trim(), form.Name.Trim(), MapSteps(), form.KindId, form.Description, form.IsActive, form.SignMode));
+            Navigation.NavigateTo($"/workflow-detail/{created}", forceLoad: true);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+    private async Task SaveStepsAsync()
+    {
+        if (Id is not { } id)
+        {
+            await NotifyErrorAsync(L["Work:SaveWorkflowFirst"]);
+            return;
+        }
+        isSaving = true;
+        try
+        {
+            await Documents.UpdateDefinitionAsync(id, DefinitionRequest());
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+    private void BindTemplateForm()
+    {
+        if (template is null)
+        {
+            templateForm.Code = string.IsNullOrWhiteSpace(form.Code) ? "" : $"{form.Code}-tpl";
+            templateForm.Name = form.Name;
+            templateForm.TemplateJson = "{}";
+            templateForm.OutputFormat = "PDF";
+            return;
+        }
+        templateForm.Code = template.Code;
+        templateForm.Name = template.Name;
+        templateForm.TemplateJson = string.IsNullOrWhiteSpace(template.TemplateJson) ? "{}" : template.TemplateJson;
+        templateForm.OutputFormat = string.IsNullOrWhiteSpace(template.OutputFormat) ? "PDF" : template.OutputFormat;
+    }
+    private async Task SaveTemplateAsync()
+    {
+        if (Id is not { } id) return;
+        isSaving = true;
+        try
+        {
+            await EnsureTemplateAsync();
+            if (template is null) return;
+            template = await Documents.UpdateTemplateAsync(template.Id,
+                new UpdateWorkflowTemplateRequest(templateForm.Name.Trim(), templateForm.TemplateJson, templateForm.OutputFormat));
+            await Documents.UpdateDefinitionAsync(id, DefinitionRequest());
+            BindTemplateForm();
+            await LoadPdfAsync();
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+    private async Task EnsureTemplateAsync()
+    {
+        if (Id is not { } id) return;
+        if (template is not null) return;
+        var code = string.IsNullOrWhiteSpace(templateForm.Code) ? $"{form.Code}-tpl" : templateForm.Code.Trim();
+        var name = string.IsNullOrWhiteSpace(templateForm.Name) ? form.Name : templateForm.Name.Trim();
+        var json = string.IsNullOrWhiteSpace(templateForm.TemplateJson) ? "{}" : templateForm.TemplateJson;
+        template = await Documents.CreateTemplateAsync(new CreateWorkflowTemplateRequest(code, name, id, 1, json, templateForm.OutputFormat));
+        BindTemplateForm();
+    }
+    private Task UploadWordAsync(InputFileChangeEventArgs args) => UploadTemplateFileAsync("word", args.File, refreshPreview: true);
+    private async Task UploadTemplateFileAsync(string kind, IBrowserFile file, bool refreshPreview = false)
+    {
+        if (Id is null) return;
+        try
+        {
+            await EnsureTemplateAsync();
+            template = await Documents.UploadTemplateFileAsync(template!.Id, kind, file);
+            if (refreshPreview) await LoadPdfAsync();
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+    private async Task SetActiveAsync()
+    {
+        if (template is null) return;
+        try { template = await Documents.SetTemplateActiveAsync(template.Id, true); await NotifySuccessAsync(L["Catalog:Updated"]); }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+    private async Task LoadPdfAsync()
+    {
+        if (template?.PdfFileId is null)
+        {
+            await RevokePdfAsync();
+            return;
+        }
+        try
+        {
+            var bytes = await Documents.GetTemplateFileAsync(template.Id, "pdf");
+            await RevokePdfAsync();
+            pdfUrl = await Js.InvokeAsync<string>("hcsCreateObjectUrl", "application/pdf", bytes);
+        }
+        catch { pdfUrl = null; }
+    }
+    private async Task RevokePdfAsync()
+    {
+        var previous = pdfUrl;
+        pdfUrl = null;
+        if (string.IsNullOrWhiteSpace(previous)) return;
+        try { await Js.InvokeVoidAsync("hcsRevokeObjectUrl", previous); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+    private async Task AddStep()
+    {
+        isNewStep = true;
+        editingStep = new StepDraft($"step{form.Steps.Count + 1}", L["Feature:StepName"], "PROCESS", "Documents.Workflow.Decide")
+        {
+            SlaDays = 1
+        };
+        if (stepModal is not null) await stepModal.Show();
+    }
+    private async Task EditStep(StepDraft step)
+    {
+        isNewStep = false;
+        editingStep = step;
+        if (stepModal is not null) await stepModal.Show();
+    }
+    private void OnStepTypeChanged(string value)
+    {
+        if (editingStep is null) return;
+        editingStep.Type = value;
+        editingStep.AssigneeUserId = null;
+        editingStep.AssigneeType = value == "VIEW" ? "ScopedAssignee" : "SpecificUser";
+        editingStep.RoleId = null;
+        editingStep.UserIds = [];
+        editingStep.DepartmentIds = [];
+    }
+    private async Task RemoveStep(StepDraft step)
+    {
+        if (form.Steps.Count <= 1) return;
+        form.Steps.Remove(step);
+        if (Id is not null) await SaveStepsAsync();
+    }
+    private async Task CloseStepModal()
+    {
+        if (editingStep is null) return;
+        if (string.IsNullOrWhiteSpace(editingStep.Code) || string.IsNullOrWhiteSpace(editingStep.Name))
+        {
+            await NotifyErrorAsync(L["Catalog:TypeRequired"]);
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(editingStep.RequiredPermission))
+            editingStep.RequiredPermission = "Documents.Workflow.Decide";
+        if (!TryNormalizeAssignment(editingStep, out var errorKey))
+        {
+            await NotifyErrorAsync(L[errorKey]);
+            return;
+        }
+        if (isNewStep && !form.Steps.Contains(editingStep))
+            form.Steps.Add(editingStep);
+        isNewStep = false;
+        if (stepModal is not null) await stepModal.Hide();
+        await SaveStepsAsync();
+    }
+    private static bool TryNormalizeAssignment(StepDraft step, out string errorKey)
+    {
+        errorKey = "Work:AssigneeRequired";
+        if (step.Type == "VIEW")
+        {
+            step.AssigneeType = "ScopedAssignee";
+            step.AssigneeUserId = null;
+            return step.UserIds.Count > 0 || step.DepartmentIds.Count > 0 || step.RoleId is not null;
+        }
+        if (step.AssigneeType == "RoleInSubmitterOu")
+        {
+            step.AssigneeUserId = null;
+            step.UserIds = [];
+            return step.RoleId is not null;
+        }
+        step.AssigneeType = "SpecificUser";
+        step.RoleId = null;
+        if (step.AssigneeUserId is not { } userId)
+            return false;
+        step.UserIds = [userId];
+        return true;
+    }
+    private RenderFragment BoolIcon(bool value) => builder =>
+    {
+        builder.OpenElement(0, "i");
+        builder.AddAttribute(1, "class", value
+            ? "fa fa-check hcs-status-icon hcs-status-icon--active"
+            : "fa fa-times hcs-status-icon hcs-status-icon--inactive");
+        builder.CloseElement();
+    };
+    private RenderFragment AssigneePills(StepDraft step) => builder =>
+    {
+        var seq = 0;
+        builder.OpenElement(seq++, "div");
+        builder.AddAttribute(seq++, "class", "hcs-assignee-pills");
+        if (step.RoleId is { } roleId)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "hcs-pill hcs-pill--role");
+            builder.AddContent(seq++, roles.FirstOrDefault(x => x.Id == roleId)?.Name ?? L["Feature:Role"]);
+            builder.CloseElement();
+        }
+        if (step.AssigneeUserId is { } userId)
+        {
+            var name = ContactName(userId);
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "hcs-pill hcs-pill--user");
+            builder.AddContent(seq++, string.IsNullOrWhiteSpace(name) ? L["Work:Assignee"] : name);
+            builder.CloseElement();
+        }
+        else if (step.UserIds.Count > 0)
+        {
+            builder.OpenElement(seq++, "span");
+            builder.AddAttribute(seq++, "class", "hcs-pill hcs-pill--user");
+            builder.AddContent(seq++, $"{step.UserIds.Count} {L["Work:Members"]}");
+            builder.CloseElement();
+        }
+        if (step.RoleId is null && step.AssigneeUserId is null && step.UserIds.Count == 0)
+            builder.AddContent(seq++, "—");
+        builder.CloseElement();
+    };
+    private List<WorkflowStepInput> MapSteps() => form.Steps.Select((step, index) =>
+    {
+        var isView = step.Type == "VIEW";
+        var assigneeType = isView ? "ScopedAssignee" : (string.IsNullOrWhiteSpace(step.AssigneeType) ? "SpecificUser" : step.AssigneeType);
+        var isRole = assigneeType == "RoleInSubmitterOu";
+        var assigneeUserId = isView || isRole ? null : step.AssigneeUserId;
+        var userIds = isView
+            ? step.UserIds
+            : assigneeUserId is { } userId ? new List<Guid> { userId } : [];
+        return new WorkflowStepInput(
+            string.IsNullOrWhiteSpace(step.Code) ? $"step{index + 1}" : step.Code.Trim(),
+            step.Name.Trim(),
+            index + 1,
+            string.IsNullOrWhiteSpace(step.RequiredPermission) ? "Documents.Workflow.Decide" : step.RequiredPermission.Trim(),
+            step.Type,
+            assigneeUserId,
+            assigneeType,
+            isRole || isView ? step.RoleId : null,
+            userIds,
+            isView ? step.DepartmentIds : [],
+            step.SlaDays,
+            step.AllowReturn);
+    }).ToList();
+    private string KindName(Guid? id) => id is null ? "" : kinds.FirstOrDefault(x => x.Id == id)?.Name ?? "";
+    private void GoBackToList() => Navigation.NavigateTo("/workflow-lists");
+    private string ContactName(Guid? id) => id is null ? "" : contacts.FirstOrDefault(x => x.Id == id)?.DisplayName ?? "";
+    private CatalogSelect2Item? ContactItem(Guid? id) =>
+        contacts.FirstOrDefault(x => x.Id == id) is { } contact ? CatalogSelect2Cache.UserItem(contact) : null;
+    private IReadOnlyList<CatalogSelect2Item> ContactItems(IEnumerable<Guid> ids) =>
+        ids.Select(id => ContactItem(id)).OfType<CatalogSelect2Item>().ToList();
+    private string RoleName(Guid? id) => CatalogSelect2Cache.TextFor(roles, id, x => x.Id, x => x.Name);
+    private const string SpecificUserAssignee = "SpecificUser";
+    private const string RoleInSubmitterOuAssignee = "RoleInSubmitterOu";
+    private string AssigneeTypeRadioName => "hcs-assignee-type-" + (editingStep?.Key.ToString("N") ?? "new");
+    private string AssigneeSelectKey =>
+        (editingStep?.Key.ToString("N") ?? "new") + "-" + (editingStep?.AssigneeType ?? SpecificUserAssignee);
+    private bool IsRoleAssignee => editingStep?.AssigneeType == RoleInSubmitterOuAssignee;
+    private async Task SetAssigneeTypeAsync(string value)
+    {
+        if (editingStep is null) return;
+        var next = value == RoleInSubmitterOuAssignee ? RoleInSubmitterOuAssignee : SpecificUserAssignee;
+        if (editingStep.AssigneeType == next) return;
+        editingStep.AssigneeType = next;
+        editingStep.UserIds = [];
+        if (next == RoleInSubmitterOuAssignee)
+            editingStep.AssigneeUserId = null;
+        else
+            editingStep.RoleId = null;
+        await InvokeAsync(StateHasChanged);
+    }
+    private IReadOnlyList<string> UserNames(IEnumerable<Guid> ids) => CatalogSelect2Cache.TextsFor(contacts, ids, x => x.Id, x => x.DisplayName);
+    private Task<CatalogSelect2SearchResponse> SearchRolesAsync(string term, int page)
+    {
+        var found = roles.Where(x => string.IsNullOrWhiteSpace(term)
+            || x.Name.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+        return Task.FromResult(CatalogSelect2Cache.Merge(roles, found, x => x.Id, x => x.Name, false));
+    }
+    private Task<CatalogSelect2SearchResponse> SearchKindsAsync(string term, int page)
+    {
+        var found = kinds.Where(x => string.IsNullOrWhiteSpace(term) || x.Name.Contains(term, StringComparison.OrdinalIgnoreCase) || x.Code.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+        return Task.FromResult(CatalogSelect2Cache.Merge(kinds, found, x => x.Id, x => CatalogSelect2Text.CodeName(x.Code, x.Name), false));
+    }
+    private async Task<CatalogSelect2SearchResponse> SearchContactsAsync(string term, int page)
+    {
+        var found = await Chat.GetContactsAsync(term, 50);
+        return CatalogSelect2Cache.Merge(contacts, found, x => x.Id, x => x.DisplayName, more: false, itemOf: CatalogSelect2Cache.UserItem);
+    }
+    public async ValueTask DisposeAsync()
+    {
+        try { await RevokePdfAsync(); } catch { }
+    }
+
+    private sealed class StepDraft(string code, string name, string type, string permission)
+    {
+        public Guid Key { get; } = Guid.NewGuid();
+        public string Code { get; set; } = code;
+        public string Name { get; set; } = name;
+        public string Type { get; set; } = type;
+        public string RequiredPermission { get; set; } = permission;
+        public Guid? AssigneeUserId { get; set; }
+        public string AssigneeType { get; set; } = "SpecificUser";
+        public Guid? RoleId { get; set; }
+        public List<Guid> UserIds { get; set; } = [];
+        public List<Guid> DepartmentIds { get; set; } = [];
+        public int? SlaDays { get; set; } = 1;
+        public bool AllowReturn { get; set; }
+        public bool HasAssignment => AssigneeUserId.HasValue || UserIds.Count > 0 || DepartmentIds.Count > 0 || RoleId.HasValue;
+        public static StepDraft From(WorkflowStepDto step)
+        {
+            var draft = new StepDraft(step.Code, step.Name, step.Type, step.RequiredPermission)
+            {
+                AssigneeUserId = step.AssigneeUserId,
+                AssigneeType = string.IsNullOrWhiteSpace(step.AssigneeType) ? "SpecificUser" : step.AssigneeType,
+                RoleId = step.RoleId,
+                UserIds = step.UserIds?.ToList() ?? [],
+                DepartmentIds = step.DepartmentIds?.ToList() ?? [],
+                SlaDays = step.SlaDays,
+                AllowReturn = step.AllowReturn
+            };
+            return draft;
+        }
+    }
+    private sealed class WorkflowForm
+    {
+        public Guid? KindId { get; set; }
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Description { get; set; } = "";
+        public string SignMode { get; set; } = "SEQUENTIAL";
+        public bool IsActive { get; set; } = true;
+        public List<StepDraft> Steps { get; } = [new("review", "Review", "PROCESS", "Documents.Workflow.Decide")];
+        public void Reset()
+        {
+            KindId = null; Code = Name = Description = ""; SignMode = "SEQUENTIAL"; IsActive = true;
+            Steps.Clear();
+            Steps.Add(new("review", "Review", "PROCESS", "Documents.Workflow.Decide"));
+        }
+    }
+    private sealed class TemplateForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string TemplateJson { get; set; } = "{}";
+        public string OutputFormat { get; set; } = "PDF";
+        public void Reset()
+        {
+            Code = Name = "";
+            TemplateJson = "{}";
+            OutputFormat = "PDF";
+        }
+    }
+}

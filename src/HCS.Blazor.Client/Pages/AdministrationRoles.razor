@@ -1,0 +1,622 @@
+@page "/administration/roles"
+@page "/roles"
+@attribute [Authorize(Roles = "admin")]
+@using HCS.Localization
+@using System.Net
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Web
+@using Microsoft.Extensions.Localization
+@using Volo.Abp.AspNetCore.Components.Messages
+@inject IdentityAdminClient IdentityClient
+@inject IUiMessageService UiMessageService
+@inject IStringLocalizer<HCSResource> L
+@inject NavigationManager Navigation
+
+<PageTitle>@L["Roles:Title"] · HCS</PageTitle>
+
+<AuthorizeView Roles="admin">
+    <Authorized>
+        <main class="hcs-admin-page hcs-roles-page">
+            <header class="hcs-admin-heading hcs-roles-heading">
+                <div>
+                    <h1>@L["Roles:Title"]</h1>
+                    <p>@L["Roles:Description"]</p>
+                </div>
+                <div class="hcs-roles-heading__actions">
+                    <Button Color="Color.Primary" Class="hcs-role-create" Clicked="OpenCreateRoleAsync" Disabled="@isCreatingRole">
+                        <i class="fa fa-plus" aria-hidden="true"></i> @L["Roles:Create"]
+                    </Button>
+                    <Button Color="Color.Light" Class="hcs-roles-refresh" Clicked="LoadRolesAsync" Disabled="@isLoading">
+                        <i class="fa fa-rotate" aria-hidden="true"></i> @L["Roles:Refresh"]
+                    </Button>
+                </div>
+            </header>
+
+            @if (!string.IsNullOrWhiteSpace(errorMessage))
+            {
+                <div class="hcs-admin-alert" role="alert">
+                    <span>@errorMessage</span>
+                    @if (sessionExpired)
+                    {
+                        <Button Color="Color.Primary" Size="Size.Small" Clicked="NavigateToLogin">@L["Roles:LoginAgain"]</Button>
+                    }
+                    else
+                    {
+                        <Button Color="Color.Light" Size="Size.Small" Clicked="LoadRolesAsync">@L["Roles:Retry"]</Button>
+                    }
+                </div>
+            }
+
+            @if (isLoading && roles.Count == 0)
+            {
+                <section class="hcs-roles-state hcs-loading" aria-live="polite">
+                    <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                    <p>@L["Roles:LoadingRoles"]</p>
+                </section>
+            }
+            else if (roles.Count == 0)
+            {
+                <section class="hcs-roles-state hcs-empty">
+                    <i class="fa fa-shield-halved" aria-hidden="true"></i>
+                    <h2>@L["Roles:EmptyTitle"]</h2>
+                    <p>@L["Roles:EmptyDescription"]</p>
+                </section>
+            }
+            else
+            {
+                <div class="hcs-roles-layout">
+                    <Card Class="hcs-roles-list-card">
+                        <CardHeader>
+                            <CardTitle>@L["Roles:ListTitle"]</CardTitle>
+                        </CardHeader>
+                        <CardBody>
+                            <div class="hcs-roles-list" aria-label='@L["Roles:ListTitle"]'>
+                                @foreach (var role in roles)
+                                {
+                                    <button type="button" class="hcs-role-option @(selectedRoleName == role.Name ? "is-active" : null)" @onclick="@(() => LoadPermissionsAsync(role.Name))">
+                                        <span class="hcs-role-option__name">@role.Name</span>
+                                        <span class="hcs-role-option__tags">
+                                            @if (role.IsStatic)
+                                            {
+                                                <small>@L["Roles:Static"]</small>
+                                            }
+                                            @if (role.IsDefault)
+                                            {
+                                                <small>@L["Roles:Default"]</small>
+                                            }
+                                            @if (role.IsPublic)
+                                            {
+                                                <small>@L["Roles:Public"]</small>
+                                            }
+                                        </span>
+                                    </button>
+                                }
+                            </div>
+                        </CardBody>
+                    </Card>
+
+                    <Card Class="hcs-role-permissions-card">
+                        <CardHeader>
+                            <div>
+                                <CardTitle>@L["Roles:PermissionsTitle"]</CardTitle>
+                                <p class="hcs-role-permissions-card__subtitle">@selectedRoleName</p>
+                            </div>
+                        </CardHeader>
+                        <CardBody>
+                            @if (isLoadingPermissions)
+                            {
+                                <section class="hcs-roles-state hcs-loading" aria-live="polite">
+                                    <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                                    <p>@L["Roles:LoadingPermissions"]</p>
+                                </section>
+                            }
+                            else if (!string.IsNullOrWhiteSpace(permissionErrorMessage) && permissionGroups.Count == 0)
+                            {
+                                <div class="hcs-admin-alert" role="alert">
+                                    <span>@permissionErrorMessage</span>
+                                    @if (permissionSessionExpired)
+                                    {
+                                        <Button Color="Color.Primary" Size="Size.Small" Clicked="NavigateToLogin">@L["Roles:LoginAgain"]</Button>
+                                    }
+                                    else
+                                    {
+                                        <Button Color="Color.Light" Size="Size.Small" Clicked="@(() => LoadPermissionsAsync(selectedRoleName!))">@L["Roles:Retry"]</Button>
+                                    }
+                                </div>
+                            }
+                            else
+                            {
+                                @if (!string.IsNullOrWhiteSpace(permissionErrorMessage))
+                                {
+                                    <div class="hcs-admin-alert" role="alert">
+                                        <span>@permissionErrorMessage</span>
+                                    </div>
+                                }
+                                <div class="hcs-permission-toolbar">
+                                    <TextInput @bind-Value="permissionFilter" Placeholder='@L["Roles:SearchPermissions"]' Autocomplete="off" name="hcsRolePermissionFilter" />
+                                    <label class="form-check">
+                                        <input class="form-check-input" type="checkbox" checked="@AllPermissionsGranted" disabled="@(!HasAnyEditablePermissions || IsAdminRole)" @onchange="OnToggleAllPermissions" />
+                                        <span class="form-check-label">@L["Roles:GrantAll"]</span>
+                                    </label>
+                                </div>
+                                <div class="hcs-permission-layout">
+                                    <fieldset class="hcs-permission-groups">
+                                        <legend>@L["Roles:PermissionGroups"]</legend>
+                                        @foreach (var group in permissionGroups)
+                                        {
+                                            <button type="button" class="@(selectedPermissionGroup == group.Name ? "is-active" : null)" @onclick="@(() => selectedPermissionGroup = group.Name)">
+                                                <span>@PermissionLabel(group.Name, group.DisplayName)</span>
+                                                <small>@group.Permissions.Count(permission => permission.IsGranted)</small>
+                                            </button>
+                                        }
+                                    </fieldset>
+                                    <section class="hcs-permission-items" aria-label='@L["Roles:PermissionList"]'>
+                                        @if (SelectedPermissionGroup is null)
+                                        {
+                                        <p class="hcs-empty-state">@L["Roles:SelectGroup"]</p>
+                                        }
+                                        else
+                                        {
+                                            <label class="form-check">
+                                                <input class="form-check-input" type="checkbox" checked="@SelectedGroupAllGranted" disabled="@(!HasEditablePermissions(SelectedPermissionGroup) || IsAdminRole)" @onchange="OnToggleSelectedGroup" />
+                                                <span class="form-check-label">@L["Roles:SelectAll"]</span>
+                                            </label>
+                                            <hr />
+                                            @foreach (var permission in VisiblePermissions)
+                                            {
+                                                <div class="hcs-permission-row" @key="permission.Name">
+                                                    <label class="form-check">
+                                                        <input class="form-check-input" type="checkbox" checked="@permission.IsGranted" disabled="@(!permission.IsEditable || IsAdminRole)" @onchange="@(e => OnPermissionChanged(permission, e))" />
+                                                        <span class="form-check-label">@PermissionLabel(permission.Name, permission.DisplayName)</span>
+                                                    </label>
+                                                    <small>@permission.Name</small>
+                                                </div>
+                                            }
+                                        }
+                                    </section>
+                                </div>
+                            }
+                        </CardBody>
+                        <CardFooter>
+                            @if (IsAdminRole)
+                            {
+                                <p class="hcs-role-permissions-hint">@L["Roles:AdminImmutable"]</p>
+                            }
+                            @if (CanDeleteSelectedRole)
+                            {
+                                <Button Color="Color.Danger" Class="hcs-role-delete me-2" Clicked="DeleteSelectedRoleAsync" Loading="@isDeleting" Disabled="@(isDeleting || isSaving || isLoadingPermissions)">
+                                    <i class="fa fa-trash" aria-hidden="true"></i> @L["Roles:Delete"]
+                                </Button>
+                            }
+                            <Button Color="Color.Primary" Class="hcs-role-permissions-save" Clicked="SavePermissionsAsync" Loading="@isSaving" Disabled="@(isSaving || isDeleting || isLoadingPermissions || string.IsNullOrWhiteSpace(selectedRoleName) || IsAdminRole)">
+                                <i class="fa fa-floppy-disk" aria-hidden="true"></i> @L["Roles:SavePermissions"]
+                            </Button>
+                        </CardFooter>
+                    </Card>
+                </div>
+            }
+        </main>
+    </Authorized>
+    <NotAuthorized>
+        <main class="hcs-admin-page"><div class="hcs-admin-alert" role="alert">@L["Roles:NoAdminPermission"]</div></main>
+    </NotAuthorized>
+</AuthorizeView>
+
+<Modal @ref="createRoleModal">
+    <ModalContent Centered="true" Class="hcs-role-create-modal">
+        <ModalHeader>
+            <ModalTitle>@L["Roles:CreateTitle"]</ModalTitle>
+            <CloseButton Clicked="CloseCreateRoleAsync" />
+        </ModalHeader>
+        <ModalBody>
+            @if (!string.IsNullOrWhiteSpace(createRoleErrorMessage))
+            {
+                <div class="hcs-admin-alert" role="alert">@createRoleErrorMessage</div>
+            }
+            <Field>
+                <FieldLabel>@L["Roles:Name"] *</FieldLabel>
+                <HcsIsolatedTextInput @bind-Value="roleForm.Name" Name="hcsRoleName" Autofocus="true" Placeholder='@L["Roles:NamePlaceholder"].Value' />
+            </Field>
+            <div class="hcs-role-create-flags">
+                <Check TValue="bool" @bind-Checked="roleForm.IsDefault">@L["Roles:Default"]</Check>
+                <Check TValue="bool" @bind-Checked="roleForm.IsPublic">@L["Roles:Public"]</Check>
+            </div>
+        </ModalBody>
+        <ModalFooter>
+            <Button Color="Color.Secondary" Class="hcs-modal-cancel" Clicked="CloseCreateRoleAsync">@L["Roles:Cancel"]</Button>
+            <Button Color="Color.Primary" Class="hcs-modal-save" Clicked="CreateRoleAsync" Loading="@isCreatingRole" Disabled="@isCreatingRole">@L["Roles:CreateSubmit"]</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+
+@code {
+    private readonly List<IdentityAdminRoleDto> roles = [];
+    private readonly List<IdentityAdminPermissionGroup> permissionGroups = [];
+    private Modal? createRoleModal;
+    private IdentityAdminRoleCreateForm roleForm = new();
+    private string? selectedRoleName;
+    private string? selectedPermissionGroup;
+    private string? permissionFilter;
+    private string? errorMessage;
+    private string? permissionErrorMessage;
+    private string? createRoleErrorMessage;
+    private bool sessionExpired;
+    private bool permissionSessionExpired;
+    private bool isLoading;
+    private bool isLoadingPermissions;
+    private bool isCreatingRole;
+    private bool isSaving;
+    private bool isDeleting;
+
+    private IdentityAdminRoleDto? SelectedRole =>
+        roles.FirstOrDefault(role => string.Equals(role.Name, selectedRoleName, StringComparison.OrdinalIgnoreCase));
+
+    private bool CanDeleteSelectedRole => SelectedRole is { } role && CanDelete(role);
+
+    private IdentityAdminPermissionGroup? SelectedPermissionGroup =>
+        permissionGroups.FirstOrDefault(group => group.Name == selectedPermissionGroup);
+
+    private IEnumerable<IdentityAdminPermission> VisiblePermissions =>
+        (SelectedPermissionGroup?.Permissions ?? []).Where(permission =>
+            string.IsNullOrWhiteSpace(permissionFilter) ||
+            permission.DisplayName.Contains(permissionFilter, StringComparison.OrdinalIgnoreCase) ||
+            permission.Name.Contains(permissionFilter, StringComparison.OrdinalIgnoreCase));
+
+    private bool IsAdminRole =>
+        string.Equals(selectedRoleName, "admin", StringComparison.OrdinalIgnoreCase);
+
+    private static bool CanDelete(IdentityAdminRoleDto role) =>
+        !role.IsStatic && !string.Equals(role.Name, "admin", StringComparison.OrdinalIgnoreCase);
+
+    private bool AllPermissionsGranted
+    {
+        get
+        {
+            var editablePermissions = EditablePermissions().ToList();
+            return editablePermissions.Count > 0 && editablePermissions.All(permission => permission.IsGranted);
+        }
+    }
+
+    private bool HasAnyEditablePermissions => EditablePermissions().Any();
+
+    private bool SelectedGroupAllGranted
+    {
+        get
+        {
+            var editablePermissions = EditablePermissions(SelectedPermissionGroup).ToList();
+            return editablePermissions.Count > 0 && editablePermissions.All(permission => permission.IsGranted);
+        }
+    }
+
+    protected override async Task OnInitializedAsync() => await LoadRolesAsync();
+
+    private async Task LoadRolesAsync()
+    {
+        isLoading = true;
+        errorMessage = null;
+        sessionExpired = false;
+        try
+        {
+            var result = await IdentityClient.GetRolesAsync(maxResultCount: 100);
+            roles.Clear();
+            roles.AddRange(result.Items);
+            var nextRole = roles.FirstOrDefault(role => role.Name == selectedRoleName) ?? roles.FirstOrDefault();
+            if (nextRole is null)
+            {
+                selectedRoleName = null;
+                permissionGroups.Clear();
+            }
+            else
+            {
+                await LoadPermissionsAsync(nextRole.Name);
+            }
+        }
+        catch (IdentityAdminApiException exception)
+        {
+            sessionExpired = exception.StatusCode == HttpStatusCode.Unauthorized;
+            errorMessage = FriendlyApiError(exception, "Roles:LoadError");
+        }
+        catch (Exception)
+        {
+            errorMessage = L["Roles:LoadError"].Value;
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task LoadPermissionsAsync(string roleName)
+    {
+        if (string.IsNullOrWhiteSpace(roleName)) return;
+        selectedRoleName = roleName;
+        var previousGroup = selectedPermissionGroup;
+        selectedPermissionGroup = null;
+        permissionFilter = null;
+        permissionErrorMessage = null;
+        permissionSessionExpired = false;
+        isLoadingPermissions = true;
+        permissionGroups.Clear();
+        try
+        {
+            var result = await IdentityClient.GetRolePermissionsAsync(roleName);
+            permissionGroups.AddRange(result.Groups);
+            selectedPermissionGroup = permissionGroups.FirstOrDefault(group => group.Name == previousGroup)?.Name
+                ?? permissionGroups.FirstOrDefault()?.Name;
+        }
+        catch (IdentityAdminApiException exception)
+        {
+            permissionSessionExpired = exception.StatusCode == HttpStatusCode.Unauthorized;
+            permissionErrorMessage = FriendlyApiError(exception, "Roles:PermissionsLoadError");
+        }
+        catch (Exception)
+        {
+            permissionErrorMessage = L["Roles:PermissionsLoadError"].Value;
+        }
+        finally
+        {
+            isLoadingPermissions = false;
+        }
+    }
+
+    private Task OnToggleAllPermissions(ChangeEventArgs args)
+    {
+        if (!IsAdminRole)
+        {
+            SetGranted(EditablePermissions(), CheckboxValue(args));
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task OnToggleSelectedGroup(ChangeEventArgs args)
+    {
+        if (!IsAdminRole)
+        {
+            SetGranted(EditablePermissions(SelectedPermissionGroup), CheckboxValue(args));
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private Task OnPermissionChanged(IdentityAdminPermission permission, ChangeEventArgs args)
+    {
+        if (permission.IsEditable && !IsAdminRole)
+        {
+            permission.IsGranted = CheckboxValue(args);
+        }
+
+        return InvokeAsync(StateHasChanged);
+    }
+
+    private static bool HasEditablePermissions(IdentityAdminPermissionGroup? group) =>
+        EditablePermissions(group).Any();
+
+    private IEnumerable<IdentityAdminPermission> EditablePermissions() =>
+        permissionGroups.SelectMany(group => EditablePermissions(group));
+
+    private static IEnumerable<IdentityAdminPermission> EditablePermissions(IdentityAdminPermissionGroup? group) =>
+        group?.Permissions.Where(permission => permission.IsEditable) ?? [];
+
+    private static void SetGranted(IEnumerable<IdentityAdminPermission> permissions, bool isGranted)
+    {
+        foreach (var permission in permissions)
+        {
+            permission.IsGranted = isGranted;
+        }
+    }
+
+    private static bool CheckboxValue(ChangeEventArgs args) =>
+        args.Value is bool value ? value : bool.TryParse(args.Value?.ToString(), out var parsed) && parsed;
+
+    private async Task SavePermissionsAsync()
+    {
+        if (isSaving || string.IsNullOrWhiteSpace(selectedRoleName) || IsAdminRole)
+        {
+            if (IsAdminRole)
+            {
+                permissionErrorMessage = L["Roles:AdminImmutable"].Value;
+            }
+
+            return;
+        }
+
+        isSaving = true;
+        permissionErrorMessage = null;
+        try
+        {
+            await IdentityClient.UpdateRolePermissionsAsync(selectedRoleName, permissionGroups.SelectMany(group => group.Permissions));
+            await LoadPermissionsAsync(selectedRoleName);
+            if (string.IsNullOrWhiteSpace(permissionErrorMessage))
+            {
+                await UiMessageService.Success(L["Roles:Saved"].Value);
+            }
+        }
+        catch (IdentityAdminApiException exception)
+        {
+            permissionErrorMessage = FriendlyApiError(exception, "Roles:SaveError");
+            await UiMessageService.Error(permissionErrorMessage);
+        }
+        catch (Exception)
+        {
+            permissionErrorMessage = L["Roles:SaveError"].Value;
+            await UiMessageService.Error(permissionErrorMessage);
+        }
+        finally
+        {
+            isSaving = false;
+        }
+    }
+
+    private async Task OpenCreateRoleAsync()
+    {
+        roleForm = new IdentityAdminRoleCreateForm();
+        createRoleErrorMessage = null;
+        if (createRoleModal is not null)
+        {
+            await createRoleModal.Show();
+        }
+    }
+
+    private async Task CloseCreateRoleAsync()
+    {
+        if (createRoleModal is not null)
+        {
+            await createRoleModal.Hide();
+        }
+
+        roleForm = new IdentityAdminRoleCreateForm();
+        createRoleErrorMessage = null;
+    }
+
+    private async Task CreateRoleAsync()
+    {
+        if (isCreatingRole)
+        {
+            return;
+        }
+
+        var roleName = roleForm.Name.Trim();
+        if (string.IsNullOrWhiteSpace(roleName))
+        {
+            createRoleErrorMessage = L["Roles:NameRequired"].Value;
+            return;
+        }
+
+        isCreatingRole = true;
+        createRoleErrorMessage = null;
+        try
+        {
+            var created = await IdentityClient.CreateRoleAsync(roleName, roleForm.IsDefault, roleForm.IsPublic);
+            await CloseCreateRoleAsync();
+            await UiMessageService.Success(L["Roles:Created"].Value);
+            await LoadRolesAsync();
+            if (roles.FirstOrDefault(role => role.Name == created.Name) is { } createdRole)
+            {
+                await LoadPermissionsAsync(createdRole.Name);
+            }
+        }
+        catch (IdentityAdminApiException exception)
+        {
+            createRoleErrorMessage = FriendlyApiError(exception, "Roles:CreateError");
+            await UiMessageService.Error(createRoleErrorMessage);
+        }
+        catch (Exception)
+        {
+            createRoleErrorMessage = L["Roles:CreateError"].Value;
+            await UiMessageService.Error(createRoleErrorMessage);
+        }
+        finally
+        {
+            isCreatingRole = false;
+        }
+    }
+
+    private async Task DeleteSelectedRoleAsync()
+    {
+        var role = SelectedRole;
+        if (role is null || !CanDelete(role) || isDeleting)
+        {
+            return;
+        }
+
+        if (!await UiMessageService.Confirm(string.Format(L["Roles:DeleteConfirmation"].Value, role.Name)))
+        {
+            return;
+        }
+
+        isDeleting = true;
+        errorMessage = null;
+        try
+        {
+            await IdentityClient.DeleteRoleAsync(role.Id);
+            selectedRoleName = null;
+            await LoadRolesAsync();
+            await UiMessageService.Success(L["Roles:Deleted"].Value);
+        }
+        catch (IdentityAdminApiException exception)
+        {
+            sessionExpired = exception.StatusCode == HttpStatusCode.Unauthorized;
+            errorMessage = FriendlyApiError(exception, "Roles:DeleteError", "Roles:DeleteConflict");
+            await UiMessageService.Error(errorMessage);
+        }
+        catch (Exception)
+        {
+            errorMessage = L["Roles:DeleteError"].Value;
+            await UiMessageService.Error(errorMessage);
+        }
+        finally
+        {
+            isDeleting = false;
+        }
+    }
+
+    private string PermissionLabel(string name, string fallback)
+    {
+        foreach (var candidate in PermissionLabelCandidates(name, fallback))
+        {
+            var localized = L[$"Permission:{candidate}"];
+            if (!localized.ResourceNotFound)
+            {
+                return localized.Value;
+            }
+        }
+
+        return string.IsNullOrWhiteSpace(fallback) ? name : fallback;
+    }
+
+    private static IEnumerable<string> PermissionLabelCandidates(string name, string fallback)
+    {
+        foreach (var raw in new[] { name, fallback })
+        {
+            if (string.IsNullOrWhiteSpace(raw))
+            {
+                continue;
+            }
+
+            var normalized = NormalizePermissionName(raw);
+            yield return normalized;
+
+            if (normalized.StartsWith("Abp", StringComparison.Ordinal) && normalized.Length > 3)
+            {
+                yield return normalized[3..];
+            }
+
+            if (!normalized.StartsWith("Abp", StringComparison.Ordinal) &&
+                (normalized.StartsWith("FeatureManagement", StringComparison.Ordinal) ||
+                 normalized.StartsWith("SettingManagement", StringComparison.Ordinal) ||
+                 normalized.StartsWith("PermissionManagement", StringComparison.Ordinal) ||
+                 normalized.StartsWith("Identity", StringComparison.Ordinal)))
+            {
+                yield return "Abp" + normalized;
+            }
+        }
+    }
+
+    private static string NormalizePermissionName(string value)
+    {
+        var normalized = value.Trim();
+        if (normalized.StartsWith("HCS.", StringComparison.OrdinalIgnoreCase))
+        {
+            normalized = normalized[4..];
+        }
+
+        return normalized.StartsWith("Permission:", StringComparison.OrdinalIgnoreCase)
+            ? normalized["Permission:".Length..]
+            : normalized;
+    }
+
+    private void NavigateToLogin() => Navigation.NavigateTo("/login", forceLoad: true);
+
+    private string FriendlyApiError(IdentityAdminApiException exception, string fallbackKey, string? conflictKey = null) => exception.StatusCode switch
+    {
+        HttpStatusCode.Unauthorized => L["Roles:SessionExpired"].Value,
+        HttpStatusCode.Forbidden => L["Roles:Forbidden"].Value,
+        HttpStatusCode.NotFound => L["Roles:NotFound"].Value,
+        HttpStatusCode.BadRequest => exception.ResponseBody?.Contains("admin role", StringComparison.OrdinalIgnoreCase) == true
+            ? L["Roles:AdminImmutable"].Value
+            : L["Roles:BadRequest"].Value,
+        HttpStatusCode.Conflict => L[conflictKey ?? "Roles:Conflict"].Value,
+        _ => L[fallbackKey].Value
+    };
+}

@@ -1,0 +1,276 @@
+@using Blazorise.DataGrid
+@using HCS.Permissions
+@using Microsoft.AspNetCore.Authorization
+@inherits HCSComponentBase
+
+@if (isAuthorized)
+{
+        <section class="hcs-feature hcs-catalog-page" aria-labelledby="catalog-title">
+            <header class="hcs-catalog-titlebar">
+                <div class="min-w-0">
+                    <p class="visually-hidden">@L["Catalog:Section"]</p>
+                    <h1 id="catalog-title">@Definition.Title</h1>
+                    <p class="visually-hidden">@Definition.Description</p>
+                </div>
+                <div class="hcs-catalog-page__actions">
+                    <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-export" Clicked="ExportCurrentPageAsync" Disabled="@(!rows.Any() || isLoading)">
+                        <i class="fa fa-download me-1" aria-hidden="true"></i> @L["Catalog:Export"]
+                    </Button>
+                    @if (canCreate)
+                    {
+                        <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreateModalAsync" Disabled="@isSaving">
+                            <Icon Name="@IconName.Add" /> @L["Catalog:New"]
+                        </Button>
+                    }
+                </div>
+            </header>
+
+            @if (errorCanRetry)
+            {
+                <div class="hcs-catalog-page__actions mb-3">
+                    <Button Color="Color.Light" Outline="true" Clicked="RefreshAsync">
+                        <i class="fa fa-rotate me-1" aria-hidden="true"></i> @L["Catalog:Retry"]
+                    </Button>
+                </div>
+            }
+
+            <Card Class="mb-2 hcs-catalog-filter-card">
+                <CardBody>
+                    <div class="hcs-catalog-filter-row">
+                        <Addons Class="hcs-catalog-search">
+                            <Addon AddonType="AddonType.Body">
+                                <TextInput @bind-Value="filterText" Autofocus="true" Placeholder="@(L["Catalog:SearchPlaceholder"].Value)" />
+                            </Addon>
+                            <Addon AddonType="AddonType.End">
+                                <Button Color="Color.Primary" Clicked="SearchAsync" Disabled="@isLoading">
+                                    <i class="fa fa-search me-1" aria-hidden="true"></i> @L["Catalog:SearchButton"]
+                                </Button>
+                            </Addon>
+                        </Addons>
+                        <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-toggle" Clicked="ToggleAdvancedFilters">
+                            <i class="fa fa-sliders me-2" aria-hidden="true"></i>@L["Catalog:Filter"]
+                            <i class="fa @(showAdvancedFilters ? "fa-chevron-up" : "fa-chevron-down") ms-2" aria-hidden="true"></i>
+                        </Button>
+                    </div>
+                    @if (showAdvancedFilters)
+                    {
+                        <div class="hcs-catalog-advanced-filter">
+                            <Field>
+                                <FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                                <Select TValue="string" @bind-Value="statusFilter" @bind-Value:after="StatusFilterChangedAsync">
+                                    <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                                    <SelectItem Value="@("true")">@L["Catalog:Active"]</SelectItem>
+                                    <SelectItem Value="@("false")">@L["Catalog:Inactive"]</SelectItem>
+                                </Select>
+                            </Field>
+                            <Button Color="Color.Light" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetSearchAsync" Disabled="@isLoading">
+                                @L["Catalog:Reset"]
+                            </Button>
+                        </div>
+                    }
+                </CardBody>
+            </Card>
+
+            <Card Class="hcs-catalog-grid-card">
+                <CardBody>
+                    <DataGrid TItem="OrganizationCatalogRow"
+                              @ref="dataGrid"
+                              Data="@rows"
+                              ReadData="OnDataGridReadAsync"
+                              TotalItems="@totalCount"
+                              ShowPager="true"
+                              ShowPageSizes="true"
+                              PageSizes="@pageSizes"
+                              PageSize="@pageSize"
+                              Responsive="true"
+                              Striped="true"
+                              Hoverable="true"
+                              Class="hcs-catalog-grid">
+                        <EmptyTemplate>
+                            <div class="hcs-empty py-5">
+                                <i class="fa fa-inbox" aria-hidden="true"></i>
+                                <h2>@L["Catalog:EmptyTitle"]</h2>
+                                <p>@L["Catalog:EmptyDescription"]</p>
+                            </div>
+                        </EmptyTemplate>
+                        <LoadingTemplate>
+                            <div class="hcs-loading py-5" role="status" aria-live="polite">
+                                <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                                <span>@L["Catalog:Loading"]</span>
+                            </div>
+                        </LoadingTemplate>
+                        <DataGridColumns>
+                            <DataGridColumn TItem="OrganizationCatalogRow" Caption='@string.Empty'>
+                                <DisplayTemplate Context="cell">
+                                    <input class="hcs-row-check" type="checkbox" disabled tabindex="-1" aria-hidden="true" />
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                            @if (!Definition.IsTypedMasterData && Definition.Kind != OrganizationCatalogKind.Department)
+                            {
+                                <DataGridColumn TItem="OrganizationCatalogRow" Field="Type" Caption='@L["Catalog:Type"].Value' />
+                            }
+                            <DataGridColumn TItem="OrganizationCatalogRow" Field="Code" Caption='@L["Catalog:Code"].Value' />
+                            <DataGridColumn TItem="OrganizationCatalogRow" Field="Name" Caption='@L["Catalog:Name"].Value' />
+                            @if (Definition.Kind is OrganizationCatalogKind.Department or OrganizationCatalogKind.Unit)
+                            {
+                                <DataGridColumn TItem="OrganizationCatalogRow" Caption="@RelationColumnTitle">
+                                    <DisplayTemplate Context="cell">
+                                        @RelationName(cell.Item.RelationId)
+                                    </DisplayTemplate>
+                                </DataGridColumn>
+                            }
+                            @if (Definition.Kind == OrganizationCatalogKind.Position)
+                            {
+                            <DataGridColumn TItem="OrganizationCatalogRow" Field="SignOrder" Caption='@L["Catalog:SignOrder"].Value' />
+                            }
+                            <DataGridColumn TItem="OrganizationCatalogRow" Field="SortOrder" Caption='@L["Catalog:SortOrder"].Value' />
+                            <DataGridColumn TItem="OrganizationCatalogRow" Caption='@L["Catalog:Status"].Value'>
+                                <DisplayTemplate Context="cell">
+                                    <span class="hcs-status-icon @(cell.Item.IsActive ? "hcs-status-icon--active" : "hcs-status-icon--inactive")" title='@(cell.Item.IsActive ? L["Catalog:Active"].Value : L["Catalog:Inactive"].Value)'>
+                                        <i class="fa @(cell.Item.IsActive ? "fa-check" : "fa-xmark")" aria-hidden="true"></i>
+                                        <span class="visually-hidden">@(cell.Item.IsActive ? L["Catalog:Active"] : L["Catalog:Inactive"])</span>
+                                    </span>
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                            @if (canUpdate || canDelete)
+                            {
+                            <DataGridColumn TItem="OrganizationCatalogRow" Caption='@L["Catalog:Actions"].Value'>
+                                <DisplayTemplate Context="cell">
+                                    <div class="hcs-row-actions" @onclick:stopPropagation="true">
+                                        @if (canUpdate)
+                                        {
+                                            <Button Color="Color.Primary" Outline="true" Size="Size.Small" Type="ButtonType.Button" Class="hcs-action-button hcs-action-button--edit" Title='@L["Catalog:Edit"].Value' Clicked="@(() => OpenEditModalAsync(cell.Item))">
+                                                <Icon Name="@IconName.Edit" />
+                                                <span class="visually-hidden">@L["Catalog:Edit"]</span>
+                                            </Button>
+                                        }
+                                        @if (canDelete)
+                                        {
+                                            <Button Color="Color.Danger" Outline="true" Size="Size.Small" Type="ButtonType.Button" Class="hcs-action-button hcs-action-button--delete" Title='@L["Catalog:Delete"].Value' Clicked="@(() => DeleteAsync(cell.Item))" Disabled="@isDeleting.Contains(cell.Item.Id)">
+                                                <Icon Name="@IconName.Delete" />
+                                                <span class="visually-hidden">@L["Catalog:Delete"]</span>
+                                            </Button>
+                                        }
+                                    </div>
+                                </DisplayTemplate>
+                            </DataGridColumn>
+                            }
+                        </DataGridColumns>
+                    </DataGrid>
+                </CardBody>
+            </Card>
+        </section>
+
+        <Modal @ref="editModal" Size="ModalSize.Default">
+            <ModalContent Centered="true" Class="hcs-catalog-modal">
+                <ModalHeader Class="hcs-catalog-modal__header">
+                    <ModalTitle>@(editingId.HasValue ? L["Catalog:EditTitle"] : L["Catalog:CreateTitle"]) @Definition.Title</ModalTitle>
+                    <CloseButton Clicked="CloseModalAsync" />
+                </ModalHeader>
+                <ModalBody Class="hcs-catalog-modal__body">
+                    <Validations @ref="validations" Mode="ValidationMode.Auto" Model="@form" ValidateOnLoad="false">
+                        <div class="hcs-catalog-form">
+                        @if (Definition.Kind == OrganizationCatalogKind.MasterData)
+                        {
+                            <Validation>
+                                <Field>
+                                    <FieldLabel>@L["Catalog:Type"] @(!Definition.IsTypedMasterData ? "*" : string.Empty)</FieldLabel>
+                                    @if (Definition.IsTypedMasterData)
+                                    {
+                                    <Select TValue="string" @bind-Value="form.Type" Disabled="true" Class="hcs-catalog-select">
+                                            <SelectItem Value="@Definition.MasterType">@Definition.Title</SelectItem>
+                                        </Select>
+                                    }
+                                    else
+                                    {
+                                        <Select TValue="string" @bind-Value="form.Type" Class="hcs-catalog-select">
+                                            <SelectItem Value="@string.Empty">@L["Catalog:ChooseType"]</SelectItem>
+                                            @foreach (var masterType in MasterTypeOptions)
+                                            {
+                                                <SelectItem Value="@masterType.Type">@L[masterType.TitleKey]</SelectItem>
+                                            }
+                                        </Select>
+                                    }
+                                </Field>
+                            </Validation>
+                        }
+
+                        @if (Definition.Kind == OrganizationCatalogKind.Department)
+                        {
+                            <Field>
+                                <FieldLabel>@L["Catalog:ParentDepartment"]</FieldLabel>
+                                <CatalogSelect2 Value="@ParseOptionalGuid(form.ParentId)"
+                                                ValueChanged="OnParentDepartmentChanged"
+                                                Placeholder="@L["Catalog:NoParent"]"
+                                                SelectedItem="@DepartmentSelectItem(form.ParentId)"
+                                                Search="SearchParentDepartmentsAsync" />
+                                <FieldHelp>@L["Catalog:ParentDepartmentHelp"]</FieldHelp>
+                            </Field>
+                        }
+
+                        @if (Definition.Kind == OrganizationCatalogKind.Unit)
+                        {
+                            <Field>
+                                <FieldLabel>@L["Catalog:Department"] *</FieldLabel>
+                                <CatalogSelect2 Value="@ParseOptionalGuid(form.DepartmentId)"
+                                                ValueChanged="OnDepartmentChanged"
+                                                Placeholder="@L["Catalog:ChooseDepartment"]"
+                                                SelectedItem="@DepartmentSelectItem(form.DepartmentId)"
+                                                Search="SearchDepartmentsAsync" />
+                            </Field>
+                        }
+
+                        <div class="hcs-form-row">
+                        @* HcsIsolatedTextInput is a plain input — do not wrap in Blazorise Validation
+                           (ValidateAll requires IValidationInput and throws "Input component is not assigned"). *@
+                        <Field>
+                            <FieldLabel>@L["Catalog:Code"] *</FieldLabel>
+                            <HcsIsolatedTextInput @bind-Value="form.Code"
+                                                 Name="hcsCatalogCode"
+                                                 MaxLength="50"
+                                                 Autofocus="true"
+                                                 CssClass="form-control hcs-catalog-input hcs-catalog-input--code" />
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Catalog:Name"] *</FieldLabel>
+                            <HcsIsolatedTextInput @bind-Value="form.Name" Name="hcsCatalogName" MaxLength="256" CssClass="form-control hcs-catalog-input" />
+                        </Field>
+                        </div>
+                        @if (Definition.Kind == OrganizationCatalogKind.Position)
+                        {
+                            <Validation>
+                                <Field>
+                                    <FieldLabel>@L["Catalog:SignOrder"]</FieldLabel>
+                                    <NumericPicker TValue="int" @bind-Value="form.SignOrder" Min="0" Max="100" Decimals="0" Class="hcs-catalog-input" />
+                                </Field>
+                            </Validation>
+                        }
+                        <Validation>
+                            <Field>
+                                <FieldLabel>@L["Catalog:SortOrder"]</FieldLabel>
+                                <NumericPicker TValue="int" @bind-Value="form.SortOrder" Min="0" Max="10000" Decimals="0" Class="hcs-catalog-input" />
+                            </Field>
+                        </Validation>
+                        <Field Class="hcs-catalog-active-field">
+                            <Check TValue="bool" @bind-Checked="form.IsActive">@L["Catalog:Active"]</Check>
+                        </Field>
+                        </div>
+                    </Validations>
+                </ModalBody>
+                <ModalFooter Class="hcs-catalog-modal__footer">
+                    <Button Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="CloseModalAsync">@L["Catalog:Cancel"]</Button>
+                    <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="SaveAsync" Loading="@isSaving" Disabled="@isSaving">
+                        @(editingId.HasValue ? L["Catalog:SaveChanges"] : L["Catalog:Create"])
+                    </Button>
+                </ModalFooter>
+            </ModalContent>
+        </Modal>
+}
+else
+{
+        <div class="hcs-empty py-5">
+            <i class="fa fa-lock" aria-hidden="true"></i>
+            <h2>@L["Catalog:ForbiddenTitle"]</h2>
+            <p>@L["Catalog:ForbiddenDescription"]</p>
+        </div>
+}

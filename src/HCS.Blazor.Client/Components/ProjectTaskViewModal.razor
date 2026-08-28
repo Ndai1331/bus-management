@@ -1,0 +1,254 @@
+@inherits HCSComponentBase
+@inject WorkManagementClient Work
+@inject DocumentClient Documents
+@inject CollaborationClient Chat
+@inject IUiMessageService UiMessage
+
+<Modal @ref="modal" Size="ModalSize.ExtraLarge">
+    <ModalContent Centered Class="hcs-catalog-modal">
+        <ModalHeader Class="hcs-catalog-modal__header">
+            <ModalTitle>@L["Feature:TaskDetail"]</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody Class="hcs-catalog-modal__body">
+            @if (detail is not null)
+            {
+                <Tabs SelectedTab="@tab" SelectedTabChanged="value => tab = value">
+                    <Items>
+                        <Tab Name="general"><Icon Name="IconName.Info" Class="me-1" /> @L["Feature:GeneralInformation"]</Tab>
+                        <Tab Name="assignments"><Icon Name="IconName.Users" Class="me-1" /> @L["Feature:Assignments"]</Tab>
+                        <Tab Name="documents"><Icon Name="IconName.File" Class="me-1" /> @L["Menu:Documents"]</Tab>
+                    </Items>
+                    <Content>
+                        <TabPanel Name="general">
+                            <div class="hcs-catalog-form">
+                                <div class="hcs-form-row">
+                                    <Field><FieldLabel>@L["Catalog:Code"]</FieldLabel><HcsIsolatedTextInput Value="@detail.Task.Code" Name="hcsTaskViewCode" Disabled="true" /></Field>
+                                    <Field><FieldLabel>@L["Feature:TaskTitle"]</FieldLabel><HcsIsolatedTextInput @bind-Value="title" Name="hcsTaskViewTitle" /></Field>
+                                </div>
+                                <Field><FieldLabel>@L["Feature:Description"]</FieldLabel><textarea class="form-control" rows="3" @bind="description"></textarea></Field>
+                                <div class="hcs-form-row hcs-form-row--equal">
+                                    <Field><FieldLabel>@L["Feature:StartDate"]</FieldLabel><HcsDatePicker TValue="DateTime" @bind-Value="startDate" InputMode="DateInputMode.DateTime" ShowTodayButton ShowClearButton /></Field>
+                                    <Field><FieldLabel>@L["Feature:DueDate"]</FieldLabel><HcsDatePicker TValue="DateTime" @bind-Value="dueDate" InputMode="DateInputMode.DateTime" ShowTodayButton ShowClearButton /></Field>
+                                </div>
+                                <div class="hcs-form-row hcs-form-row--equal">
+                                    <Field><FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                                        <Select TValue="string" SelectedValue="@status" SelectedValueChanged="OnStatusChanged">
+                                            @foreach (var value in WorkUi.TaskStatuses) { <SelectItem Value="@value">@L[WorkUi.TaskStatusKey(value)]</SelectItem> }
+                                        </Select>
+                                    </Field>
+                                    <Field><FieldLabel>@L["Feature:Priority"]</FieldLabel>
+                                        <Select TValue="string" @bind-Value="priority">
+                                            @foreach (var value in WorkUi.TaskPriorities) { <SelectItem Value="@value">@L[WorkUi.PriorityKey(value)]</SelectItem> }
+                                        </Select>
+                                    </Field>
+                                </div>
+                                <Field>
+                                    <FieldLabel>@L["Work:ProgressPercent"] · @progress%</FieldLabel>
+                                    <input type="range" class="w-100" min="0" max="100" step="5"
+                                           value="@progress"
+                                           @oninput="args => OnProgressInput(args)" />
+                                </Field>
+                                <a class="btn btn-outline-primary btn-sm" href="@($"/project-task-detail/{detail.Task.Id}")">@L["Work:ViewDetail"]</a>
+                            </div>
+                        </TabPanel>
+                        <TabPanel Name="assignments">
+                            <Field>
+                                <UserSelect2 Value="assigneeId"
+                                             ValueChanged="value => assigneeId = value"
+                                             Placeholder="@L["Chat:SelectContacts"]"
+                                             SelectedText="@Name(assigneeId)"
+                                             Search="SearchContactsAsync" />
+                            </Field>
+                            <Button Color="Color.Primary" Class="mb-3" Clicked="AddAssignmentAsync">@L["Feature:Assign"]</Button>
+                            @if (detail.Assignments.Count == 0) { <p class="text-muted">@L["Catalog:EmptyTitle"]</p> }
+                            else
+                            {
+                                <ul class="list-group">
+                                    @foreach (var assignment in detail.Assignments)
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between">
+                                            <span>@Name(assignment.UserId) · @assignment.AssignmentType</span>
+                                            <Button Size="Size.Small" Color="Color.Danger" Outline="true" Clicked="() => RemoveAssignmentAsync(assignment)">@L["Catalog:Delete"]</Button>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </TabPanel>
+                        <TabPanel Name="documents">
+                            <Field>
+                                <CatalogSelect2 Value="documentId"
+                                                ValueChanged="value => documentId = value"
+                                                Placeholder="@L["Feature:ChooseDocument"]"
+                                                SelectedText="@DocumentName(documentId)"
+                                                Search="SearchDocumentsAsync" />
+                            </Field>
+                            <Button Color="Color.Primary" Class="mb-3" Clicked="AddDocumentAsync">@L["Feature:AttachDocument"]</Button>
+                            @if (detail.Documents.Count == 0) { <p class="text-muted">@L["Work:NoDocuments"]</p> }
+                            else
+                            {
+                                <ul class="list-group">
+                                    @foreach (var reference in detail.Documents)
+                                    {
+                                        <li class="list-group-item d-flex justify-content-between align-items-center gap-2">
+                                            <a class="text-truncate" href="@($"/document-detail/{reference.DocumentId}")">@(reference.DocumentCode ?? reference.DocumentId.ToString("N")[..8])</a>
+                                            <div class="hcs-row-actions">
+                                                <Button Size="Size.Small" Color="Color.Primary" Outline="true" Class="hcs-action-button hcs-action-button--preview" Title="@L["Work:PdfPreview"]" aria-label="@L["Work:PdfPreview"]" Clicked="() => OnViewDocument.InvokeAsync(reference.DocumentId)"><i class="fa fa-eye" aria-hidden="true"></i></Button>
+                                                <Button Size="Size.Small" Color="Color.Danger" Outline="true" Clicked="() => RemoveDocumentAsync(reference)">@L["Catalog:Delete"]</Button>
+                                            </div>
+                                        </li>
+                                    }
+                                </ul>
+                            }
+                        </TabPanel>
+                    </Content>
+                </Tabs>
+            }
+        </ModalBody>
+        <ModalFooter Class="hcs-catalog-modal__footer">
+            <Button Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="HideAsync">@L["Catalog:Cancel"]</Button>
+            <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="SaveAsync" Disabled="@isSaving">@L["Catalog:SaveChanges"]</Button>
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+@code {
+    [Parameter] public EventCallback OnChanged { get; set; }
+    [Parameter] public EventCallback<Guid> OnViewDocument { get; set; }
+
+    private Modal? modal;
+    private ProjectTaskDetailDto? detail;
+    private readonly List<ChatContactDto> contacts = [];
+    private readonly List<DocumentDto> documents = [];
+    private string tab = "general", title = "", description = "", status = "New", priority = "Normal";
+    private DateTime startDate = DateTime.Today, dueDate = DateTime.Today.AddDays(7);
+    private int progress;
+    private Guid? assigneeId, documentId;
+    private bool isSaving;
+
+    public async Task ShowAsync(Guid taskId)
+    {
+        tab = "general";
+        detail = await Work.GetTaskAsync(taskId);
+        Bind(detail.Task);
+        if (contacts.Count == 0) contacts.AddRange(await Chat.GetContactsAsync(null, 50));
+        if (documents.Count == 0)
+        {
+            var page = await Documents.GetDocumentsAsync(new DocumentListQuery(null, null, false, 0, 100));
+            documents.AddRange(page.Items);
+        }
+        if (modal is not null) await modal.Show();
+    }
+
+    public Task HideAsync() => modal?.Hide() ?? Task.CompletedTask;
+
+    private void Bind(ProjectTaskDto task)
+    {
+        title = task.Title;
+        description = task.Description ?? "";
+        startDate = task.StartDate;
+        dueDate = task.DueDate;
+        status = task.Status;
+        priority = task.Priority;
+        progress = task.ProgressPercent;
+    }
+
+    private void OnProgressInput(ChangeEventArgs args)
+    {
+        if (int.TryParse(args.Value?.ToString(), out var value))
+        {
+            progress = Math.Clamp(value, 0, 100);
+            if (progress == 100) status = "Completed";
+        }
+    }
+
+    private Task OnStatusChanged(string value)
+    {
+        status = value;
+        if (string.Equals(status, "Completed", StringComparison.OrdinalIgnoreCase)) progress = 100;
+        return Task.CompletedTask;
+    }
+
+    private async Task SaveAsync()
+    {
+        if (detail is null) return;
+        isSaving = true;
+        try
+        {
+            await Work.UpdateTaskAsync(detail.Task.Id, new UpdateProjectTaskRequest(
+                title.Trim(), string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                startDate, dueDate, priority, status, progress));
+            detail = await Work.GetTaskAsync(detail.Task.Id);
+            Bind(detail.Task);
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+
+    private async Task AddAssignmentAsync()
+    {
+        if (detail is null || assigneeId is not { } userId) return;
+        try
+        {
+            await Work.AddAssignmentAsync(detail.Task.Id, new AddTaskAssignmentRequest(userId, "Assignee"));
+            detail = await Work.GetTaskAsync(detail.Task.Id);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+
+    private async Task RemoveAssignmentAsync(TaskAssignmentDto assignment)
+    {
+        if (detail is null) return;
+        if (!await UiMessage.Confirm(L["Catalog:DeleteConfirmation"].Value)) return;
+        try
+        {
+            await Work.RemoveAssignmentAsync(detail.Task.Id, assignment.Id);
+            detail = await Work.GetTaskAsync(detail.Task.Id);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Delete); }
+    }
+
+    private async Task AddDocumentAsync()
+    {
+        if (detail is null || documentId is not { } id) return;
+        var document = documents.FirstOrDefault(x => x.Id == id);
+        try
+        {
+            await Work.AddTaskDocumentAsync(detail.Task.Id, new AddTaskDocumentRequest(id, document?.Number));
+            detail = await Work.GetTaskAsync(detail.Task.Id);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+
+    private async Task RemoveDocumentAsync(TaskDocumentReferenceDto reference)
+    {
+        if (detail is null) return;
+        if (!await UiMessage.Confirm(L["Catalog:DeleteConfirmation"].Value)) return;
+        try
+        {
+            await Work.RemoveTaskDocumentAsync(detail.Task.Id, reference.Id);
+            detail = await Work.GetTaskAsync(detail.Task.Id);
+            await OnChanged.InvokeAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Delete); }
+    }
+
+    private string Name(Guid? id) => id is null ? "" : contacts.FirstOrDefault(x => x.Id == id)?.DisplayName ?? "";
+    private string DocumentName(Guid? id) => id is null ? "" : documents.FirstOrDefault(x => x.Id == id) is { } d ? $"{d.Number} · {d.Title}" : "";
+    private async Task<CatalogSelect2SearchResponse> SearchContactsAsync(string term, int page)
+    {
+        var found = await Chat.GetContactsAsync(term, 50);
+        return CatalogSelect2Cache.Merge(contacts, found, x => x.Id, x => x.DisplayName, false, CatalogSelect2Cache.UserItem);
+    }
+    private Task<CatalogSelect2SearchResponse> SearchDocumentsAsync(string term, int page)
+    {
+        var found = documents.Where(x => string.IsNullOrWhiteSpace(term)
+            || x.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || x.Number.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+        return Task.FromResult(CatalogSelect2Cache.Merge(documents, found, x => x.Id, x => $"{x.Number} · {x.Title}", false));
+    }
+}

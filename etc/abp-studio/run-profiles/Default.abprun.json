@@ -1,0 +1,132 @@
+{
+  "applications": {
+    "HCS.AuthServer": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44401",
+      "path": "../../../apps/auth-server/HCS.AuthServer/HCS.AuthServer.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 1 }
+    },
+    "HCS.PlatformService": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44411/health",
+      "path": "../../../services/platform/HCS.PlatformService/HCS.PlatformService.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 2 }
+    },
+    "HCS.OrganizationService": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44412/health",
+      "path": "../../../services/organization/HCS.OrganizationService.Host/HCS.OrganizationService.Host.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 2 }
+    },
+    "HCS.DocumentService": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44413/health",
+      "path": "../../../services/document/HCS.DocumentService/HCS.DocumentService.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 2 }
+    },
+    "HCS.WorkManagementService": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44414/health",
+      "path": "../../../services/work-management/HCS.WorkManagementService/HCS.WorkManagementService.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 2 }
+    },
+    "HCS.CollaborationService": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44415/health",
+      "path": "../../../services/collaboration/HCS.CollaborationService/HCS.CollaborationService.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 2 }
+    },
+    "HCS.WebGateway": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44402/health",
+      "path": "../../../gateways/web/HCS.WebGateway/HCS.WebGateway.csproj",
+      "healthCheckEndpoint": "/health",
+      "execution": { "order": 3 }
+    },
+    "HCS.Blazor": {
+      "type": "dotnet-project",
+      "launchUrl": "https://localhost:44403",
+      "path": "../../../src/HCS.Blazor/HCS.Blazor.csproj",
+      "healthCheckEndpoint": "/",
+      "execution": {
+        "order": 4
+      }
+    }
+  },
+  "containers": {
+    "serviceName": "HCS-Containers"
+  },
+  "tasks":{
+    "Initialize Solution":{
+      "behaviour": 2,
+      "startCommand": "./initialize-solution.ps1",
+      "workingDirectory": "../../scripts",
+      "shortDescription": "Prepares the solution for development."
+    },
+    "Migrate Database":{
+      "behaviour": 0,
+      "startCommand": "./migrate-database.ps1",
+      "workingDirectory": "../../scripts",
+      "shortDescription": "Migrates the database to the latest version."
+    }
+  },
+  "workflows": {
+    "d3b2a1c4-e5f6-4890-abcd-ef1234567890": {
+      "Id": "d3b2a1c4-e5f6-4890-abcd-ef1234567890",
+      "Name": "Default",
+      "Description": "Stops applications, builds, migrates, and starts applications",
+      "IsShared": true,
+      "BeforeTasks": [],
+      "AfterTasks": [
+        {
+          "ActionType": "Build",
+          "Targets": [],
+          "AllTargets": true,
+          "ModuleTargets": [],
+          "PackageTargets": [],
+          "FolderTargets": [],
+          "ApplicationTargets": [],
+          "ContainerTargets": []
+        },
+        {
+          "ActionType": "AddMigration",
+          "Targets": [],
+          "AllTargets": false,
+          "ModuleTargets": [],
+          "PackageTargets": [],
+          "FolderTargets": [],
+          "ApplicationTargets": [],
+          "ContainerTargets": []
+        },
+        {
+          "ActionType": "RunTask",
+          "Targets": [
+            "Migrate Database"
+          ],
+          "AllTargets": false,
+          "ModuleTargets": [],
+          "PackageTargets": [],
+          "FolderTargets": [],
+          "ApplicationTargets": [],
+          "ContainerTargets": []
+        },
+        {
+          "ActionType": "StartApplication",
+          "Targets": [],
+          "AllTargets": true,
+          "ModuleTargets": [],
+          "PackageTargets": [],
+          "FolderTargets": [],
+          "ApplicationTargets": [],
+          "ContainerTargets": []
+        }
+      ]
+    }
+  }
+}

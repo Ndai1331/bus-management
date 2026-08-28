@@ -1,0 +1,274 @@
+@inherits HCSComponentBase
+@inject WorkManagementClient Work
+@inject DocumentClient Documents
+@inject CollaborationClient Chat
+
+<Modal @ref="modal" Size="ModalSize.Large">
+    <ModalContent Centered Class="hcs-catalog-modal">
+        <ModalHeader Class="hcs-catalog-modal__header">
+            <ModalTitle>@L["Work:NewTask"]</ModalTitle>
+            <CloseButton />
+        </ModalHeader>
+        <ModalBody Class="hcs-catalog-modal__body">
+            <Tabs SelectedTab="@tab" SelectedTabChanged="OnTabChanged">
+                <Items>
+                    <Tab Name="general"><Icon Name="IconName.Info" Class="me-1" /> @L["Feature:GeneralInformation"]</Tab>
+                    <Tab Name="assignments" Disabled="@(createdId is null)"><Icon Name="IconName.Users" Class="me-1" /> @L["Feature:Assignments"]</Tab>
+                    <Tab Name="documents" Disabled="@(createdId is null)"><Icon Name="IconName.File" Class="me-1" /> @L["Menu:Documents"]</Tab>
+                </Items>
+                <Content>
+                    <TabPanel Name="general">
+                        <div class="hcs-catalog-form">
+                            @if (projectId is null)
+                            {
+                                <Field><FieldLabel>@L["Feature:Project"]</FieldLabel>
+                                    <CatalogSelect2 Value="selectedProjectId"
+                                                    ValueChanged="OnProjectChanged"
+                                                    Placeholder="@L["Feature:ChooseProject"]"
+                                                    SelectedText="@ProjectSelectText(selectedProjectId)"
+                                                    Search="SearchProjectsAsync" />
+                                </Field>
+                            }
+                            <Field><FieldLabel>@L["Feature:ParentTask"]</FieldLabel>
+                                <Select TValue="Guid?" @bind-Value="parentTaskId">
+                                    <SelectItem TValue="Guid?" Value="null">@L["Catalog:NoParent"]</SelectItem>
+                                    @foreach (var task in parentOptions)
+                                    {
+                                        <SelectItem TValue="Guid?" Value="task.Id">@task.Title</SelectItem>
+                                    }
+                                </Select>
+                            </Field>
+                            <div class="hcs-form-row">
+                                <Field><FieldLabel>@L["Catalog:Code"]</FieldLabel><HcsIsolatedTextInput @bind-Value="code" Name="hcsTaskCode" MaxLength="64" Disabled="@(createdId is not null)" /></Field>
+                                <Field><FieldLabel>@L["Feature:TaskTitle"]</FieldLabel><HcsIsolatedTextInput @bind-Value="title" Name="hcsTaskTitle" /></Field>
+                            </div>
+                            <Field><FieldLabel>@L["Feature:Description"]</FieldLabel><textarea class="form-control" rows="3" @bind="description"></textarea></Field>
+                            <div class="hcs-form-row hcs-form-row--equal">
+                                <Field><FieldLabel>@L["Feature:StartDate"]</FieldLabel><HcsDatePicker TValue="DateTime" @bind-Value="startDate" InputMode="DateInputMode.DateTime" ShowTodayButton ShowClearButton /></Field>
+                                <Field><FieldLabel>@L["Feature:DueDate"]</FieldLabel><HcsDatePicker TValue="DateTime" @bind-Value="dueDate" InputMode="DateInputMode.DateTime" ShowTodayButton ShowClearButton /></Field>
+                            </div>
+                            <div class="hcs-form-row hcs-form-row--equal">
+                                <Field><FieldLabel>@L["Feature:Priority"]</FieldLabel>
+                                    <Select TValue="string" @bind-Value="priority">
+                                        @foreach (var value in WorkUi.TaskPriorities) { <SelectItem Value="@value">@L[WorkUi.PriorityKey(value)]</SelectItem> }
+                                    </Select>
+                                </Field>
+                                <Field><FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                                    <Select TValue="string" @bind-Value="status">
+                                        @foreach (var value in WorkUi.TaskStatuses) { <SelectItem Value="@value">@L[WorkUi.TaskStatusKey(value)]</SelectItem> }
+                                    </Select>
+                                </Field>
+                            </div>
+                        </div>
+                    </TabPanel>
+                    <TabPanel Name="assignments">
+                        <Field>
+                            <FieldLabel>@L["Feature:ChooseAssignee"]</FieldLabel>
+                            <UserSelect2 Value="assigneeId"
+                                         ValueChanged="value => assigneeId = value"
+                                         Placeholder="@L["Feature:ChooseAssignee"]"
+                                         SelectedItem="@ContactItem(assigneeId)"
+                                         SelectedText="@ContactName(assigneeId)"
+                                         Search="SearchContactsAsync" />
+                        </Field>
+                        <Button Color="Color.Primary" Clicked="AddAssignmentAsync" Disabled="@isAssigning">@L["Feature:Assign"]</Button>
+                    </TabPanel>
+                    <TabPanel Name="documents">
+                        <Field>
+                            <CatalogSelect2 Value="documentId"
+                                            ValueChanged="value => documentId = value"
+                                            Placeholder="@L["Feature:ChooseDocument"]"
+                                            SelectedText="@DocumentName(documentId)"
+                                            Search="SearchDocumentsAsync" />
+                        </Field>
+                        <Button Color="Color.Primary" Clicked="AddDocumentAsync">@L["Feature:AttachDocument"]</Button>
+                    </TabPanel>
+                </Content>
+            </Tabs>
+        </ModalBody>
+        <ModalFooter Class="hcs-catalog-modal__footer">
+            <Button Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="HideAsync">@L["Catalog:Cancel"]</Button>
+            @if (createdId is null)
+            {
+                <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="CreateAsync" Disabled="@isSaving">@L["Catalog:SaveChanges"]</Button>
+            }
+            else
+            {
+                <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="FinishAsync">@L["Catalog:SaveChanges"]</Button>
+            }
+        </ModalFooter>
+    </ModalContent>
+</Modal>
+@code {
+    [Parameter] public EventCallback OnCreated { get; set; }
+
+    private Modal? modal;
+    private readonly List<ProjectDto> projects = [];
+    private readonly List<ProjectTaskDto> parentOptions = [];
+    private readonly List<ChatContactDto> contacts = [];
+    private readonly List<DocumentDto> documents = [];
+    private Guid? projectId, selectedProjectId, parentTaskId, createdId, assigneeId, documentId, linkedDocumentId;
+    private string tab = "general", code = "", title = "", description = "", priority = "Normal", status = "New";
+    private DateTime startDate = DateTime.Today, dueDate = DateTime.Today.AddDays(7);
+    private bool isSaving, isAssigning;
+
+    public async Task ShowAsync(Guid? fixedProjectId = null, Guid? parentId = null, Guid? linkedDocumentId = null)
+    {
+        Reset();
+        projectId = selectedProjectId = fixedProjectId;
+        parentTaskId = parentId;
+        this.linkedDocumentId = linkedDocumentId;
+        documentId = linkedDocumentId;
+        if (projects.Count == 0)
+        {
+            var page = await Work.GetProjectsAsync(new WorkListQuery(null, null, 0, 100));
+            projects.AddRange(page.Items);
+        }
+        if (contacts.Count == 0) contacts.AddRange(await Chat.GetContactsAsync(null, 50));
+        await LoadParentsAsync();
+        if (modal is not null) await modal.Show();
+    }
+
+    public Task HideAsync() => modal?.Hide() ?? Task.CompletedTask;
+
+    private void Reset()
+    {
+        tab = "general";
+        createdId = assigneeId = documentId = parentTaskId = linkedDocumentId = null;
+        code = title = description = "";
+        priority = "Normal";
+        status = "New";
+        startDate = DateTime.Today;
+        dueDate = DateTime.Today.AddDays(7);
+        parentOptions.Clear();
+    }
+
+    private async Task OnProjectChanged(Guid? value)
+    {
+        selectedProjectId = value;
+        parentTaskId = null;
+        await LoadParentsAsync();
+    }
+
+    private Task OnTabChanged(string value)
+    {
+        tab = value;
+        return Task.CompletedTask;
+    }
+
+    private async Task LoadParentsAsync()
+    {
+        parentOptions.Clear();
+        var id = projectId ?? selectedProjectId;
+        if (id is not { } project) return;
+        try
+        {
+            var page = await Work.GetTasksAsync(project, new WorkListQuery(null, null, 0, 100));
+            parentOptions.AddRange(page.Items);
+        }
+        catch { }
+    }
+
+    private async Task CreateAsync()
+    {
+        var id = projectId ?? selectedProjectId;
+        if (id is not { } project) { await NotifyErrorAsync(L["Feature:ChooseProject"]); return; }
+        isSaving = true;
+        Guid? newId = null;
+        try
+        {
+            var created = await Work.CreateTaskAsync(new CreateProjectTaskRequest(
+                project, parentTaskId, code.Trim(), title.Trim(),
+                string.IsNullOrWhiteSpace(description) ? null : description.Trim(),
+                startDate, dueDate, priority, status, 0));
+            newId = created.Id;
+            createdId = created.Id;
+            if (linkedDocumentId is { } linked)
+            {
+                documentId = linked;
+                await AddDocumentAsync();
+            }
+            tab = "assignments";
+            await NotifySuccessAsync(L["Catalog:Created"]);
+        }
+        catch (Exception ex)
+        {
+            if (newId is { } rollback)
+            {
+                try { await Work.DeleteTaskAsync(rollback); } catch { }
+            }
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+        }
+        finally { isSaving = false; }
+    }
+
+    private async Task AddAssignmentAsync()
+    {
+        if (createdId is not { } taskId) return;
+        if (assigneeId is not { } userId)
+        {
+            await NotifyErrorAsync(L["Feature:ChooseAssignee"]);
+            return;
+        }
+        isAssigning = true;
+        try
+        {
+            await Work.AddAssignmentAsync(taskId, new AddTaskAssignmentRequest(userId, "Assignee"));
+            assigneeId = null;
+            await NotifySuccessAsync(L["Feature:AssignmentAdded"]);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isAssigning = false; }
+    }
+
+    private async Task AddDocumentAsync()
+    {
+        if (createdId is not { } taskId || documentId is not { } id) return;
+        if (documents.Count == 0)
+        {
+            var page = await Documents.GetDocumentsAsync(new DocumentListQuery(null, null, false, 0, 100));
+            documents.AddRange(page.Items);
+        }
+        var document = documents.FirstOrDefault(x => x.Id == id);
+        try { await Work.AddTaskDocumentAsync(taskId, new AddTaskDocumentRequest(id, document?.Number)); }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+
+    private async Task FinishAsync()
+    {
+        await HideAsync();
+        await OnCreated.InvokeAsync();
+    }
+
+    private string ProjectSelectText(Guid? id) =>
+        CatalogSelect2Cache.TextFor(projects, id, x => x.Id, x => CatalogSelect2Text.CodeName(x.Code, x.Name));
+    private async Task<CatalogSelect2SearchResponse> SearchProjectsAsync(string term, int page)
+    {
+        var skip = Math.Max(page - 1, 0) * 20;
+        var result = await Work.GetProjectsAsync(new WorkListQuery(term, null, skip, 20));
+        return CatalogSelect2Cache.Merge(projects, result.Items, x => x.Id,
+            x => CatalogSelect2Text.CodeName(x.Code, x.Name), more: skip + result.Items.Count < result.TotalCount);
+    }
+    private string ContactName(Guid? id) => id is null ? "" : contacts.FirstOrDefault(x => x.Id == id)?.DisplayName ?? "";
+    private CatalogSelect2Item? ContactItem(Guid? id) => id is { } userId
+        ? contacts.Where(x => x.Id == userId).Select(CatalogSelect2Cache.UserItem).FirstOrDefault()
+        : null;
+    private string DocumentName(Guid? id) => id is null ? "" : documents.FirstOrDefault(x => x.Id == id) is { } d ? $"{d.Number} · {d.Title}" : "";
+    private async Task<CatalogSelect2SearchResponse> SearchContactsAsync(string term, int page)
+    {
+        var found = await Chat.GetContactsAsync(term, 50);
+        return CatalogSelect2Cache.Merge(contacts, found, x => x.Id, x => x.DisplayName, false, CatalogSelect2Cache.UserItem);
+    }
+    private async Task<CatalogSelect2SearchResponse> SearchDocumentsAsync(string term, int page)
+    {
+        if (documents.Count == 0)
+        {
+            var pageResult = await Documents.GetDocumentsAsync(new DocumentListQuery(term, null, false, 0, 100));
+            documents.AddRange(pageResult.Items);
+        }
+        var found = documents.Where(x => string.IsNullOrWhiteSpace(term)
+            || x.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || x.Number.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList();
+        return CatalogSelect2Cache.Merge(documents, found, x => x.Id, x => $"{x.Number} · {x.Title}", false);
+    }
+}

@@ -1,0 +1,57 @@
+<Solution>
+    <Configurations>
+        <Platform Name="Any CPU" />
+    </Configurations>
+    <Folder Name="/src/">
+        <Project Path="src/HCS.Domain/HCS.Domain.csproj" />
+        <Project Path="src/HCS.Application/HCS.Application.csproj" />
+        <Project Path="src/HCS.EntityFrameworkCore/HCS.EntityFrameworkCore.csproj" />
+        <Project Path="src/HCS.Domain.Shared/HCS.Domain.Shared.csproj" />
+        <Project Path="src/HCS.Application.Contracts/HCS.Application.Contracts.csproj" />
+        <Project Path="src/HCS.HttpApi/HCS.HttpApi.csproj" />
+        <Project Path="src/HCS.HttpApi.Client/HCS.HttpApi.Client.csproj" />
+        <Project Path="src/HCS.DbMigrator/HCS.DbMigrator.csproj" />
+        <Project Path="src/HCS.Blazor/HCS.Blazor.csproj" />
+        <Project Path="src/HCS.Blazor.Client/HCS.Blazor.Client.csproj" />
+    </Folder>
+    <Folder Name="/gateways/">
+        <Project Path="gateways/web/HCS.WebGateway/HCS.WebGateway.csproj" />
+        <Project Path="gateways/web/HCS.WebGateway/HCS.WebGateway.Tests/HCS.WebGateway.Tests.csproj" />
+    </Folder>
+    <Folder Name="/apps/">
+        <Project Path="apps/auth-server/HCS.AuthServer/HCS.AuthServer.csproj" />
+        <Project Path="apps/auth-server/HCS.AuthServer.Tests/HCS.AuthServer.Tests.csproj" />
+    </Folder>
+    <Folder Name="/services/">
+        <Project Path="services/platform/HCS.PlatformService/HCS.PlatformService.csproj" />
+        <Project Path="services/organization/HCS.OrganizationService/HCS.OrganizationService.csproj" />
+        <Project Path="services/organization/HCS.OrganizationService.Host/HCS.OrganizationService.Host.csproj" />
+        <Project Path="services/organization/HCS.OrganizationService.Tests/HCS.OrganizationService.Tests.csproj" />
+        <Project Path="services/document/HCS.DocumentService.Contracts/HCS.DocumentService.Contracts.csproj" />
+        <Project Path="services/document/HCS.DocumentService/HCS.DocumentService.csproj" />
+        <Project Path="services/document/HCS.DocumentService.Tests/HCS.DocumentService.Tests.csproj" />
+        <Project Path="services/work-management/HCS.WorkManagementService.Contracts/HCS.WorkManagementService.Contracts.csproj" />
+        <Project Path="services/work-management/HCS.WorkManagementService/HCS.WorkManagementService.csproj" />
+        <Project Path="services/work-management/HCS.WorkManagementService.Tests/HCS.WorkManagementService.Tests.csproj" />
+        <Project Path="services/collaboration/HCS.CollaborationService.Contracts/HCS.CollaborationService.Contracts.csproj" />
+        <Project Path="services/collaboration/HCS.CollaborationService/HCS.CollaborationService.csproj" />
+        <Project Path="services/collaboration/HCS.CollaborationService.Tests/HCS.CollaborationService.Tests.csproj" />
+        <Project Path="services/bus-management/HCS.BusManagementService.Contracts/HCS.BusManagementService.Contracts.csproj" />
+        <Project Path="services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj" />
+        <Project Path="services/bus-management/HCS.BusManagementService.Tests/HCS.BusManagementService.Tests.csproj" />
+    </Folder>
+    <Folder Name="/building-blocks/">
+        <Project Path="building-blocks/HCS.IntegrationEvents/HCS.IntegrationEvents.csproj" />
+    </Folder>
+    <Folder Name="/tools/">
+        <Project Path="tools/HCS.MigrationImporter/HCS.MigrationImporter.csproj" />
+        <Project Path="tools/HCS.MigrationImporter/HCS.MigrationImporter.Tests/HCS.MigrationImporter.Tests.csproj" />
+    </Folder>
+    <Folder Name="/test/">
+        <Project Path="test/HCS.Application.Tests/HCS.Application.Tests.csproj" />
+        <Project Path="test/HCS.EntityFrameworkCore.Tests/HCS.EntityFrameworkCore.Tests.csproj" />
+        <Project Path="test/HCS.TestBase/HCS.TestBase.csproj" />
+        <Project Path="test/HCS.Domain.Tests/HCS.Domain.Tests.csproj" />
+        <Project Path="test/HCS.HttpApi.Client.ConsoleTestApp/HCS.HttpApi.Client.ConsoleTestApp.csproj" />
+    </Folder>
+</Solution>

@@ -1,0 +1,242 @@
+@page "/survey-collections/{SurveyLocationId:guid}"
+@attribute [AllowAnonymous]
+@inherits HCSComponentBase
+@inject WorkManagementClient Work
+@inject NavigationManager Navigation
+
+<PageTitle>@L["SurveyCollections:Title"] · HCS</PageTitle>
+
+<section class="hcs-document-page hcs-public-survey">
+    @if (isLoading)
+    {
+        <div class="hcs-loading py-5" role="status"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div>
+    }
+    else if (location is null)
+    {
+        <div class="hcs-empty py-5"><i class="fa fa-exclamation-triangle"></i><h1>@L["SurveyCollections:SurveyLocationNotFound"]</h1></div>
+    }
+    else if (showThankYou)
+    {
+        <div class="hcs-public-survey__thank-you">
+            <div class="hcs-public-survey__thank-you-icon"><i class="fa fa-check"></i></div>
+            <h1>@L["SurveyCollections:ThankYou"]</h1>
+            <p>@L["SurveyCollections:ThankYouMessage"]</p>
+            <p class="text-muted">@L["SurveyCollections:YourFeedbackIsImportant"]</p>
+            <button type="button" class="btn btn-primary" @onclick="ReloadPage">@L["Back"]</button>
+        </div>
+    }
+    else
+    {
+        <header class="hcs-document-page__header hcs-public-survey__header">
+            <div>
+                <div class="hcs-public-survey__eyebrow">@L["SurveyCollections:Title"]</div>
+                <h1>@location.Name</h1>
+                @if (!string.IsNullOrWhiteSpace(location.Description))
+                {
+                    <p class="mb-0 text-muted">@location.Description</p>
+                }
+            </div>
+        </header>
+        @if (criteria.Count == 0)
+        {
+            <div class="alert alert-warning mt-4">@L["SurveyCollections:NoCriteriaPleaseComeBackLater"]</div>
+        }
+        else
+        {
+            <p class="hcs-public-survey__intro">@L["SurveyCollections:PublicSurveyIntro"]</p>
+            <div class="hcs-public-survey__criteria-grid">
+                @foreach (var item in criteria)
+                {
+                    <article class="hcs-public-survey__criteria-card">
+                        <div class="hcs-public-survey__criteria-image">
+                            @if (!string.IsNullOrWhiteSpace(item.Image))
+                            {
+                                <img src="@item.Image" alt="@item.Name" loading="lazy" />
+                            }
+                            else
+                            {
+                                <i class="fa fa-star-o" aria-hidden="true"></i>
+                            }
+                        </div>
+                        <h2>@item.Name</h2>
+                        <div class="hcs-star-rating" role="radiogroup" aria-label="@item.Name">
+                            @for (var star = 1; star <= WorkUi.MaxStars; star++)
+                            {
+                                var currentStar = star;
+                                <button type="button" class="@(SelectedStars(item.Id) >= currentStar ? "is-active" : null)" role="radio" aria-checked="@(SelectedStars(item.Id) == currentStar)" aria-label="@($"{currentStar} {L["SurveyCollections:Star"]}")" @onclick="() => SetRating(item.Id, currentStar)">★</button>
+                            }
+                        </div>
+                    </article>
+                }
+            </div>
+            <div class="hcs-public-survey__actions">
+                <button type="button" class="btn btn-primary btn-lg" @onclick="OpenForm"><i class="fa fa-paper-plane me-2"></i>@L["SurveyCollections:SubmitSurvey"]</button>
+            </div>
+        }
+    }
+</section>
+
+@if (showForm)
+{
+    <div class="hcs-public-survey__backdrop" role="presentation">
+        <div class="hcs-public-survey__dialog" role="dialog" aria-modal="true" aria-labelledby="survey-dialog-title">
+            <div class="hcs-public-survey__dialog-header">
+                <h2 id="survey-dialog-title">@L["SurveyCollections:SubmitSurvey"]</h2>
+                <button type="button" class="btn-close" aria-label="@L["Close"]" @onclick="CloseForm"></button>
+            </div>
+            <div class="hcs-public-survey__dialog-body">
+                <div class="row g-3">
+                    <div class="col-md-6"><label class="form-label" for="survey-full-name">@L["FullName"] <span class="text-danger">*</span></label><input id="survey-full-name" class="form-control" @bind="fullName" autocomplete="name" autofocus /></div>
+                    <div class="col-md-6"><label class="form-label" for="survey-phone">@L["PhoneNumber"] <span class="text-danger">*</span></label><input id="survey-phone" class="form-control" @bind="phoneNumber" autocomplete="tel" inputmode="tel" /></div>
+                    <div class="col-md-6"><label class="form-label" for="survey-patient-code">@L["PatientCode"]</label><input id="survey-patient-code" class="form-control" @bind="patientCode" autocomplete="off" /></div>
+                    <div class="col-md-6"><label class="form-label" for="survey-device-type">@L["DeviceType"]</label><input id="survey-device-type" class="form-control" value="WEB" readonly /></div>
+                    <div class="col-12"><label class="form-label" for="survey-note">@L["Note"]</label><textarea id="survey-note" class="form-control" rows="3" @bind="note"></textarea></div>
+                    <div class="col-12"><label class="form-label" for="survey-photo">@L["SurveyCollections:UploadPhoto"]</label><InputFile id="survey-photo" class="form-control" OnChange="OnFileChanged" accept="image/*" />
+                        @if (!string.IsNullOrWhiteSpace(selectedFileName)) { <div class="text-success small mt-2"><i class="fa fa-check-circle me-1"></i>@selectedFileName</div> }
+                    </div>
+                </div>
+                @if (!string.IsNullOrWhiteSpace(formError)) { <div class="alert alert-danger mt-3 mb-0">@formError</div> }
+            </div>
+            <div class="hcs-public-survey__dialog-footer">
+                <button type="button" class="btn btn-light" @onclick="CloseForm" disabled="@isSubmitting">@L["Catalog:Cancel"]</button>
+                <button type="button" class="btn btn-primary" @onclick="SubmitAsync" disabled="@isSubmitting">@if (isSubmitting) { <i class="fa fa-spinner fa-spin me-2"></i> } @L["SurveyCollections:SubmitSurvey"]</button>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    [Parameter] public Guid SurveyLocationId { get; set; }
+    private SurveyLocationDto? location;
+    private readonly List<SurveyCriteriaDto> criteria = [];
+    private readonly Dictionary<Guid, int> scores = [];
+    private IBrowserFile? selectedFile;
+    private string? selectedFileName;
+    private string fullName = string.Empty;
+    private string phoneNumber = string.Empty;
+    private string patientCode = string.Empty;
+    private string note = string.Empty;
+    private string? formError;
+    private bool isLoading = true;
+    private bool isSubmitting;
+    private bool showForm;
+    private bool showThankYou;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            location = await Work.GetPublicLocationAsync(SurveyLocationId);
+            criteria.AddRange(await Work.GetPublicCriteriaAsync(SurveyLocationId));
+            foreach (var item in criteria) scores[item.Id] = WorkUi.MaxStars;
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private int SelectedStars(Guid criteriaId) => scores.GetValueOrDefault(criteriaId, WorkUi.MaxStars);
+
+    private void SetRating(Guid criteriaId, int rating) => scores[criteriaId] = Math.Clamp(rating, 1, WorkUi.MaxStars);
+
+    private void OpenForm()
+    {
+        fullName = string.Empty;
+        phoneNumber = string.Empty;
+        patientCode = string.Empty;
+        note = string.Empty;
+        selectedFile = null;
+        selectedFileName = null;
+        formError = null;
+        showForm = true;
+    }
+
+    private void CloseForm()
+    {
+        if (!isSubmitting) showForm = false;
+    }
+
+    private void OnFileChanged(InputFileChangeEventArgs args)
+    {
+        var file = args.File;
+        if (file is null) return;
+        if (!file.ContentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            formError = L["SurveyCollections:ImageOnly"].Value;
+            selectedFile = null;
+            selectedFileName = null;
+            return;
+        }
+        if (file.Size > WorkAssetLimits.MaxFileSize)
+        {
+            formError = L["SurveyCollections:ImageTooLarge"].Value;
+            selectedFile = null;
+            selectedFileName = null;
+            return;
+        }
+        selectedFile = file;
+        selectedFileName = file.Name;
+        formError = null;
+    }
+
+    private async Task SubmitAsync()
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+        {
+            formError = L["SurveyCollections:FullNameRequired"].Value;
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(phoneNumber))
+        {
+            formError = L["SurveyCollections:PhoneRequired"].Value;
+            return;
+        }
+
+        isSubmitting = true;
+        formError = null;
+        try
+        {
+            var surveyTime = DateTime.Now;
+            var session = await Work.CreatePublicSessionAsync(new CreatePublicSurveySessionRequest(
+                SurveyLocationId, fullName.Trim(), phoneNumber.Trim(), NullIfEmpty(patientCode), surveyTime,
+                "WEB", NullIfEmpty(note), string.Concat(fullName.Trim(), "_", phoneNumber.Trim(), "_",
+                    SurveyLocationId, "_", surveyTime.ToString("ddMMyyyyHHmm"))));
+
+            if (selectedFile is not null)
+            {
+                await Work.UploadPublicSurveyFileAsync(session.Id, selectedFile);
+            }
+
+            var inputs = criteria.Select(item => new SubmitSurveyResultRequest(
+                item.Id, null, WorkUi.StarsToScore(SelectedStars(item.Id)), null)).ToList();
+            var results = await Work.SubmitPublicResultsAsync(session.Id, inputs);
+            if (results.Count == 0) throw new InvalidOperationException(L["SurveyCollections:FailedToCreateSurveySession"].Value);
+
+            showForm = false;
+            showThankYou = true;
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+            formError = L["SurveyCollections:FailedToCreateSurveySession"].Value;
+        }
+        finally
+        {
+            isSubmitting = false;
+        }
+    }
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private void ReloadPage() => Navigation.NavigateTo($"/survey-collections/{SurveyLocationId:D}", forceLoad: true);
+
+    private static class WorkAssetLimits
+    {
+        public const long MaxFileSize = 25 * 1024 * 1024;
+    }
+}

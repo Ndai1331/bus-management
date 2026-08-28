@@ -1,0 +1,133 @@
+@inject IHttpClientFactory HttpClientFactory
+@inject IUiMessageService UiMessage
+
+<section class="hcs-feature" aria-labelledby="feature-title">
+    <header class="hcs-feature__header">
+        <div class="hcs-feature__icon" aria-hidden="true"><i class="@Icon"></i></div>
+        <div class="min-w-0">
+            <p class="hcs-feature__eyebrow">HCS Digital Workspace</p>
+            <h1 id="feature-title">@Title</h1>
+            <p>@Description</p>
+        </div>
+        @if (CanLoad)
+        {
+            <button class="btn btn-primary hcs-touch-target" @onclick="LoadAsync" disabled="@isLoading">
+                <i class="fa fa-rotate me-2" aria-hidden="true"></i>@(isLoading ? "Đang tải…" : "Làm mới")
+            </button>
+        }
+    </header>
+
+    <div class="hcs-endpoint" translate="no">
+        <i class="fa fa-shield-halved" aria-hidden="true"></i>
+        <span>Gateway</span><code>@Endpoint</code>
+    </div>
+
+    @if (isLoading)
+    {
+        <div class="hcs-skeleton" aria-live="polite" aria-label="Đang tải dữ liệu">
+            <span></span><span></span><span></span>
+        </div>
+    }
+    else if (rows.Count == 0)
+    {
+        <div class="hcs-empty">
+            <i class="fa fa-inbox" aria-hidden="true"></i>
+            <h2>@(CanLoad ? "Chưa có dữ liệu" : "Sẵn sàng kết nối")</h2>
+            <p>@(CanLoad ? "Không tìm thấy bản ghi phù hợp." : "Chức năng dùng API bảo mật qua gateway và chỉ hiện thao tác khi backend hỗ trợ.")</p>
+            @if (CanLoad)
+            {
+                <button class="btn btn-outline-primary" @onclick="LoadAsync">Thử lại</button>
+            }
+        </div>
+    }
+    else
+    {
+        <div class="table-responsive hcs-data-table">
+            <table class="table align-middle mb-0">
+                <thead><tr>@foreach (var column in columns) { <th scope="col">@Humanize(column)</th> }</tr></thead>
+                <tbody>
+                @foreach (var row in rows)
+                {
+                    <tr>@foreach (var column in columns) { <td>@FormatValue(row, column)</td> }</tr>
+                }
+                </tbody>
+            </table>
+        </div>
+    }
+</section>
+
+@code {
+    [Parameter, EditorRequired] public string Title { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Description { get; set; } = string.Empty;
+    [Parameter, EditorRequired] public string Endpoint { get; set; } = string.Empty;
+    [Parameter] public string Icon { get; set; } = "fa fa-layer-group";
+    [Parameter] public bool CanLoad { get; set; } = true;
+
+    private bool isLoading;
+    private readonly List<Dictionary<string, string>> rows = [];
+    private readonly List<string> columns = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        rows.Clear();
+        columns.Clear();
+        if (CanLoad) await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            using var http = HttpClientFactory.CreateClient("HCS.Bff");
+            using var response = await http.GetAsync(Endpoint);
+            if (!response.IsSuccessStatusCode)
+            {
+                await UiMessage.Error($"Gateway trả về {(int)response.StatusCode}. Kiểm tra service, phiên đăng nhập và quyền truy cập.");
+                return;
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync();
+            using var document = await JsonDocument.ParseAsync(stream);
+            var root = document.RootElement;
+            var data = root.ValueKind == JsonValueKind.Object && root.TryGetProperty("items", out var items) ? items : root;
+            IEnumerable<JsonElement> elements = data.ValueKind == JsonValueKind.Array
+                ? data.EnumerateArray().ToArray()
+                : [data];
+            foreach (var element in elements.Take(100)) AddRow(element);
+        }
+        catch (Exception exception)
+        {
+            await UiMessage.Error($"{exception.Message} Không thể kết nối qua gateway bảo mật. Hãy kiểm tra phiên đăng nhập và trạng thái các dịch vụ HCS.");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void AddRow(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object) return;
+        var row = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var property in element.EnumerateObject().Take(8))
+        {
+            if (!columns.Contains(property.Name)) columns.Add(property.Name);
+            row[property.Name] = property.Value.ValueKind switch
+            {
+                JsonValueKind.String => property.Value.GetString() ?? string.Empty,
+                JsonValueKind.True => "Có",
+                JsonValueKind.False => "Không",
+                JsonValueKind.Null => "—",
+                _ => property.Value.ToString()
+            };
+        }
+        rows.Add(row);
+    }
+
+    private static string FormatValue(Dictionary<string, string> row, string column) =>
+        row.TryGetValue(column, out var value) && !string.IsNullOrWhiteSpace(value) ? value : "—";
+
+    private static string Humanize(string value) =>
+        System.Text.RegularExpressions.Regex.Replace(value, "([a-z])([A-Z])", "$1 $2");
+}

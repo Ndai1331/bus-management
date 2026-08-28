@@ -1,0 +1,416 @@
+@page "/account"
+@attribute [Authorize]
+@inherits HCSComponentBase
+@using HCS.Blazor.Client.Account
+@using HCS.Blazor.Client.Components
+@using Microsoft.AspNetCore.Components
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Web
+@inject AccountProfileClient Account
+@inject NavigationManager Navigation
+
+<PageTitle>@L["Account:Title"] · HCS</PageTitle>
+
+<section class="hcs-account-page" aria-label='@L["Account:Title"]'>
+    @if (isLoading)
+    {
+        <div class="hcs-account-loading" role="status" aria-live="polite">
+            <span class="hcs-account-skeleton hcs-account-skeleton--hero"></span>
+            <span class="hcs-account-skeleton hcs-account-skeleton--line"></span>
+            <span class="hcs-account-skeleton hcs-account-skeleton--body"></span>
+            <span class="visually-hidden">@L["Catalog:Loading"]</span>
+        </div>
+    }
+    else if (profile is not null)
+    {
+        <header class="hcs-account-hero">
+            <div class="hcs-account-hero__banner" aria-hidden="true">
+                <span class="hcs-account-hero__shape hcs-account-hero__shape--one"></span>
+                <span class="hcs-account-hero__shape hcs-account-hero__shape--two"></span>
+                <span class="hcs-account-hero__shape hcs-account-hero__shape--three"></span>
+            </div>
+            <div class="hcs-account-hero__body">
+                <div class="hcs-account-avatar-frame">
+                    @if (!string.IsNullOrWhiteSpace(avatarDataUrl))
+                    {
+                        <img class="hcs-account-avatar" src="@avatarDataUrl" alt="@DisplayName()" @onerror="HandleAvatarError" />
+                    }
+                    else
+                    {
+                        <span class="hcs-account-avatar hcs-account-avatar--initials" aria-label="@DisplayName()">@InitialsFromProfile()</span>
+                    }
+                    <label class="hcs-account-avatar__upload @(isSavingAvatar ? "is-busy" : null)" for="account-avatar-file" title='@L["Account:ChangeAvatar"]'>
+                        <i class="fa fa-pen" aria-hidden="true"></i>
+                        <span class="visually-hidden">@L["Account:ChangeAvatar"]</span>
+                    </label>
+                    <InputFile id="account-avatar-file" class="d-none hcs-account-avatar__input" accept="image/jpeg,image/png,image/webp,image/gif" OnChange="UploadAvatarAsync" disabled="@isSavingAvatar" />
+                </div>
+
+                <div class="hcs-account-hero__identity">
+                    <p class="hcs-account-eyebrow">@L["Account:ProfileEyebrow"]</p>
+                    <h1 id="account-page-title">@DisplayName()</h1>
+                    <p class="hcs-account-hero__username">&#64;@form.UserName</p>
+                    <div class="hcs-account-hero__meta">
+                        <span><i class="fa fa-envelope" aria-hidden="true"></i>@form.Email</span>
+                        @if (!string.IsNullOrWhiteSpace(form.PhoneNumber))
+                        {
+                            <span><i class="fa fa-phone" aria-hidden="true"></i>@form.PhoneNumber</span>
+                        }
+                    </div>
+                </div>
+
+                <div class="hcs-account-hero__actions">
+                    <span class="hcs-account-status"><i class="fa fa-circle-check" aria-hidden="true"></i>@L["Account:ProfileReady"]</span>
+                    @if (!string.IsNullOrWhiteSpace(avatarDataUrl))
+                    {
+                        <Button Color="Color.Danger" Outline="true" Clicked="DeleteAvatarAsync" Disabled="@isSavingAvatar" Class="hcs-account-secondary-action">
+                            <i class="fa fa-trash" aria-hidden="true"></i>@L["Account:RemoveAvatar"]
+                        </Button>
+                    }
+                </div>
+            </div>
+        </header>
+
+        <nav class="hcs-account-tabs" role="tablist" aria-label='@L["Account:TabsLabel"]'>
+            <button id="account-profile-tab" class="hcs-account-tab @(activeTab == ProfileTab ? "is-active" : null)" type="button" role="tab"
+                    aria-selected="@(activeTab == ProfileTab)" aria-controls="account-profile-panel" tabindex="@(activeTab == ProfileTab ? "0" : "-1")"
+                    @onclick="() => SelectTab(ProfileTab)" @onkeydown="HandleTabKeyDown">
+                <i class="fa fa-user" aria-hidden="true"></i>@L["Account:ProfileTab"]
+            </button>
+            <button id="account-signatures-tab" class="hcs-account-tab @(activeTab == SignaturesTab ? "is-active" : null)" type="button" role="tab"
+                    aria-selected="@(activeTab == SignaturesTab)" aria-controls="account-signatures-panel" tabindex="@(activeTab == SignaturesTab ? "0" : "-1")"
+                    @onclick="() => SelectTab(SignaturesTab)" @onkeydown="HandleTabKeyDown">
+                <i class="fa fa-signature" aria-hidden="true"></i>@L["Account:SignaturesTab"]
+            </button>
+        </nav>
+
+        @if (activeTab == ProfileTab)
+        {
+            <div id="account-profile-panel" class="hcs-account-panel" role="tabpanel" aria-labelledby="account-profile-tab">
+                <div class="hcs-account-content-grid">
+                    <section class="card hcs-account-card">
+                        <div class="card-body">
+                            <div class="hcs-account-card__heading">
+                                <div>
+                                    <p class="hcs-account-eyebrow">@L["Account:ProfileEyebrow"]</p>
+                                    <h2>@L["Account:ProfileSection"]</h2>
+                                </div>
+                                <i class="fa fa-id-card" aria-hidden="true"></i>
+                            </div>
+                            <p class="hcs-form-note">@L["Account:ProfileHint"]</p>
+                            <form class="hcs-account-form" aria-busy="@isSavingProfile" @onsubmit="SaveProfileAsync" @onsubmit:preventDefault>
+                                <div class="hcs-account-form__row">
+                                    <div>
+                                        <label class="form-label" for="account-surname">@L["Account:Surname"]</label>
+                                        <input id="account-surname" class="form-control" @bind="form.Surname" autocomplete="family-name" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="account-name">@L["Account:Name"]</label>
+                                        <input id="account-name" class="form-control" @bind="form.Name" autocomplete="given-name" />
+                                    </div>
+                                </div>
+                                <div class="hcs-account-form__row">
+                                    <div>
+                                        <label class="form-label" for="account-username">@L["Account:UserName"]</label>
+                                        <input id="account-username" class="form-control" @bind="form.UserName" readonly autocomplete="username" />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="account-phone">@L["Account:PhoneNumber"]</label>
+                                        <input id="account-phone" class="form-control" type="tel" @bind="form.PhoneNumber" autocomplete="tel" />
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="form-label" for="account-email">@L["Account:Email"]</label>
+                                    <input id="account-email" class="form-control" type="email" @bind="form.Email" autocomplete="email" required />
+                                </div>
+                                <div class="hcs-account-form__actions">
+                                    <Button Color="Color.Primary" Type="ButtonType.Submit" Disabled="@isSavingProfile">
+                                        <i class="fa @(isSavingProfile ? "fa-spinner fa-spin" : "fa-floppy-disk")" aria-hidden="true"></i>@L["Catalog:SaveChanges"]
+                                    </Button>
+                                </div>
+                            </form>
+                        </div>
+                    </section>
+
+                    <section class="card hcs-account-card">
+                        <div class="card-body">
+                            <div class="hcs-account-card__heading">
+                                <div>
+                                    <p class="hcs-account-eyebrow">@L["Account:SecurityEyebrow"]</p>
+                                    <h2>@L["Account:PasswordSection"]</h2>
+                                </div>
+                                <i class="fa fa-shield-halved" aria-hidden="true"></i>
+                            </div>
+                            @if (!profile.HasPassword || profile.IsExternal)
+                            {
+                                <p class="hcs-account-info-box"><i class="fa fa-circle-info" aria-hidden="true"></i>@L["Account:PasswordExternalWarning"]</p>
+                            }
+                            else
+                            {
+                                <form class="hcs-account-form" aria-busy="@isSavingPassword" @onsubmit="ChangePasswordAsync" @onsubmit:preventDefault>
+                                    <div>
+                                        <label class="form-label" for="account-current-password">@L["Account:CurrentPassword"]</label>
+                                        <input id="account-current-password" class="form-control" type="password" @bind="currentPassword" autocomplete="current-password" required />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="account-new-password">@L["Account:NewPassword"]</label>
+                                        <input id="account-new-password" class="form-control" type="password" @bind="newPassword" autocomplete="new-password" required />
+                                    </div>
+                                    <div>
+                                        <label class="form-label" for="account-confirm-password">@L["Account:ConfirmPassword"]</label>
+                                        <input id="account-confirm-password" class="form-control" type="password" @bind="confirmPassword" autocomplete="new-password" required
+                                               aria-invalid="@passwordMismatch" aria-describedby="@(passwordMismatch ? "account-confirm-password-error" : null)" />
+                                        @if (passwordMismatch)
+                                        {
+                                            <p id="account-confirm-password-error" class="hcs-account-field-error" role="alert">@L["Account:PasswordMismatch"]</p>
+                                        }
+                                    </div>
+                                    <div class="hcs-account-form__actions">
+                                        <Button Color="Color.Primary" Type="ButtonType.Submit" Disabled="@isSavingPassword">
+                                            <i class="fa @(isSavingPassword ? "fa-spinner fa-spin" : "fa-key")" aria-hidden="true"></i>@L["Account:ChangePassword"]
+                                        </Button>
+                                    </div>
+                                </form>
+                            }
+                        </div>
+                    </section>
+                </div>
+            </div>
+        }
+        else
+        {
+            <div id="account-signatures-panel" class="hcs-account-panel" role="tabpanel" aria-labelledby="account-signatures-tab">
+                <UserSignaturesPanel />
+            </div>
+        }
+    }
+    else if (profileLoadFailed)
+    {
+        <div class="hcs-account-empty" role="alert">
+            <i class="fa fa-triangle-exclamation" aria-hidden="true"></i>
+            <h1 id="account-page-title">@L["Account:ProfileLoadFailed"]</h1>
+            <p>@L["Account:ProfileLoadFailedHint"]</p>
+            <button type="button" class="hcs-account-retry" @onclick="LoadProfileAsync">
+                <i class="fa fa-rotate-right" aria-hidden="true"></i>@L["Catalog:Retry"]
+            </button>
+        </div>
+    }
+</section>
+
+@code {
+    private const string ProfileTab = "profile";
+    private const string SignaturesTab = "signatures";
+
+    [SupplyParameterFromQuery(Name = "tab")]
+    private string? Tab { get; set; }
+
+    private AccountProfileDto? profile;
+    private readonly ProfileForm form = new();
+    private bool isLoading = true;
+    private bool isSavingProfile;
+    private bool isSavingPassword;
+    private bool isSavingAvatar;
+    private bool profileLoadFailed;
+    private bool passwordMismatch;
+    private string activeTab = ProfileTab;
+    private string currentPassword = "";
+    private string newPassword = "";
+    private string confirmPassword = "";
+    private string? avatarDataUrl;
+
+    protected override void OnParametersSet()
+    {
+        activeTab = NormalizeTab(Tab);
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadProfileAsync();
+    }
+
+    private async Task LoadProfileAsync()
+    {
+        isLoading = true;
+        profileLoadFailed = false;
+        try
+        {
+            profile = await Account.GetProfileAsync();
+            form.UserName = profile.UserName;
+            form.Email = profile.Email;
+            form.Name = profile.Name ?? "";
+            form.Surname = profile.Surname ?? "";
+            form.PhoneNumber = profile.PhoneNumber ?? "";
+            form.ConcurrencyStamp = profile.ConcurrencyStamp;
+            try
+            {
+                await ReloadAvatarAsync();
+            }
+            catch
+            {
+                avatarDataUrl = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            profile = null;
+            profileLoadFailed = true;
+            await NotifyErrorAsync(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void SelectTab(string tab)
+    {
+        activeTab = tab;
+        Navigation.NavigateTo($"/account?tab={tab}", replace: true);
+    }
+
+    private void HandleTabKeyDown(KeyboardEventArgs args)
+    {
+        var nextTab = args.Key switch
+        {
+            "ArrowRight" or "ArrowDown" => activeTab == ProfileTab ? SignaturesTab : ProfileTab,
+            "ArrowLeft" or "ArrowUp" => activeTab == SignaturesTab ? ProfileTab : SignaturesTab,
+            "Home" => ProfileTab,
+            "End" => SignaturesTab,
+            _ => null
+        };
+
+        if (nextTab is not null)
+        {
+            SelectTab(nextTab);
+        }
+    }
+
+    private static string NormalizeTab(string? tab) =>
+        string.Equals(tab, SignaturesTab, StringComparison.OrdinalIgnoreCase) ? SignaturesTab : ProfileTab;
+
+    private string DisplayName() =>
+        string.IsNullOrWhiteSpace($"{form.Surname} {form.Name}".Trim()) ? form.UserName : $"{form.Surname} {form.Name}".Trim();
+
+    private async Task SaveProfileAsync()
+    {
+        if (profile is null) return;
+        isSavingProfile = true;
+        try
+        {
+            profile = await Account.UpdateProfileAsync(new AccountProfileUpdateDto
+            {
+                UserName = form.UserName,
+                Email = form.Email.Trim(),
+                Name = NullIfEmpty(form.Name),
+                Surname = NullIfEmpty(form.Surname),
+                PhoneNumber = NullIfEmpty(form.PhoneNumber),
+                ConcurrencyStamp = form.ConcurrencyStamp
+            });
+            form.ConcurrencyStamp = profile.ConcurrencyStamp;
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+        }
+        finally
+        {
+            isSavingProfile = false;
+        }
+    }
+
+    private async Task ChangePasswordAsync()
+    {
+        passwordMismatch = false;
+        if (!string.Equals(newPassword, confirmPassword, StringComparison.Ordinal))
+        {
+            passwordMismatch = true;
+            await NotifyErrorAsync(L["Account:PasswordMismatch"]);
+            return;
+        }
+
+        isSavingPassword = true;
+        try
+        {
+            await Account.ChangePasswordAsync(currentPassword, newPassword);
+            currentPassword = "";
+            newPassword = "";
+            confirmPassword = "";
+            await NotifySuccessAsync(L["Account:PasswordChanged"]);
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+        }
+        finally
+        {
+            isSavingPassword = false;
+        }
+    }
+
+    private async Task UploadAvatarAsync(InputFileChangeEventArgs args)
+    {
+        isSavingAvatar = true;
+        try
+        {
+            await Account.UploadAvatarAsync(args.File);
+            await ReloadAvatarAsync();
+            await NotifySuccessAsync(L["Account:AvatarUpdated"]);
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Save);
+        }
+        finally
+        {
+            isSavingAvatar = false;
+        }
+    }
+
+    private async Task DeleteAvatarAsync()
+    {
+        isSavingAvatar = true;
+        try
+        {
+            await Account.DeleteAvatarAsync();
+            avatarDataUrl = null;
+            await NotifySuccessAsync(L["Account:AvatarRemoved"]);
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex, BffErrorKind.Delete);
+        }
+        finally
+        {
+            isSavingAvatar = false;
+        }
+    }
+
+    private async Task ReloadAvatarAsync()
+    {
+        var content = await Account.TryGetAvatarAsync();
+        avatarDataUrl = content?.ToDataUrl();
+    }
+
+    private string InitialsFromProfile()
+    {
+        var displayName = DisplayName();
+        var parts = displayName.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (parts.Length >= 2) return $"{parts[0][0]}{parts[^1][0]}".ToUpperInvariant();
+        return string.IsNullOrWhiteSpace(displayName) ? "HC" : displayName[..Math.Min(2, displayName.Length)].ToUpperInvariant();
+    }
+
+    private void HandleAvatarError() => avatarDataUrl = null;
+
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private sealed class ProfileForm
+    {
+        public string UserName { get; set; } = "";
+        public string Email { get; set; } = "";
+        public string Name { get; set; } = "";
+        public string Surname { get; set; } = "";
+        public string PhoneNumber { get; set; } = "";
+        public string ConcurrencyStamp { get; set; } = "";
+    }
+}

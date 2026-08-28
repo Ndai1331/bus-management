@@ -1,0 +1,129 @@
+{{- $root := . -}}
+{{- $apps := list
+  (dict "name" "auth-server" "image" "authServer" "port" 8080)
+  (dict "name" "web-gateway" "image" "webGateway" "port" 8080)
+  (dict "name" "blazor" "image" "blazor" "port" 8080)
+  (dict "name" "platform" "image" "platform" "port" 8080)
+  (dict "name" "organization" "image" "organization" "port" 8080)
+  (dict "name" "document" "image" "document" "port" 8080)
+  (dict "name" "work-management" "image" "workManagement" "port" 8080)
+  (dict "name" "collaboration" "image" "collaboration" "port" 8080)
+  (dict "name" "bus-management" "image" "busManagement" "port" 8080) -}}
+{{- range $app := $apps }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $app.name }}
+  labels: {{- include "hcs.labels" $root | nindent 4 }}
+spec:
+  replicas: 1
+  selector: { matchLabels: { app.kubernetes.io/name: {{ $app.name }} } }
+  template:
+    metadata:
+      annotations: { hcs.io/deployment-nonce: {{ $root.Values.deploymentNonce | quote }} }
+      labels:
+        app.kubernetes.io/name: {{ $app.name }}
+        {{- include "hcs.labels" $root | nindent 8 }}
+    spec:
+      securityContext: { runAsNonRoot: true }
+      {{- if and (eq $app.name "web-gateway") $root.Values.ingress.internalControllerIp }}
+      hostAliases:
+        - ip: {{ $root.Values.ingress.internalControllerIp | quote }}
+          hostnames:
+            - {{ $root.Values.ingress.authHost | quote }}
+      {{- end }}
+      containers:
+        - name: {{ $app.name }}
+          image: "{{ (index $root.Values.images $app.image).repository }}:{{ (index $root.Values.images $app.image).tag }}"
+          imagePullPolicy: {{ $root.Values.imagePullPolicy }}
+          ports: [{ name: http, containerPort: {{ $app.port }} }]
+          envFrom: [{ secretRef: { name: {{ $root.Values.runtimeSecretName }} } }]
+          env:
+            - { name: ASPNETCORE_ENVIRONMENT, value: Production }
+            - { name: ASPNETCORE_FORWARDEDHEADERS_ENABLED, value: "true" }
+            # HTTPS terminates at the Ingress. This overrides development URLs
+            # from appsettings so Kestrel listens only on the in-cluster port.
+            - { name: Urls, value: "http://+:8080" }
+            {{- if eq $app.name "document" }}
+            - { name: DataProtection__KeysPath, value: /var/run/hcs-data-protection }
+            {{- end }}
+            {{- if eq $app.name "auth-server" }}
+            - { name: App__SelfUrl, value: "https://{{ $root.Values.ingress.authHost }}" }
+            - { name: App__RedirectAllowedUrls, value: "https://{{ $root.Values.ingress.authHost }}" }
+            {{- end }}
+            {{- if eq $app.name "web-gateway" }}
+            - { name: ReverseProxy__Clusters__Platform__Destinations__primary__Address, value: "http://platform/" }
+            - { name: ReverseProxy__Clusters__Organization__Destinations__primary__Address, value: "http://organization/" }
+            - { name: ReverseProxy__Clusters__Document__Destinations__primary__Address, value: "http://document/" }
+            - { name: ReverseProxy__Clusters__WorkManagement__Destinations__primary__Address, value: "http://work-management/" }
+            - { name: ReverseProxy__Clusters__Collaboration__Destinations__primary__Address, value: "http://collaboration/" }
+            - { name: ReverseProxy__Clusters__BusManagement__Destinations__primary__Address, value: "http://bus-management/" }
+            {{- end }}
+            {{- if eq $app.name "blazor" }}
+            - { name: App__SelfUrl, value: "https://{{ $root.Values.ingress.host }}" }
+            - { name: App__RedirectAllowedUrls, value: "https://{{ $root.Values.ingress.host }}" }
+            # Server-rendered ABP calls stay inside the cluster. Browser-facing
+            # BFF redirects use Bff__PublicOrigin from hcs-runtime instead.
+            - { name: RemoteServices__Default__BaseUrl, value: "http://web-gateway/" }
+            {{- end }}
+          readinessProbe: { tcpSocket: { port: http }, initialDelaySeconds: 10, periodSeconds: 10 }
+          livenessProbe: { tcpSocket: { port: http }, initialDelaySeconds: 30, periodSeconds: 20 }
+          resources: {{- toYaml $root.Values.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } }
+          volumeMounts:
+            - { name: certificates, mountPath: /var/run/hcs-certs, readOnly: true }
+            - { name: logs, mountPath: /app/Logs }
+            {{- if eq $app.name "document" }}
+            - { name: document-data-protection, mountPath: /var/run/hcs-data-protection }
+            {{- end }}
+      volumes:
+        - name: certificates
+          secret: { secretName: {{ $root.Values.certificateSecretName }} }
+        - name: logs
+          emptyDir: {}
+        {{- if eq $app.name "document" }}
+        - name: document-data-protection
+          persistentVolumeClaim: { claimName: document-data-protection }
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $app.name }}
+  labels: {{- include "hcs.labels" $root | nindent 4 }}
+spec:
+  selector: { app.kubernetes.io/name: {{ $app.name }} }
+  ports: [{ name: http, port: 80, targetPort: http }]
+{{- end }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrator
+  annotations: { "helm.sh/hook": post-install,post-upgrade, "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded }
+spec:
+  backoffLimit: 3
+  template:
+    spec:
+      restartPolicy: OnFailure
+      securityContext: { runAsNonRoot: true }
+      containers:
+        - name: db-migrator
+          image: "{{ .Values.images.dbMigrator.repository }}:{{ .Values.images.dbMigrator.tag }}"
+          imagePullPolicy: {{ .Values.imagePullPolicy }}
+          envFrom: [{ secretRef: { name: {{ .Values.runtimeSecretName }} } }]
+          env:
+            - { name: ASPNETCORE_ENVIRONMENT, value: Production }
+            - { name: ASPNETCORE_FORWARDEDHEADERS_ENABLED, value: "true" }
+            - { name: Urls, value: "http://+:8080" }
+          resources: {{- toYaml .Values.resources | nindent 12 }}
+          securityContext: { allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: { drop: ["ALL"] } }
+          volumeMounts:
+            - { name: certificates, mountPath: /var/run/hcs-certs, readOnly: true }
+            - { name: logs, mountPath: /app/Logs }
+      volumes:
+        - name: certificates
+          secret: { secretName: {{ .Values.certificateSecretName }} }
+        - name: logs
+          emptyDir: {}

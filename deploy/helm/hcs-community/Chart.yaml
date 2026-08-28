@@ -1,0 +1,6 @@
+apiVersion: v2
+name: hcs-community
+description: HCS ABP Community microservices and local infrastructure
+type: application
+version: 0.1.0
+appVersion: "10.6"

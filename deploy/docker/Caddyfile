@@ -1,0 +1,24 @@
+{
+    local_certs
+}
+
+https://hcs.localhost {
+    tls internal
+
+    # The Blazor host delegates sign-in to the BFF. Keep legacy ABP account
+    # links from loading an Account page that belongs to the AuthServer only.
+    redir /Account/Login /login 302
+    # Profile/manage lives on AuthServer; relative /Account/* links must not 404 on the UI host.
+    redir /Account/* https://auth.hcs.localhost{uri} 302
+
+    @gateway path /bff/* /signin-oidc /signout-callback-oidc /api/* /hubs/*
+    reverse_proxy @gateway web-gateway:8080
+    reverse_proxy blazor:8080
+}
+
+https://auth.hcs.localhost {
+    tls internal
+    # AuthServer has no home page; send bare "/" to the app after local login fallbacks.
+    redir / https://hcs.localhost/ 302
+    reverse_proxy auth-server:8080
+}

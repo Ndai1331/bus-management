@@ -1,0 +1,201 @@
+@page "/tasks"
+@attribute [Authorize(Policy = "WorkManagement.ProjectTasks")]
+@inherits HCSComponentBase
+@inject WorkManagementClient Work
+@inject IUiMessageService UiMessage
+@inject IJSRuntime JsRuntime
+
+<PageTitle>@L["Menu:Tasks"] · HCS</PageTitle>
+<section class="hcs-catalog-page">
+    <header class="hcs-catalog-titlebar">
+        <div class="min-w-0"><h1>@L["Menu:Tasks"]</h1></div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Outline="true" Clicked="ToggleViewAsync">
+                <i class="fa @(isKanban ? "fa-table-list" : "fa-columns") me-1"></i> @(isKanban ? L["Work:ListView"] : L["Work:KanbanView"])
+            </Button>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-export" Clicked="ExportAsync" Disabled="@(tasks.Count == 0 || isLoading)">
+                <i class="fa fa-download me-1"></i> @L["Catalog:Export"]
+            </Button>
+            <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreate">
+                <Icon Name="@IconName.Add" /> @L["Work:NewTask"]
+            </Button>
+        </div>
+    </header>
+    <Card Class="mb-2 hcs-catalog-filter-card"><CardBody>
+        <div class="hcs-catalog-filter-row">
+            <Addons Class="hcs-catalog-search">
+                <Addon AddonType="AddonType.Body"><TextInput @bind-Value="filter" Placeholder="@L["Catalog:SearchPlaceholder"]" /></Addon>
+                <Addon AddonType="AddonType.End">
+                    <Button Color="Color.Primary" Clicked="SearchAsync" Disabled="@isLoading"><i class="fa fa-search me-1"></i> @L["Catalog:SearchButton"]</Button>
+                </Addon>
+            </Addons>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-toggle" Clicked="() => showFilters = !showFilters">
+                <i class="fa fa-sliders me-2"></i>@L["Catalog:Filter"]
+                <i class="fa @(showFilters ? "fa-chevron-up" : "fa-chevron-down") ms-2"></i>
+            </Button>
+        </div>
+        @if (showFilters)
+        {
+            <div class="hcs-catalog-advanced-filter">
+                <Field>
+                    <FieldLabel>@L["Feature:Project"]</FieldLabel>
+                    <CatalogSelect2 Value="projectFilter"
+                                    ValueChanged="async value => { projectFilter = value; await SearchAsync(); }"
+                                    Placeholder="@L["Catalog:SearchPlaceholder"]"
+                                    SelectedText="@ProjectSelectText(projectFilter)"
+                                    Search="SearchProjectsAsync" />
+                </Field>
+                <Field>
+                    <FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                    <Select TValue="string" @bind-Value="statusFilter">
+                        <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                        @foreach (var value in WorkUi.TaskStatuses) { <SelectItem Value="@value">@L[WorkUi.TaskStatusKey(value)]</SelectItem> }
+                    </Select>
+                </Field>
+                <Button Color="Color.Light" Outline="true" Clicked="ResetSearchAsync">@L["Catalog:Reset"]</Button>
+            </div>
+        }
+    </CardBody></Card>
+
+    @if (isKanban)
+    {
+        <div class="hcs-kanban-board">
+            @foreach (var column in WorkUi.TaskStatuses)
+            {
+                var columnTasks = tasks.Where(x => string.Equals(x.Status, column, StringComparison.Ordinal)).ToList();
+                <section class="hcs-kanban-column @(dragOver == column ? "is-over" : null)"
+                         @ondragover:preventDefault
+                         @ondragenter="() => dragOver = column"
+                         @ondragleave="() => dragOver = dragOver == column ? null : dragOver"
+                         @ondrop="() => DropAsync(column)">
+                    <header class="hcs-kanban-hd">
+                        <h2>@L[WorkUi.TaskStatusKey(column)]</h2>
+                        <span class="hcs-kanban-count">@columnTasks.Count</span>
+                    </header>
+                    <div class="hcs-kanban-zone">
+                        @foreach (var task in columnTasks)
+                        {
+                            <article class="hcs-kanban-card" draggable="true" @ondragstart="() => dragging = task" @ondragend="() => dragging = null">
+                                <div class="hcs-kanban-project">@ProjectName(task.ProjectId)</div>
+                                <h3 class="hcs-kanban-title"><a href="@($"/project-task-detail/{task.Id}")">@task.Title</a></h3>
+                                <div class="hcs-kanban-code">@task.Code</div>
+                                @if (task.ParentTaskId is { } parentId)
+                                {
+                                    <div class="hcs-kanban-parent">@L["Feature:ParentTask"]: @ParentTitle(parentId)</div>
+                                }
+                                <div class="hcs-kanban-pills">
+                                    <span class="@WorkUi.PriorityBadgeClass(task.Priority)">@L[WorkUi.PriorityKey(task.Priority)]</span>
+                                    <span class="@WorkUi.ProgressBadgeClass(task.ProgressPercent)">@task.ProgressPercent%</span>
+                                </div>
+                                <div class="hcs-kanban-dates">
+                                    <span class="hcs-kanban-date hcs-kanban-date--start">@WorkUi.FormatDay(task.StartDate)</span>
+                                    <span class="hcs-kanban-date hcs-kanban-date--due">@WorkUi.FormatDay(task.DueDate)</span>
+                                </div>
+                                <div class="hcs-kanban-foot">
+                                    <span class="hcs-kanban-avatar">@(string.IsNullOrWhiteSpace(task.Title) ? "?" : task.Title[..1])</span>
+                                    <span>#@task.Id.ToString("N")[..8]</span>
+                                    <div class="hcs-kanban-menu" @onclick:stopPropagation="true" @ondragstart:preventDefault>
+                                        <Dropdown>
+                                            <DropdownToggle Color="Color.Light" Size="Size.Small" Class="hcs-kanban-menu__toggle" aria-label="@L["Catalog:Actions"]">
+                                                <i class="fa fa-ellipsis-h" aria-hidden="true"></i>
+                                            </DropdownToggle>
+                                            <DropdownMenu>
+                                                <DropdownItem Clicked="() => OpenView(task)"><i class="fa fa-eye me-2"></i>@L["Work:ViewDetail"]</DropdownItem>
+                                                <DropdownDivider />
+                                                <DropdownItem Clicked="() => DeleteAsync(task)" TextColor="TextColor.Danger"><i class="fa fa-trash me-2"></i>@L["Catalog:Delete"]</DropdownItem>
+                                            </DropdownMenu>
+                                        </Dropdown>
+                                    </div>
+                                </div>
+                            </article>
+                        }
+                    </div>
+                </section>
+            }
+        </div>
+    }
+    else
+    {
+        <Card Class="hcs-catalog-grid-card"><CardBody>
+            @if (isLoading) { <div class="hcs-loading py-5"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div> }
+            else
+            {
+                <TaskTree Tasks="tasks" ViewClicked="OpenView" CreateClicked="OpenCreateChild" ProjectNameOf="ProjectName" />
+            }
+        </CardBody></Card>
+    }
+</section>
+<ProjectTaskCreateModal @ref="createModal" OnCreated="LoadAsync" />
+<ProjectTaskViewModal @ref="viewModal" OnChanged="LoadAsync" />
+@code {
+    private readonly List<ProjectDto> projects = [];
+    private readonly List<ProjectTaskDto> tasks = [];
+    private ProjectTaskCreateModal? createModal;
+    private ProjectTaskViewModal? viewModal;
+    private Guid? projectFilter;
+    private ProjectTaskDto? dragging;
+    private string? dragOver, filter, statusFilter;
+    private bool isLoading, showFilters, isKanban = true;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var projectPage = await Work.GetProjectsAsync(new WorkListQuery(null, null, 0, 100));
+            projects.Clear(); projects.AddRange(projectPage.Items);
+            var taskPage = await Work.GetTasksAsync(projectFilter, new WorkListQuery(filter, string.IsNullOrWhiteSpace(statusFilter) ? null : statusFilter, 0, 100));
+            tasks.Clear(); tasks.AddRange(taskPage.Items);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+        finally { isLoading = false; }
+    }
+
+    private Task SearchAsync() => LoadAsync();
+    private Task ResetSearchAsync() { filter = statusFilter = null; projectFilter = null; return LoadAsync(); }
+    private Task ToggleViewAsync() { isKanban = !isKanban; return LoadAsync(); }
+    private Task OpenCreate() => createModal?.ShowAsync(projectFilter) ?? Task.CompletedTask;
+    private Task OpenCreateChild(ProjectTaskDto? parent) =>
+        createModal?.ShowAsync(parent?.ProjectId ?? projectFilter, parent?.Id) ?? Task.CompletedTask;
+    private Task OpenView(ProjectTaskDto task) => viewModal?.ShowAsync(task.Id) ?? Task.CompletedTask;
+    private async Task DeleteAsync(ProjectTaskDto task)
+    {
+        if (!await UiMessage.Confirm(string.Format(L["Catalog:DeleteConfirmation"], task.Title))) return;
+        try { await Work.DeleteTaskAsync(task.Id); await NotifySuccessAsync(L["Catalog:Deleted"]); await LoadAsync(); }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Delete); }
+    }
+    private async Task DropAsync(string status)
+    {
+        if (dragging is null || string.Equals(dragging.Status, status, StringComparison.Ordinal)) { dragOver = null; return; }
+        try
+        {
+            await Work.UpdateTaskAsync(dragging.Id, new UpdateProjectTaskRequest(dragging.Title, dragging.Description, dragging.StartDate, dragging.DueDate, dragging.Priority, status, dragging.ProgressPercent));
+            dragging = null; dragOver = null; await LoadAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); dragOver = null; }
+    }
+    private async Task ExportAsync()
+    {
+        try
+        {
+            await CsvDownload.DownloadAsync(JsRuntime, $"tasks-{DateTime.Now:yyyyMMdd-HHmm}.csv",
+                [L["Catalog:Code"], L["Feature:TaskTitle"], L["Feature:Project"], L["Catalog:Status"], L["Feature:Priority"]],
+                tasks.Select(item => (IReadOnlyList<string>)[item.Code, item.Title, ProjectName(item.ProjectId), L[WorkUi.TaskStatusKey(item.Status)], L[WorkUi.PriorityKey(item.Priority)]]));
+            await UiMessage.Success(L["Catalog:Exported"]);
+        }
+        catch { await UiMessage.Error(L["Catalog:ExportError"]); }
+    }
+    private string ProjectName(Guid projectId) => projects.FirstOrDefault(x => x.Id == projectId)?.Name ?? "—";
+    private string ProjectSelectText(Guid? id) =>
+        CatalogSelect2Cache.TextFor(projects, id, x => x.Id, x => CatalogSelect2Text.CodeName(x.Code, x.Name));
+    private async Task<CatalogSelect2SearchResponse> SearchProjectsAsync(string term, int page)
+    {
+        var skip = Math.Max(page - 1, 0) * 20;
+        var result = await Work.GetProjectsAsync(new WorkListQuery(term, null, skip, 20));
+        return CatalogSelect2Cache.Merge(projects, result.Items, x => x.Id,
+            x => CatalogSelect2Text.CodeName(x.Code, x.Name), more: skip + result.Items.Count < result.TotalCount);
+    }
+    private string ParentTitle(Guid parentId) => tasks.FirstOrDefault(x => x.Id == parentId)?.Title ?? "—";
+}

@@ -1,0 +1,54 @@
+@page "/report-web-frame"
+@page "/notification-receivers"
+@using Microsoft.AspNetCore.Components.Routing
+@inherits HCSComponentBase
+@inject NavigationManager Navigation
+
+<PageTitle>@feature.Title · HCS</PageTitle>
+<GatewayDataPanel @key="@routeKey"
+                  Title="@feature.Title"
+                  Description="@feature.Description"
+                  Endpoint="@feature.Endpoint"
+                  Icon="@feature.Icon"
+                  CanLoad="@feature.CanLoad" />
+
+@code {
+    private FeatureDefinition feature = default!;
+    private string routeKey = "";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Navigation.LocationChanged += OnLocationChanged;
+        ApplyRoute();
+    }
+
+    protected override void OnParametersSet() => ApplyRoute();
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var previousRoute = routeKey;
+        ApplyRoute();
+        if (!string.Equals(previousRoute, routeKey, StringComparison.Ordinal))
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ApplyRoute()
+    {
+        var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+        routeKey = relative.Split('?', '#')[0].Trim('/').ToLowerInvariant();
+        feature = FeatureCatalog.Resolve(relative);
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Navigation.LocationChanged -= OnLocationChanged;
+        }
+
+        base.Dispose(disposing);
+    }
+}

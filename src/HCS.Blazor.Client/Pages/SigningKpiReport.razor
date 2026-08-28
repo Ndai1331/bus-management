@@ -1,0 +1,62 @@
+@page "/signing-kpi-report"
+@attribute [Authorize(Policy = "Documents.Signing.Report")]
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+@inject WorkManagementClient Work
+
+<PageTitle>@L["Menu:SigningKpi"] · HCS</PageTitle>
+<section class="hcs-document-page">
+    <header class="hcs-document-page__header"><div><h1>@L["Feature:SigningKpi"]</h1></div><Button Color="Color.Primary" Outline="true" Clicked="LoadAsync">@L["Catalog:Refresh"]</Button></header>
+    <div class="row g-3 mb-4">
+        <div class="col-md-4"><Card><CardBody><p class="mb-1">@L["Feature:Completed"]</p><h2>@completed</h2></CardBody></Card></div>
+        <div class="col-md-4"><Card><CardBody><p class="mb-1">@L["Feature:Failed"]</p><h2>@failed</h2></CardBody></Card></div>
+        <div class="col-md-4"><Card><CardBody><p class="mb-1">@L["Feature:Attempts"]</p><h2>@attempts</h2></CardBody></Card></div>
+    </div>
+    <Card Class="mb-4"><CardHeader>@L["Menu:Reports"] · signing</CardHeader>
+        <CardBody Class="p-0">
+            @if (rows.Count == 0) { <p class="p-4 mb-0">@L["Catalog:EmptyTitle"]</p> }
+            else {
+                <table class="table mb-0"><thead><tr><th>@L["Catalog:Code"]</th><th>@L["Catalog:Name"]</th><th>@L["Catalog:Status"]</th></tr></thead>
+                <tbody>@foreach (var row in rows) { <tr><td>@row.Key</td><td>@row.Label</td><td>@row.Value</td></tr> }</tbody></table>
+            }
+        </CardBody>
+    </Card>
+    <Card><CardHeader>@L["Feature:Attempts"]</CardHeader>
+        <CardBody Class="p-0">
+            <table class="table mb-0"><thead><tr><th>@L["Menu:Documents"]</th><th>@L["Feature:Completed"]</th><th>@L["Feature:Failed"]</th></tr></thead>
+            <tbody>
+            @foreach (var report in reports)
+            {
+                <tr><td><a href="@($"/document-detail/{report.DocumentId}")">@report.DocumentId.ToString("N")[..8]</a></td><td>@report.Completed</td><td>@report.Failed</td></tr>
+            }
+            </tbody></table>
+        </CardBody>
+    </Card>
+</section>
+@code {
+    private readonly List<ReportRowDto> rows = [];
+    private readonly List<SigningReportDto> reports = [];
+    private int completed, failed, attempts;
+
+    protected override Task OnInitializedAsync() => LoadAsync();
+    private async Task LoadAsync()
+    {
+        completed = failed = attempts = 0; rows.Clear(); reports.Clear();
+        try
+        {
+            try { rows.AddRange(await Work.GetReportsAsync("signing")); } catch { /* reports permission is independent */ }
+            var page = await Documents.GetDocumentsAsync(new DocumentListQuery(null, null, false, 0, 50));
+            foreach (var document in page.Items.Where(x => x.Files.Count > 0).Take(20))
+            {
+                try
+                {
+                    var report = await Documents.GetSigningReportAsync(document.Id);
+                    reports.Add(report);
+                    completed += report.Completed; failed += report.Failed; attempts += report.Attempts.Count;
+                }
+                catch { /* skip documents without signing access */ }
+            }
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+    }
+}

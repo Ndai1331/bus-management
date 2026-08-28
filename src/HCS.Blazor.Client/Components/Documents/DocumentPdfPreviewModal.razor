@@ -1,0 +1,134 @@
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+
+<Modal @ref="modal" Size="ModalSize.ExtraLarge">
+    <ModalContent Centered Class="hcs-catalog-modal hcs-catalog-modal--pdf">
+        <ModalHeader Class="hcs-catalog-modal__header">
+            <ModalTitle>@title</ModalTitle>
+            <CloseButton Clicked="HideAsync" />
+        </ModalHeader>
+        <ModalBody Class="hcs-catalog-modal__body hcs-catalog-modal__body--pdf">
+            @if (isLoading)
+            {
+                <div class="hcs-loading py-5"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div>
+            }
+            else if (!string.IsNullOrWhiteSpace(error))
+            {
+                <p class="text-muted mb-0">@error</p>
+            }
+            else if (!string.IsNullOrWhiteSpace(pdfUrl))
+            {
+                <HcsPdfFrame Source="@pdfUrl" Title="@L["Work:PdfPreview"]" ViewerHeight="Height.Rem(35)" />
+            }
+            else if (selectedFile is not null)
+            {
+                <div class="hcs-file-preview-card">
+                    <i class="fa fa-file-lines" aria-hidden="true"></i>
+                    <div class="min-w-0"><strong class="d-block text-truncate">@selectedFile.FileName</strong><span class="hcs-catalog-desc">@selectedFile.ContentType · @FormatSize(selectedFile.Size)</span></div>
+                    <Button Color="Color.Primary" Outline="true" Clicked="DownloadSelectedAsync"><i class="fa fa-download me-1" aria-hidden="true"></i>@L["Work:View"]</Button>
+                </div>
+            }
+        </ModalBody>
+        <PdfViewerTaskActionsFooter OnClose="HideAsync" ShowAssignTask="ShowAssignTask" OnAssignTask="OnAssignTask" />
+    </ModalContent>
+</Modal>
+@code {
+    [Parameter] public bool ShowAssignTask { get; set; }
+    [Parameter] public EventCallback OnAssignTask { get; set; }
+
+    private Modal? modal;
+    private string title = "";
+    private string? pdfUrl;
+    private string? error;
+    private bool isLoading;
+    private DocumentFileDto? selectedFile;
+    public Guid? DocumentId { get; private set; }
+
+    public async Task ShowAsync(Guid documentId, IReadOnlyList<DocumentFileDto> files, string? documentTitle = null, Guid? selectedFileId = null)
+    {
+        DocumentId = documentId;
+        title = string.IsNullOrWhiteSpace(documentTitle) ? L["Work:PdfPreview"] : documentTitle;
+        error = null;
+        selectedFile = null;
+        isLoading = true;
+        await RevokeAsync();
+        if (modal is not null) await modal.Show();
+        var file = selectedFileId is { } requestedFileId
+            ? files.FirstOrDefault(x => x.Id == requestedFileId)
+            : null;
+        file ??= DocumentFilePick.PreferPdf(files) ?? files.FirstOrDefault();
+        if (file is null)
+        {
+            error = L["Work:NoPdfAvailable"];
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+        selectedFile = file;
+        if (!DocumentFilePick.IsPdf(file))
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+            return;
+        }
+        try
+        {
+            var content = await Documents.GetWatermarkedFileContentAsync(documentId, file.Id);
+            pdfUrl = await Js.InvokeAsync<string>("hcsCreateObjectUrl", "application/pdf", content.Bytes);
+        }
+        catch (Exception ex)
+        {
+            error = MapBffError(ex);
+        }
+        finally
+        {
+            isLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public async Task HideAsync()
+    {
+        await RevokeAsync();
+        if (modal is not null) await modal.Hide();
+    }
+
+    private async Task RevokeAsync()
+    {
+        var previous = pdfUrl;
+        pdfUrl = null;
+        if (string.IsNullOrWhiteSpace(previous)) return;
+        try { await Js.InvokeVoidAsync("hcsRevokeObjectUrl", previous); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+
+    private async Task DownloadSelectedAsync()
+    {
+        if (DocumentId is not { } documentId || selectedFile is null) return;
+        try
+        {
+            var content = DocumentFilePick.IsPdf(selectedFile)
+                ? await Documents.GetWatermarkedFileContentAsync(documentId, selectedFile.Id)
+                : await Documents.GetFileContentAsync(documentId, selectedFile.Id);
+            await Js.InvokeVoidAsync("hcsDownloadBytes", selectedFile.FileName, content.ContentType, content.Bytes);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+    }
+
+    private static string FormatSize(long size) => size switch
+    {
+        >= 1024 * 1024 => $"{size / 1024d / 1024d:0.##} MB",
+        >= 1024 => $"{size / 1024d:0.##} KB",
+        _ => $"{size} B"
+    };
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await RevokeAsync(); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+}

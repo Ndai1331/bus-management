@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="HCS.CollaborationService.Contracts/HCS.CollaborationService.Contracts.csproj" />
+  <Project Path="HCS.CollaborationService/HCS.CollaborationService.csproj" />
+  <Project Path="HCS.CollaborationService.Tests/HCS.CollaborationService.Tests.csproj" />
+</Solution>

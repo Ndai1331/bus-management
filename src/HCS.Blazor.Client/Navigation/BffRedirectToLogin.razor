@@ -1,0 +1,25 @@
+@using Microsoft.Extensions.Configuration
+@using HCS.Localization
+@using Microsoft.Extensions.Localization
+@inject IConfiguration Configuration
+@inject NavigationManager Navigation
+@inject IStringLocalizer<HCSResource> Localizer
+
+<div class="hcs-login-redirect" role="status" aria-live="polite">
+    <span class="hcs-login-redirect__spinner" aria-hidden="true"></span>
+    <span>@Localizer["Auth:Redirecting"]</span>
+</div>
+
+@code {
+    [Parameter] public string? ReturnUrl { get; set; }
+
+    protected override void OnAfterRender(bool firstRender)
+    {
+        if (firstRender)
+        {
+            Navigation.NavigateTo(
+                BffLoginUrlBuilder.Build(Configuration, ReturnUrl ?? Navigation.Uri),
+                forceLoad: true);
+        }
+    }
+}

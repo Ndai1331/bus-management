@@ -1,0 +1,1704 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0": {
+      "Blazorise.Bootstrap5": {
+        "type": "Direct",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "9akVZ7feO2PxuA8nfUWH0eGEEHA65r4i8mobX9LQsXREkv/OpHUnWGovjOA/TcgepVnRLwEKIOF2yUfbHuM4LQ==",
+        "dependencies": {
+          "Blazorise": "2.3.0"
+        }
+      },
+      "Blazorise.Icons.FontAwesome": {
+        "type": "Direct",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "XriQ603OsRZx0EcqJdtIxagIqlm8Bh0OaHp/Oly/PDBaPqQgNKaI1o++eOnyysAMes9EFg614eEopJralL/Pdg==",
+        "dependencies": {
+          "Blazorise": "2.3.0"
+        }
+      },
+      "Blazorise.PdfViewer": {
+        "type": "Direct",
+        "requested": "[2.3.0, )",
+        "resolved": "2.3.0",
+        "contentHash": "Pikov19Mrm2bJtxeTLj1KTgZ9MNkWSk7pirnMe04mWWfcxbiZZPR13slsF7eGArEcW8L3AOaXOA3+TK9QUZMFQ==",
+        "dependencies": {
+          "Blazorise": "2.3.0"
+        }
+      },
+      "Microsoft.AspNetCore.App.Internal.Assets": {
+        "type": "Direct",
+        "requested": "[10.0.1, )",
+        "resolved": "10.0.1",
+        "contentHash": "rafnWkNfJPA0nCZ5u9bFLiIhCv+aGDWBPJMejuROFMHEpsNhTdv8Cvhv+2jIH+b5485FhndbiwOQJUBMeBa6BQ=="
+      },
+      "Microsoft.AspNetCore.Components.WebAssembly.Server": {
+        "type": "Direct",
+        "requested": "[10.0.9, )",
+        "resolved": "10.0.9",
+        "contentHash": "ZTtYvBILwGxhIiXi1L03ETBBOgMmizStu7dO/YblK6rPTa27wpEgYKp5Z9bUfr+wsFvHIDWd/ZMGb9on41f6yw==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Components.WebAssembly": "10.0.9"
+        }
+      },
+      "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": {
+        "type": "Direct",
+        "requested": "[10.0.10, )",
+        "resolved": "10.0.10",
+        "contentHash": "cbAS0fCaHRF201gdtopfEwxW3CbWRX5/ScaAixbG0h33fQIoHUFMktCSVvpnfCvgUs6l9fmn/ZU2FeJGZ2/rGg==",
+        "dependencies": {
+          "StackExchange.Redis": "2.7.27"
+        }
+      },
+      "Serilog.AspNetCore": {
+        "type": "Direct",
+        "requested": "[9.0.0, )",
+        "resolved": "9.0.0",
+        "contentHash": "JslDajPlBsn3Pww1554flJFTqROvK9zz9jONNQgn0D8Lx2Trw8L0A8/n6zEQK1DAZWXrJwiVLw8cnTR3YFuYsg==",
+        "dependencies": {
+          "Serilog": "4.2.0",
+          "Serilog.Extensions.Hosting": "9.0.0",
+          "Serilog.Formatting.Compact": "3.0.0",
+          "Serilog.Settings.Configuration": "9.0.0",
+          "Serilog.Sinks.Console": "6.0.0",
+          "Serilog.Sinks.Debug": "3.0.0",
+          "Serilog.Sinks.File": "6.0.0"
+        }
+      },
+      "Serilog.Sinks.Async": {
+        "type": "Direct",
+        "requested": "[2.1.0, )",
+        "resolved": "2.1.0",
+        "contentHash": "SnmRknWsSMgyo9wDXeZZCqSp48kkQYy44taSM6vcpxfiRICzSf09oLKEmVr0RCwQnfd8mJQ2WNN6nvhqf0RowQ==",
+        "dependencies": {
+          "Serilog": "4.1.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.Server.LeptonXLiteTheme": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "kUW0TZAITZXuvmnQox0mrljJdgzF+BonNAmgxGKhTucu/QxRSx44ZI88nnkqv8x7DcJIgyYQJp5N43TZo/+FIQ==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Server.Theming": "10.6.0",
+          "Volo.Abp.AspNetCore.Components.Web.LeptonXLiteTheme": "5.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.WebAssembly.LeptonXLiteTheme.Bundling": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "++LOBMsoPZV3F4ZX9pV+4H+MjFak9MUuq6HRgjWKUTdn992tOoY0GSNy9TOWpbhE8GQFejJ1gwwmsDorSn5SQw==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.WebAssembly.Theming.Bundling": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.Client": {
+        "type": "Direct",
+        "requested": "[10.6.0, )",
+        "resolved": "10.6.0",
+        "contentHash": "KTaIGyWtbeCcxU7kZnP7VZ5+N+Hy5R99Y8Y6M3MG82hB/hxvXFtFpZSVGBiOl6IchsFC5FyktGYLiohOCluw8w==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.Client.Common": "10.6.0",
+          "Volo.Abp.EventBus": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Theme.LeptonXLite": {
+        "type": "Direct",
+        "requested": "[5.6.0, )",
+        "resolved": "5.6.0",
+        "contentHash": "2AQucKVHUwYsk3L152MIsfjmk3hbwCy4nNw6lcphw1wICRlJtrjMXTK7MzXo4MZ+LfK0E8r4lo5jrp/HiZ1tlw==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.AspNetCore.Mvc.UI.MultiTenancy": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared": "10.6.0",
+          "Volo.Abp.Mapperly": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Serilog": {
+        "type": "Direct",
+        "requested": "[10.6.0, )",
+        "resolved": "10.6.0",
+        "contentHash": "pT9c4gfuUU6+ZYcbS86CYKurEXNYN4l2L0MR5atUU2G05ACu65dxgxHDXrNs5WeYhMwAOlYTU/m+2hasKDI7mA==",
+        "dependencies": {
+          "Serilog": "4.3.0",
+          "Volo.Abp.AspNetCore": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0"
+        }
+      },
+      "Volo.Abp.Autofac": {
+        "type": "Direct",
+        "requested": "[10.6.0, )",
+        "resolved": "10.6.0",
+        "contentHash": "UGlsP1KlEDgGTPvXs33oemkcgLTsEkp17UZEk465T0m1EHUe/Puzsdkf0ZaTgkyb9+zcMCavsX2siCh05Ho36A==",
+        "dependencies": {
+          "Autofac": "9.1.0",
+          "Autofac.Extensions.DependencyInjection": "11.0.0",
+          "Autofac.Extras.DynamicProxy": "7.1.0",
+          "Microsoft.Bcl.AsyncInterfaces": "10.0.9",
+          "Volo.Abp.Castle.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Http.Client.Web": {
+        "type": "Direct",
+        "requested": "[10.6.0, )",
+        "resolved": "10.6.0",
+        "contentHash": "z/a3shP/ugQm9dreToFUU30v06HQn527t3guG+GG4vHMYBQC1JpvOr7bkWu8Goo849lQeHgCcBtJwrxTqrF8gA==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc": "10.6.0",
+          "Volo.Abp.Http.Client": "10.6.0"
+        }
+      },
+      "Asp.Versioning.Abstractions": {
+        "type": "Transitive",
+        "resolved": "8.1.0",
+        "contentHash": "mpeNZyMdvrHztJwR1sXIUQ+3iioEU97YMBnFA9WLbsPOYhGwDJnqJMmEd8ny7kcmS9OjTHoEuX/bSXXY3brIFA=="
+      },
+      "Asp.Versioning.Http": {
+        "type": "Transitive",
+        "resolved": "8.1.0",
+        "contentHash": "Xu4xF62Cu9JqYi/CTa2TiK5kyHoa4EluPynj/bPFWDmlTIPzuJQbBI5RgFYVRFHjFVvWMoA77acRaFu7i7Wzqg==",
+        "dependencies": {
+          "Asp.Versioning.Abstractions": "8.1.0"
+        }
+      },
+      "Asp.Versioning.Mvc": {
+        "type": "Transitive",
+        "resolved": "8.1.0",
+        "contentHash": "BMAJM2sGsTUw5FQ9upKQt6GFoldWksePgGpYjl56WSRvIuE3UxKZh0gAL+wDTIfLshUZm97VCVxlOGyrcjWz9Q==",
+        "dependencies": {
+          "Asp.Versioning.Http": "8.1.0"
+        }
+      },
+      "Asp.Versioning.Mvc.ApiExplorer": {
+        "type": "Transitive",
+        "resolved": "8.1.0",
+        "contentHash": "a90gW/4TF/14Bjiwg9LqNtdKGC4G3gu02+uynq3bCISfQm48km5chny4Yg5J4hixQPJUwwJJ9Do1G+jM8L9h3g==",
+        "dependencies": {
+          "Asp.Versioning.Mvc": "8.1.0"
+        }
+      },
+      "Autofac": {
+        "type": "Transitive",
+        "resolved": "9.1.0",
+        "contentHash": "onT/BcnnfWcQNXiuC7R/0h8ALQzRdsAI20gpB7nfrudXpFMXdVZKz1umdtHXDwjc/bmWEsrCBAxck3+Arnk15g=="
+      },
+      "Autofac.Extensions.DependencyInjection": {
+        "type": "Transitive",
+        "resolved": "11.0.0",
+        "contentHash": "/FSrJyYEsptkV9O3L95dTAoGO6XGSQFDENWHFcHxW0oQIEvW56Mgr01qO53EIEIDDvMFqszBU+uIm9fzGARLPQ==",
+        "dependencies": {
+          "Autofac": "9.1.0"
+        }
+      },
+      "Autofac.Extras.DynamicProxy": {
+        "type": "Transitive",
+        "resolved": "7.1.0",
+        "contentHash": "Da6Szv7A1LK/cTdeoyqS45zb/BC5vep8+86f6C1oh2UhZaYtiijlNfLWamp3lxe0uUQ33kFe1dDCjsvfwJWzLg==",
+        "dependencies": {
+          "Autofac": "6.5.0",
+          "Castle.Core": "5.1.1"
+        }
+      },
+      "Blazorise": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "wO3mR+0nUercFcRzbVHC5AoiTxoKN4UxV/R0pflr3NRy6rLYRWHa5SG2n2xxmzMdt5RBCatKQoxVkLKw8kAU3A==",
+        "dependencies": {
+          "Blazorise.Licensing": "1.3.0"
+        }
+      },
+      "Blazorise.Components": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "a81lwy9iC1zk3MKbNs8ZpIKXUzC/rVvQ13viM/C+SSwkAdkDXPDulI3yns+ozSDZho2LcDTQcSk25ECVUNkAnw==",
+        "dependencies": {
+          "Blazorise": "2.3.0",
+          "Blazorise.Snackbar": "2.3.0"
+        }
+      },
+      "Blazorise.DataGrid": {
+        "type": "Transitive",
+        "resolved": "2.2.1",
+        "contentHash": "nXcSfXhgNB5teGksRWfOcyx53wlr8VeELiyWOs+K5o3epP6pu3PwEqsx9mUJjKosti0A3um3hewZhEkK+19yVg==",
+        "dependencies": {
+          "Blazorise": "2.2.1"
+        }
+      },
+      "Blazorise.Licensing": {
+        "type": "Transitive",
+        "resolved": "1.3.0",
+        "contentHash": "NvQlbUgd6jY/ZfkJPlhHLaMVyvfp24OMehFV8Y6mrqLHqC0CfcoE+6+YP9FZMZKNAWmcNZ85WXmYFWVl0UXGfw=="
+      },
+      "Blazorise.Snackbar": {
+        "type": "Transitive",
+        "resolved": "2.3.0",
+        "contentHash": "KsIKfEzYx7hhj7qmTLQANeDdyQ0BsbGAEWRqNmdprG005IDs8GNHGOyyZG4Va5iRlExEWvef68hpN4iINVoJdg==",
+        "dependencies": {
+          "Blazorise": "2.3.0"
+        }
+      },
+      "Castle.Core": {
+        "type": "Transitive",
+        "resolved": "5.2.1",
+        "contentHash": "wHARzQA695jwwKreOzNsq54KiGqKP38tv8hi8e2FXDEC/sA6BtrX90tVPDkOfVu13PbEzr00TCV8coikl+D1Iw=="
+      },
+      "Castle.Core.AsyncInterceptor": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "1vOovJnbjjoCFbPPNLvLTeiqJwoA+aRXkhXcgCQY0pi1eejGqCegJwl58pIIPH/uKDfUXnPIo7aqSrcXEyEH1Q==",
+        "dependencies": {
+          "Castle.Core": "4.4.0"
+        }
+      },
+      "Duende.IdentityModel": {
+        "type": "Transitive",
+        "resolved": "7.1.0",
+        "contentHash": "Ihn2LiHZfiGD0Qu6aKngK5xtqOocZcS88khVG0Xv7uObfzilevAvXHDhAqpvWiZNIXPeCD6SA5Wy/rfP0U4brA=="
+      },
+      "JetBrains.Annotations": {
+        "type": "Transitive",
+        "resolved": "2025.2.2",
+        "contentHash": "0X56ZRizuHdrnPpgXjWV7f2tQO1FlQg5O1967OGKnI/4ZRNOK642J8L7brM1nYvrxTTU5TP1yRyXLRLaXLPQ8A=="
+      },
+      "Microsoft.AspNetCore.Authentication.OpenIdConnect": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "Xvmxf86pKWHk9aSdqIQP7ao4qTLsYoiYgtbe75YP2aSCdGY4EHjaWOD0IWVR4/wcukrdj6DfqJRtVniUXSr5Nw==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Protocols.OpenIdConnect": "8.0.1"
+        }
+      },
+      "Microsoft.AspNetCore.Components.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "tBv68AsZ3r6z2QdV2m3cSSKUCbvEscN8REpHxcUs22vlR6UjTz6IKdInKNREkJ/3G1AQrBKrRTdrfrHVffE8Iw==",
+        "dependencies": {
+          "Microsoft.JSInterop.WebAssembly": "10.0.9"
+        }
+      },
+      "Microsoft.AspNetCore.Components.WebAssembly.Authentication": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "xdphQ/KxFnpjKNtms9kQ0GaUngOLW9pVGIW3uxEC9CKoC7RJKsTvkCG4o+tGVsGNitQVKkmX0oKXgvF9LRFSvw=="
+      },
+      "Microsoft.AspNetCore.Components.WebAssembly.DevServer": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "/n357A07SYSBO2M76TDCKBOWQJZyGKS3Z9F7BkXnnmK005eo3hzs6gUjCmK+G/W+P5eaJGD2cjZg2yepQKXpAQ=="
+      },
+      "Microsoft.AspNetCore.Http.Connections.Client": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "nE86FWSCy1Y11ks6uf199AtVMjwqKmYN061SEH1pGkXHDDlyZoBbRnM1NmNPZJXCSnS6xxv2oIEADmnWlorEBQ=="
+      },
+      "Microsoft.AspNetCore.SignalR.Client": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "5qXD0QIuwrdBffdmnWZ9+E/+SEkANhjy93zVvYgNubTEN55WWfFHFtJWnq2t3kJCqzfsfVvrvlnjMNx4sFejJg==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Http.Connections.Client": "10.0.9",
+          "Microsoft.AspNetCore.SignalR.Client.Core": "10.0.9"
+        }
+      },
+      "Microsoft.AspNetCore.SignalR.Client.Core": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "LxE3rdPQXV16eHCgcKh9E2itJAJQUxrY0pJ6AdOegdU+5sva1guODze9ziNaPQ0NwD6AEd6n8GROpmaLvjuChg=="
+      },
+      "Microsoft.Bcl.AsyncInterfaces": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "Aq7M8lG6BrHeatqKqncVm9m55ec34k6nnfPRLe/PvGg+b/pAsRM2ejofeKmCLjTXMa+5NGXm382f8CG/D5WDow=="
+      },
+      "Microsoft.Bcl.Cryptography": {
+        "type": "Transitive",
+        "resolved": "10.0.2",
+        "contentHash": "LG9Yll3B5aNpxv0+D47g6LiOiKBIlodhcHdQwcYzo8VeexFLGqx5ymetmA2aBRyo9cCcWsQWrFsdbsr8LvmWDw=="
+      },
+      "Microsoft.DotNet.HotReload.WebAssembly.Browser": {
+        "type": "Transitive",
+        "resolved": "10.0.101",
+        "contentHash": "30d2d7ti8GiDYf9zg4+w5cvH3jm9HAQMyXzZgCVpEjmh3WLErJazuu2tyoIO75uNYLWPD/NNTTRD9SoPpDiACw=="
+      },
+      "Microsoft.Extensions.Caching.Hybrid": {
+        "type": "Transitive",
+        "resolved": "10.7.0",
+        "contentHash": "DWdLkc6SCZhlQPXFuOjMee1wotUcsdLHzOrN2GN9JsWVscYrGXR91SjH1g7bhUrF6f8ayZD31KxoXAoXxVpCvA=="
+      },
+      "Microsoft.Extensions.DependencyModel": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "saxr2XzwgDU77LaQfYFXmddEDRUKHF4DaGMZkNB3qjdVSZlax3//dGJagJkKrGMIPNZs2jVFXITyCCR6UHJNdA=="
+      },
+      "Microsoft.Extensions.FileProviders.Embedded": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "UpRgjjSUmF7KYZTIv1Zd2Y0Wv2oK9jE+Jmyp4UMynTowjvJGG1yrRe2JodYyVgcDgZF2auGwYEl+U0J1+YhBRw=="
+      },
+      "Microsoft.IdentityModel.Abstractions": {
+        "type": "Transitive",
+        "resolved": "8.19.1",
+        "contentHash": "gFA8THIk23uNF/vMdOHnjIdXD1LyA2g12cHzMJ+Xag6WpgWLw6E/6uCXxvA0gp9d2yAvkRt3xzFzMUiO/hofnQ=="
+      },
+      "Microsoft.IdentityModel.JsonWebTokens": {
+        "type": "Transitive",
+        "resolved": "8.19.1",
+        "contentHash": "6eeY+y2QFyjj3XnCz/8gJdoP5smYHTS9ow1bw2nsZzDIPjPhBZlackYTIduSMipVpxnoT/B62LkrXX2jPggOXg==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Tokens": "8.19.1"
+        }
+      },
+      "Microsoft.IdentityModel.Logging": {
+        "type": "Transitive",
+        "resolved": "8.19.1",
+        "contentHash": "H+sMrMpdbWnwkQnpb/ESkQovtOgdefmj0ecGCcP40mDKzE5i4dUYkH6599M9mWYFNGNJnTp92l/9wLubYXWimw==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Abstractions": "8.19.1"
+        }
+      },
+      "Microsoft.IdentityModel.Protocols": {
+        "type": "Transitive",
+        "resolved": "8.0.1",
+        "contentHash": "uA2vpKqU3I2mBBEaeJAWPTjT9v1TZrGWKdgK6G5qJd03CLx83kdiqO9cmiK8/n1erkHzFBwU/RphP83aAe3i3g==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Tokens": "8.0.1"
+        }
+      },
+      "Microsoft.IdentityModel.Protocols.OpenIdConnect": {
+        "type": "Transitive",
+        "resolved": "8.0.1",
+        "contentHash": "AQDbfpL+yzuuGhO/mQhKNsp44pm5Jv8/BI4KiFXR7beVGZoSH35zMV3PrmcfvSTsyI6qrcR898NzUauD6SRigg==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Protocols": "8.0.1",
+          "System.IdentityModel.Tokens.Jwt": "8.0.1"
+        }
+      },
+      "Microsoft.IdentityModel.Tokens": {
+        "type": "Transitive",
+        "resolved": "8.19.1",
+        "contentHash": "KDiuSLXud2AFVNAOottd8ztVysfPeHyr4r8gofU3/VKUXlI7oytzGTnPsNJ/B3nui17rgz8wAdWNJOtzPjkUxw==",
+        "dependencies": {
+          "Microsoft.Bcl.Cryptography": "10.0.2",
+          "Microsoft.IdentityModel.Logging": "8.19.1"
+        }
+      },
+      "Microsoft.JSInterop.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "4G0A7GuQrtCAes8PuJPTDUcy+lCrxHWjr8ZlkDOa4h8a2Txj1XdhbXKLnld2vMY5EyZNC5jZXxa1xTD/AOCUlw=="
+      },
+      "MyCSharp.HttpUserAgentParser": {
+        "type": "Transitive",
+        "resolved": "3.0.28",
+        "contentHash": "UbqKb1z2r8gFhsD5Scf/lEI5T7VtCeQUTzXA3yyWoyvXdY5u4HL7CsHk6WNAtbZJa2rgRGqN7pHLpcffo3PIRA=="
+      },
+      "Nito.AsyncEx.Context": {
+        "type": "Transitive",
+        "resolved": "5.1.2",
+        "contentHash": "rMwL7Nj3oNyvFu/jxUzQ/YBobEkM2RQHe+5mpCDRyq6mfD7vCj7Z3rjB6XgpM6Mqcx1CA2xGv0ascU/2Xk8IIg==",
+        "dependencies": {
+          "Nito.AsyncEx.Tasks": "5.1.2"
+        }
+      },
+      "Nito.AsyncEx.Tasks": {
+        "type": "Transitive",
+        "resolved": "5.1.2",
+        "contentHash": "jEkCfR2/M26OK/U4G7SEN063EU/F4LiVA06TtpZILMdX/quIHCg+wn31Zerl2LC+u1cyFancjTY3cNAr2/89PA==",
+        "dependencies": {
+          "Nito.Disposables": "2.2.1"
+        }
+      },
+      "Nito.Disposables": {
+        "type": "Transitive",
+        "resolved": "2.2.1",
+        "contentHash": "6sZ5uynQeAE9dPWBQGKebNmxbY4xsvcc5VplB5WkYEESUS7oy4AwnFp0FhqxTSKm/PaFrFqLrYr696CYN8cugg=="
+      },
+      "NUglify": {
+        "type": "Transitive",
+        "resolved": "1.21.17",
+        "contentHash": "K2ywYpoPEvU3+Ooq6wxz+FJOkmbDeoE41q/sJZWv9tI7qbTmH2A5R0E4hWzruvl/9pnUhqwbu1mxT06C45D0ZQ=="
+      },
+      "OpenIddict.Abstractions": {
+        "type": "Transitive",
+        "resolved": "7.5.0",
+        "contentHash": "4m3smhkdeWITo1UWc3zYyGketh0ELn6UZRuZEnzcyS6fuflvl1MNSHbg1wPTTGldlxcq6VwWvVvKWyaTW/25Ig==",
+        "dependencies": {
+          "Microsoft.IdentityModel.Tokens": "8.16.0"
+        }
+      },
+      "Pipelines.Sockets.Unofficial": {
+        "type": "Transitive",
+        "resolved": "2.2.8",
+        "contentHash": "zG2FApP5zxSx6OcdJQLbZDk2AVlN2BNQD6MorwIfV6gVj0RRxWPEp2LXAxqDGZqeNV1Zp0BNPcNaey/GXmTdvQ=="
+      },
+      "Riok.Mapperly": {
+        "type": "Transitive",
+        "resolved": "4.3.1",
+        "contentHash": "oSE+OVLHyiojrws0QVbQaAT2YKsYbyHqJXPdV7EhGseR/dYgeWS2x1T5qY5I4E+RJkJqMSG+FyZOq4SljWgJWQ=="
+      },
+      "Serilog": {
+        "type": "Transitive",
+        "resolved": "4.3.0",
+        "contentHash": "+cDryFR0GRhsGOnZSKwaDzRRl4MupvJ42FhCE4zhQRVanX0Jpg6WuCBk59OVhVDPmab1bB+nRykAnykYELA9qQ=="
+      },
+      "Serilog.Extensions.Hosting": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "u2TRxuxbjvTAldQn7uaAwePkWxTHIqlgjelekBtilAGL5sYyF3+65NWctN4UrwwGLsDC7c3Vz3HnOlu+PcoxXg==",
+        "dependencies": {
+          "Serilog": "4.2.0",
+          "Serilog.Extensions.Logging": "9.0.0"
+        }
+      },
+      "Serilog.Extensions.Logging": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "NwSSYqPJeKNzl5AuXVHpGbr6PkZJFlNa14CdIebVjK3k/76kYj/mz5kiTRNVSsSaxM8kAIa1kpy/qyT9E4npRQ==",
+        "dependencies": {
+          "Serilog": "4.2.0"
+        }
+      },
+      "Serilog.Formatting.Compact": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "wQsv14w9cqlfB5FX2MZpNsTawckN4a8dryuNGbebB/3Nh1pXnROHZov3swtu3Nj5oNG7Ba+xdu7Et/ulAUPanQ==",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        }
+      },
+      "Serilog.Settings.Configuration": {
+        "type": "Transitive",
+        "resolved": "9.0.0",
+        "contentHash": "4/Et4Cqwa+F88l5SeFeNZ4c4Z6dEAIKbu3MaQb2Zz9F/g27T5a3wvfMcmCOaAiACjfUb4A6wrlTVfyYUZk3RRQ==",
+        "dependencies": {
+          "Microsoft.Extensions.DependencyModel": "9.0.0",
+          "Serilog": "4.2.0"
+        }
+      },
+      "Serilog.Sinks.Console": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "fQGWqVMClCP2yEyTXPIinSr5c+CBGUvBybPxjAGcf7ctDhadFhrQw03Mv8rJ07/wR5PDfFjewf2LimvXCDzpbA==",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        }
+      },
+      "Serilog.Sinks.Debug": {
+        "type": "Transitive",
+        "resolved": "3.0.0",
+        "contentHash": "4BzXcdrgRX7wde9PmHuYd9U6YqycCC28hhpKonK7hx0wb19eiuRj16fPcPSVp0o/Y1ipJuNLYQ00R3q2Zs8FDA==",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        }
+      },
+      "Serilog.Sinks.File": {
+        "type": "Transitive",
+        "resolved": "6.0.0",
+        "contentHash": "lxjg89Y8gJMmFxVkbZ+qDgjl+T4yC5F7WSLTvA+5q0R04tfKVLRL/EHpYoJ/MEQd2EeCKDuylBIVnAYMotmh2A==",
+        "dependencies": {
+          "Serilog": "4.0.0"
+        }
+      },
+      "StackExchange.Redis": {
+        "type": "Transitive",
+        "resolved": "2.7.27",
+        "contentHash": "Uqc2OQHglqj9/FfGQ6RkKFkZfHySfZlfmbCl+hc+u2I/IqunfelQ7QJi7ZhvAJxUtu80pildVX6NPLdDaUffOw==",
+        "dependencies": {
+          "Pipelines.Sockets.Unofficial": "2.2.8"
+        }
+      },
+      "System.CodeDom": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "scH7O8oAuOMyZKOEiOQB3ZVz6x9XkrZNKNeWVCxdvkJHSy4SYXyinGK0o2Rn5LiGh+ovezziT2WCdqWKa7WMKA=="
+      },
+      "System.IdentityModel.Tokens.Jwt": {
+        "type": "Transitive",
+        "resolved": "8.19.1",
+        "contentHash": "2VHcRtT95GAcW1E3aVBLvL2rAAMxKHXKMXKXFyWzwgkdFXZPMMvP8tVOfnRydL4vTr1RirNuGC6T8VSEF2YsPQ==",
+        "dependencies": {
+          "Microsoft.IdentityModel.JsonWebTokens": "8.19.1",
+          "Microsoft.IdentityModel.Tokens": "8.19.1"
+        }
+      },
+      "System.Linq.Dynamic.Core": {
+        "type": "Transitive",
+        "resolved": "1.6.7",
+        "contentHash": "lH+YgtovXbxD6JImHl2VXUtXRUvN8BMEZB2ReZNvS+J5GnGGZV9ivxslQ2nJWmKlBjFTReAKsevnQKE4yLP2pA=="
+      },
+      "System.Management": {
+        "type": "Transitive",
+        "resolved": "10.0.9",
+        "contentHash": "8mfTzHLlMHCqFE1+iFGzxRCeCb2gDqvRQtZthuksYB+z546QZaFCiagbJ2KXHe7dy5ZpCUg/usaIqc2DxiemPw==",
+        "dependencies": {
+          "System.CodeDom": "10.0.9"
+        }
+      },
+      "TimeZoneConverter": {
+        "type": "Transitive",
+        "resolved": "7.2.0",
+        "contentHash": "4Poqu79dTmacVETqUJ53g3x4U21V/cmWPSlehdsVE4Q00akavvlRq+SRjcg/CmfO9ibOCjRl6TeUV7hkC5RC4w=="
+      },
+      "Volo.Abp.Account.Application.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "lQGUeRYr0I9w8qJJKnq0wmh0D619Ibwf9g1rEMalU/lusqShevY8/RORcVV9FLLY03kiTv3FdE2ThPvNk0GWiw==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Identity.Application.Contracts": "10.6.0"
+        }
+      },
+      "Volo.Abp.Account.HttpApi.Client": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "9HSM6zNRg32G/VtS13dpDlf76/NJMe8zbJggJVm4LOYJuR0ZLWGLExTbgEyAlYkRuN7sRG+3QDPdCuJk+dtB1g==",
+        "dependencies": {
+          "Volo.Abp.Account.Application.Contracts": "10.6.0",
+          "Volo.Abp.Http.Client": "10.6.0"
+        }
+      },
+      "Volo.Abp.ApiVersioning.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "7bvd+42zOy4Yfg20RHh/jFI51h5JUgjE4RnTf4N2CTaY6RyKtQSkPJxjPRvk4I57BZaW9iFwbnjAZJhxzBnBxQ==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "LP+P3pM+IE7fh8oYixcmLfZGTeBnJO6MrkCNGdTZa+j+7rCXv/djWaRA8qRJktShI3iuTBC4iYKOI4RmjZFVNg==",
+        "dependencies": {
+          "Duende.IdentityModel": "7.1.0",
+          "Microsoft.AspNetCore.Authentication.OpenIdConnect": "10.0.9",
+          "MyCSharp.HttpUserAgentParser": "3.0.28",
+          "Volo.Abp.AspNetCore.Abstractions": "10.6.0",
+          "Volo.Abp.Auditing": "10.6.0",
+          "Volo.Abp.Authorization": "10.6.0",
+          "Volo.Abp.ExceptionHandling": "10.6.0",
+          "Volo.Abp.Http": "10.6.0",
+          "Volo.Abp.Security": "10.6.0",
+          "Volo.Abp.Uow": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0",
+          "Volo.Abp.VirtualFileSystem": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "4fxwyTXkrM1m369ptXXw+xoEeEziv5aLlUpcOd16fkDxO/5jXKFGh4VSFWgMSv66LzxEHgrETM28tF0U2eNVRA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Bundling": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "pfd5/5Y8fyCCy49oVdcXscSqD1o1ZASvi+3zFakqnfSuy60mO+DK7j4wdQubv8G+ztFtwQF3vLRdsE+wQEDmiw==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.UI.Bundling.Abstractions": "10.6.0",
+          "Volo.Abp.Minify": "10.6.0",
+          "Volo.Abp.VirtualFileSystem": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "caDkbZzAgdrSr6kfAXC+4iVJe6/z+3ptRJxaI/wTficto5jXBVWxV4MhaBqyj8ZSm0sgtxXr5/aml/dcwGhcFA==",
+        "dependencies": {
+          "Volo.Abp.MultiTenancy.Abstractions": "10.6.0",
+          "Volo.Abp.ObjectMapping": "10.6.0",
+          "Volo.Abp.Security": "10.6.0",
+          "Volo.Abp.Timing": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.Server": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "u6G5ygAW7ogRfru6fepGLsrybhT+KTNq/pykQL5r5TigmJ+7/r/2mbEcZlXGpb4meUK5APjWmZhBXK+NTguA1Q==",
+        "dependencies": {
+          "Duende.IdentityModel": "7.1.0",
+          "Microsoft.AspNetCore.Authentication.OpenIdConnect": "10.0.9",
+          "Volo.Abp.AspNetCore.Components.Web": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.Contracts": "10.6.0",
+          "Volo.Abp.AspNetCore.SignalR": "10.6.0",
+          "Volo.Abp.EventBus": "10.6.0",
+          "Volo.Abp.Http.Client": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.Server.Theming": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "/PH0Nz9XvpkXS69UN74u5aTn4b5/J/QZ1+3gdDKj97V/wMVVm6cZJvFbJlO4Rgj5nFOLjnE24J23I+FB3zENMA==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Server": "10.6.0",
+          "Volo.Abp.AspNetCore.Components.Web.Theming": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Bundling": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Packages": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.Web": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "P9TR/MMAOQrMRcNlZYdYWXw6tJy+XbvVYwMlFpH0rwaV5E6svn9KraRpehDQ8W/GTdE+443kAAmOYlnWa8E/7Q==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components": "10.6.0",
+          "Volo.Abp.UI": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.Web.LeptonXLiteTheme": {
+        "type": "Transitive",
+        "resolved": "5.6.0",
+        "contentHash": "NBEFepE99FQToKwKY+vgQGQoPMJDRwTtOl9syXEo1bzdWdHHdmBLq1ACgBwrVvWlrwVm4g18yuGZRgh0Y9I2CA==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Web.Theming": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.Web.Theming": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "LeVhMKtEoc7yjgj1Red9s7NoBbA/hthRvM89LJswPBx2+OGzdKFMIhJ1ZElmfK56bOmsrBNwpLv14SlXY0bl8g==",
+        "dependencies": {
+          "Volo.Abp.BlazoriseUI": "10.6.0",
+          "Volo.Abp.UI.Navigation": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "Ozy0W9mWwEqe2aBxIdPmdcB17CEVpXLK2UCbKgB58wa0nt9HyfWd5J46KRy+4K5eI3YQHyx83n3os2ooc5qV4g==",
+        "dependencies": {
+          "Duende.IdentityModel": "7.1.0",
+          "Microsoft.AspNetCore.Components.WebAssembly": "10.0.9",
+          "Microsoft.AspNetCore.Components.WebAssembly.Authentication": "10.0.9",
+          "System.IdentityModel.Tokens.Jwt": "8.19.1",
+          "Volo.Abp.AspNetCore.Components.Web": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.Client.Common": "10.6.0",
+          "Volo.Abp.UI": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.WebAssembly.LeptonXLiteTheme": {
+        "type": "Transitive",
+        "resolved": "5.6.0",
+        "contentHash": "+iPxqYjLC8WFL71pbv6dWccnwqCNaRq9sBNZ10wcTJ2vouN7rXtXpQzDxbgmQL8OVKU0ZkGsrCYoUM/MY1zUAQ==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Web.LeptonXLiteTheme": "5.6.0",
+          "Volo.Abp.AspNetCore.Components.WebAssembly.LeptonXLiteTheme.Bundling": "5.6.0",
+          "Volo.Abp.AspNetCore.Components.WebAssembly.Theming": "10.6.0",
+          "Volo.Abp.Http.Client.IdentityModel.WebAssembly": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.WebAssembly.Theming": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "R3TrjL5zKDeKX0ri2exMAsGPJlMSRMAg7KUuihoNRhwHnuHu4chxsE8QEEDga7+udI2jVG8Xp+iWgIqQB4Uugw==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Components.WebAssembly.Authentication": "10.0.9",
+          "Volo.Abp.AspNetCore.Components.Web.Theming": "10.6.0",
+          "Volo.Abp.AspNetCore.Components.WebAssembly": "10.6.0",
+          "Volo.Abp.AspNetCore.Components.WebAssembly.Theming.Bundling": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Components.WebAssembly.Theming.Bundling": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "NMipqgEf8nfAbRcAduu/adsjbmxaBjN2EQ/H95Xugl5Uz69dNsUsNNNr3LPszRn0WRw323RqBCAt2QxuLozANw==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.UI.Bundling.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.MultiTenancy": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "c8312v1c9PzDXQbxdoEImzkccEk7dIK4rY7T3WOFGcr7ESovzFRbGUpqMW0jWtxvakyYhisZrF144Yz/GZ6MdQ==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "HuQqrNVpGSw2m+H8xWQY3pzZmZF7MlzKEOI+s0YZelNqaTWoH3g9+yNk9Eq0SEiT9LXz2mLRhfmWgbVs7z1Yjg==",
+        "dependencies": {
+          "Asp.Versioning.Mvc": "8.1.0",
+          "Asp.Versioning.Mvc.ApiExplorer": "8.1.0",
+          "Volo.Abp.ApiVersioning.Abstractions": "10.6.0",
+          "Volo.Abp.AspNetCore": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.Contracts": "10.6.0",
+          "Volo.Abp.Ddd.Application": "10.6.0",
+          "Volo.Abp.GlobalFeatures": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.UI.Navigation": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.Client.Common": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "jEbl7dPc4arIYxiy0kK1TR6j6ChaH8hMTJVda4XDarUOdx98t8FkJJTN01X50SSEKz6rsjkMbuhiqDY8pOj01w==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.Contracts": "10.6.0",
+          "Volo.Abp.Authorization": "10.6.0",
+          "Volo.Abp.Caching": "10.6.0",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.Http.Client": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "2A6OVdmOfk/EB0wgO2VDn/zDTqlGSpxHEXMrlG1YWp88y6DxBAg4AnquZfFCHPsWu8QUVjdmRM592wAFP7xBrg==",
+        "dependencies": {
+          "Volo.Abp.Ddd.Application.Contracts": "10.6.0",
+          "Volo.Abp.MultiTenancy.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "5MnwqRRCNVIdzlC1TRUKjoOztin/wkM/1ovcmR2mXkdHRfTHn1P3YRswp/HxWNUabJ+LD/3ylVP4puHh180FIQ==",
+        "dependencies": {
+          "NUglify": "1.21.17",
+          "Volo.Abp.AspNetCore.Mvc": "10.6.0",
+          "Volo.Abp.UI.Navigation": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Bootstrap": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "hXYePtMwWguQnomwgJprnfgyeqwMa91S5OkfVGdl8DbH4lxOxX/Mc3xrWB8zOOA5rLvAk2bX1VSTgMtGBZuZqg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.UI": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Bundling": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "5oJHJZhKjRAONhzIER6HmF0hnVyZnp30EIEHXzKybs6lc6lj6R75kq+PjeKAjhjy9gIWWCS/pD0c0Jpl+Zqsdg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Bundling": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Bootstrap": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Bundling.Abstractions": "10.6.0",
+          "Volo.Abp.Minify": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Bundling.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "A0syrIgskoMpLxeVFooLpLaCCw/LlnOiVeH2AuZwiy8zy44tiGnCdBrzQ/zKSmFqC/d4yJXtSLxzLYBNeRssWQ==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.MultiTenancy": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "FbBLpVkZtNB5//z7NdEhNlIo9rhYHS2BWp9E8OygOg+jcmWttJ1te4xL0Zz7psa4CEBzQxJ64tsY5jhExkQLuQ==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.MultiTenancy": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Packages": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "hAJ4EINUoibEtKOrljXjMBLUBseW37nmKLcW7nqXqUKyGUhy90ifihC1+bvYRbTfgOpBP9JoaGX9S4374oHXcg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.UI.Bundling.Abstractions": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Theme.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "2UBiqQlxpEq7XOLpROfpaiAOqKAPt6XV0Y+ayzvu+JcFaitpXZCt21cVNMMCgeZid7I0BlPoj7xDVqLd2vLNJg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.UI.Bootstrap": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Packages": "10.6.0",
+          "Volo.Abp.AspNetCore.Mvc.UI.Widgets": "10.6.0",
+          "Volo.Abp.Features": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.Mvc.UI.Widgets": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "co0CamA4cdVvIcs3Dlb/kE2laMLXMF6r01+ihQVnBbX1lMMGOO/7bXlotJ+NqzeQD0iq8Lb1BlfpAMxQLbPnng==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Mvc.UI.Bundling": "10.6.0"
+        }
+      },
+      "Volo.Abp.AspNetCore.SignalR": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "rV2bayhWpCQczd3k9EVL22+OX05EuJpzRF0ZhtkHd6VLVdHVMrvrY14VLzSg/t3Nzp/7Gxo/d8bp9cqams1HVg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore": "10.6.0"
+        }
+      },
+      "Volo.Abp.Auditing": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "RaHkZRwqSwQYsMQX/SORa/I5xAhAJ2C/pZ3EgXMVhzP0KfeH2OymWQWM7XByRYQ5FDOVLCX5oxqcpRJGVouEQg==",
+        "dependencies": {
+          "Volo.Abp.Auditing.Contracts": "10.6.0",
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Json": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.Security": "10.6.0",
+          "Volo.Abp.Threading": "10.6.0",
+          "Volo.Abp.Timing": "10.6.0"
+        }
+      },
+      "Volo.Abp.Auditing.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "0xBZTKO0OEqlJh6ebOcjz4j9IVwe38OwvZ+l5RVjGXD89zQZR45XcjyKC+CeIlOv2ip3tPUSEdO1qjEhVagvRA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.AuditLogging.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "lX6U1xF+Az2iMTfuEcpUMk3UbmWqlvGnfVJWRUJHykypDbgvUqmfxvVv5zVdVz59Rqzimi1k1q2mIk4CXkoyOQ==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.Authorization": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "h+cEDNN8ZETPBn8MI343gPANWTukswThXksR4wsZp+gTaiKn6lt9kAd2Mi5VUjbt2Gi8TaIbhrkF1KpUy4TWbw==",
+        "dependencies": {
+          "Volo.Abp.Authorization.Abstractions": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.Security": "10.6.0"
+        }
+      },
+      "Volo.Abp.Authorization.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "0RyBHnozAyr2fhAbnjOnPGGSbAJWGxoDvWGQvzwAdJMP6/elQ6ZGUbG9Dn0NsuFjq6ARDln0DNwkh8aATTy+iw==",
+        "dependencies": {
+          "Volo.Abp.MultiTenancy.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.Autofac.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "O+ebBvexgdORWmZGgM5L705hHgHwkEhy5O1jXwaXptCMGHj25ym7JQu2YuyYiYX/vwxCufpKKXZEFuXFTNuFgQ==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.WebAssembly": "10.6.0",
+          "Volo.Abp.Autofac": "10.6.0"
+        }
+      },
+      "Volo.Abp.BackgroundJobs.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "LXm9IHonWuD83hQQWrC9BPWLACTpE3SxzHy1AK40/BCdv9QHOqBGX2akn43OKd/osEnu8wmnOGcfsVdBawJYIA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.BackgroundWorkers": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "gKdrTg/WyWDuTzeqztCHly5YZauSftBEADS53kFJLkgsPTgBkDXXyx89iYNfZ4R1pT8dOOghFZF6RjVmv+ZE8A==",
+        "dependencies": {
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Threading": "10.6.0"
+        }
+      },
+      "Volo.Abp.BlazoriseUI": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "Fv7Xbjc5AFeVG2aRAEBKpSXnrneFYMLjZABivkf/v6UlDoPZ5fMaYrnl5uUhfMu/nNfP7u77m4K9h0drZ+aP1g==",
+        "dependencies": {
+          "Blazorise": "2.2.1",
+          "Blazorise.Components": "2.2.1",
+          "Blazorise.DataGrid": "2.2.1",
+          "Blazorise.Snackbar": "2.2.1",
+          "Volo.Abp.AspNetCore.Components.Web": "10.6.0",
+          "Volo.Abp.Authorization": "10.6.0",
+          "Volo.Abp.Ddd.Application.Contracts": "10.6.0",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.GlobalFeatures": "10.6.0"
+        }
+      },
+      "Volo.Abp.BlobStoring.Database.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "5fkvCm4jZglPhmM29zqecouleGJGLxa6wgFO7z6hjMe4xoR80f6obyzcNMy6FeqMMwHiwhCtCGRUyFwpyFSSow==",
+        "dependencies": {
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.Caching": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "dtkfYxVFW7pFUUi7fRjjYH6yXE4t+0I6Ye/LGu+cvsO3IOUyKNwmW8ujEB6KJeuTkV8G6UiAps5syMDjRd2SlQ==",
+        "dependencies": {
+          "Microsoft.Extensions.Caching.Hybrid": "10.7.0",
+          "Volo.Abp.Json": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.Serialization": "10.6.0",
+          "Volo.Abp.Threading": "10.6.0"
+        }
+      },
+      "Volo.Abp.Castle.Core": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "RYWDCWNm1ut/Q5GeVyionTgfO/cJFAPgwAB6ygO4lMRSsEAd1kA3Gw7kcQu5zLa2lAwy7CxcvY0FBkECfNaooQ==",
+        "dependencies": {
+          "Castle.Core": "5.2.1",
+          "Castle.Core.AsyncInterceptor": "2.1.0",
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Core": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "THgRKBgnqA4+mkD6BtSHYHJXGFq78iXf1pSgUaZCadHwEFhi30o+WwSNKnMTU2ZNNHyPkc+T2BbdtSifVt8npA==",
+        "dependencies": {
+          "JetBrains.Annotations": "2025.2.2",
+          "Nito.AsyncEx.Context": "5.1.2",
+          "System.Linq.Dynamic.Core": "1.6.7",
+          "System.Management": "10.0.9"
+        }
+      },
+      "Volo.Abp.Data": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "Rroef8YFIsCTnPR89Nx5usDC7uK9NpBnhSR1wOVaKWpoJdgZDMHWZqnmCB91WHCS+PQ80REw3Cyxmwqp4etbKQ==",
+        "dependencies": {
+          "Volo.Abp.EventBus.Abstractions": "10.6.0",
+          "Volo.Abp.ObjectExtending": "10.6.0",
+          "Volo.Abp.Uow": "10.6.0"
+        }
+      },
+      "Volo.Abp.Ddd.Application": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "tAit//R+V7iSaZN/YH4rSt/BZ3wRF9w7ef8McLu4xvkQ4BGCk9f8nCy6B28741xYB0rv2GTTTSRJHz2+alky+Q==",
+        "dependencies": {
+          "Volo.Abp.Authorization": "10.6.0",
+          "Volo.Abp.Ddd.Application.Contracts": "10.6.0",
+          "Volo.Abp.Ddd.Domain": "10.6.0",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.GlobalFeatures": "10.6.0",
+          "Volo.Abp.Http.Abstractions": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.ObjectMapping": "10.6.0",
+          "Volo.Abp.Security": "10.6.0",
+          "Volo.Abp.Settings": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.Ddd.Application.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "3X/XEDbmBDsfvMbQt9QqNoSHk9VCO7h7tMDfnYodOZmvOS2G8N6w9gXKChjeaNFjPyl9xsm8Oid5z+kc4zeOZg==",
+        "dependencies": {
+          "Volo.Abp.Auditing.Contracts": "10.6.0",
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0"
+        }
+      },
+      "Volo.Abp.Ddd.Domain": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "xBae/TemNSLzetkVuWcMbOlF6Q4ycYC9F/zFVj/IzNcOnSUHPVAitOXT41TGjDAlZ1PgsyvJPzEhw8sC9W9f8w==",
+        "dependencies": {
+          "Volo.Abp.Auditing": "10.6.0",
+          "Volo.Abp.Caching": "10.6.0",
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Ddd.Domain.Shared": "10.6.0",
+          "Volo.Abp.EventBus": "10.6.0",
+          "Volo.Abp.ExceptionHandling": "10.6.0",
+          "Volo.Abp.Guids": "10.6.0",
+          "Volo.Abp.ObjectMapping": "10.6.0",
+          "Volo.Abp.Specifications": "10.6.0",
+          "Volo.Abp.Timing": "10.6.0"
+        }
+      },
+      "Volo.Abp.Ddd.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "qgodOtT/MEipDR5Xoe8S2KXD7mXSgSLjPAnbxtfsqQGKf/4TUuhK/1Hd9KXl+RPzNGcFR3bTR5nhhhnXvhtd9Q==",
+        "dependencies": {
+          "Volo.Abp.EventBus.Abstractions": "10.6.0",
+          "Volo.Abp.MultiTenancy.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.DistributedLocking.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "ai05ejXy6oGYZY7RNYHvmQRGIjaE0Z6YXNB8nYZQq9/O8m/3URe9I+X4ZXx+gIKYZHAt7anfLZzSGSzFF9LZaw==",
+        "dependencies": {
+          "Microsoft.Bcl.AsyncInterfaces": "10.0.9",
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.EventBus": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "o0dXUIBIQcWze6fUhMW07tXWgDlNLBz3O04mqdJPahBmtCD2d8x7b90ciA/ChLbt2En8U/Tep6cuDsbB6626lA==",
+        "dependencies": {
+          "Volo.Abp.BackgroundWorkers": "10.6.0",
+          "Volo.Abp.DistributedLocking.Abstractions": "10.6.0",
+          "Volo.Abp.EventBus.Abstractions": "10.6.0",
+          "Volo.Abp.Guids": "10.6.0",
+          "Volo.Abp.Json": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0"
+        }
+      },
+      "Volo.Abp.EventBus.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "i5zkscM9CQPYqzgnXFx84NOxcfPFo5OI4ddNKkV6evytApTnR7kBPKJGcGIwOZ/93BLYdvXqbNRL9kpl1aKOkA==",
+        "dependencies": {
+          "Volo.Abp.ObjectExtending": "10.6.0"
+        }
+      },
+      "Volo.Abp.ExceptionHandling": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "Stmbih8YlL2bUpYL6sLzlJAHVj0RcSfWZiQj8W6IR/kiuu9q0R9bKezeciykRfFPttFxycQNpugRCYaLMSxJDA==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0"
+        }
+      },
+      "Volo.Abp.FeatureManagement.Application.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "z5JFhqW/b9UvQ/cnWaHy3FEaO+QuYFNYCT3xySznL43FNouxrHxg0KSEJ/mT3hBk8Y6C/1nfKjnAUVR+tGFcpg==",
+        "dependencies": {
+          "Volo.Abp.Authorization.Abstractions": "10.6.0",
+          "Volo.Abp.Ddd.Application.Contracts": "10.6.0",
+          "Volo.Abp.FeatureManagement.Domain.Shared": "10.6.0",
+          "Volo.Abp.Json": "10.6.0"
+        }
+      },
+      "Volo.Abp.FeatureManagement.Blazor": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "USC/qj6ehiD6mxQjs8hj8sSADYyDtDuGhZMiGaXHYJ/r7qL4rPR6bo+atX6HhOzgBzI1Mph8FLnhyaRVc1vkCg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Web.Theming": "10.6.0",
+          "Volo.Abp.FeatureManagement.Application.Contracts": "10.6.0",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.SettingManagement.Blazor": "10.6.0"
+        }
+      },
+      "Volo.Abp.FeatureManagement.Blazor.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "8NMOj/Q/CdtLEEaDJigenZHk5qkvgaEE71KFTetoqg52658083oLAEjA+aasv89asKSpZY+p62C0ouEW86FQIQ==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.WebAssembly.Theming": "10.6.0",
+          "Volo.Abp.FeatureManagement.Blazor": "10.6.0",
+          "Volo.Abp.FeatureManagement.HttpApi.Client": "10.6.0"
+        }
+      },
+      "Volo.Abp.FeatureManagement.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "vUqE6WEILgkA8KZXdIaUvvgCl2WrXvClXhwHOxkciJk3W6L+/lIjvFNwglkvKA2pGHjv5Uw7LhKFEKqvoZB4KA==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Json.SystemTextJson": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.FeatureManagement.HttpApi.Client": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "hLO7iwUQaoxFbaaBb2k0qZmVlp+rBLdMT9pR3gsSJOB6BC8JinjNmb/+Tot0bE8AipWnovDWdcEL6QtyO59Y6A==",
+        "dependencies": {
+          "Volo.Abp.FeatureManagement.Application.Contracts": "10.6.0",
+          "Volo.Abp.Http.Client": "10.6.0"
+        }
+      },
+      "Volo.Abp.Features": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "uLWLgpfYOZJT/ggD6Vna97bnk5mUjIT2TB0/hDz8sh5p3QizgK67LiYuErxJFYDadFSdJM0ZBySPj1e/+epu8g==",
+        "dependencies": {
+          "Volo.Abp.Authorization.Abstractions": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.GlobalFeatures": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "aBS0uDPQhddUMedkW9sFT0zrBvUSaAHhvGKgqal0vTIQK+nIsVgj9UQAcBfQChoKlnrWe/X7JxVqdQfkBE5fmw==",
+        "dependencies": {
+          "Volo.Abp.Authorization.Abstractions": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.VirtualFileSystem": "10.6.0"
+        }
+      },
+      "Volo.Abp.Guids": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "UttAkgDWk4gT7qpGlYTPcAmCrNS+b5KJ8GFoGrMIbMjmzso8y0vavyAGosavgYc+xPoSWjdSp2IF/NGS+g8uKw==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Http": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "G+oqOerzZdb4yz9tFAm5c5tWgVVnGLtyAISXDAIB4vIxY23uujhIjAAgM3dXH5QZzb9RJJ84PC0W6t7Y8zRvKQ==",
+        "dependencies": {
+          "Volo.Abp.Http.Abstractions": "10.6.0",
+          "Volo.Abp.Json": "10.6.0",
+          "Volo.Abp.Minify": "10.6.0"
+        }
+      },
+      "Volo.Abp.Http.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "u44+NSXlTdjEUMBolIanyzoVx0aEVjUNpInNQP+AKxutcVTbpTirOtaHhGairYdIGMu3zIlMqx1k9ZLQPBgqNQ==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Http.Client": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "JvjvRsaMst10CSM2Huigr+rBJsJCqo8xm12fMXyuSe8ia39akmaZsr/5XPXo+sKIyTZcZ/CjOQkMm7EPpH9Wrw==",
+        "dependencies": {
+          "Volo.Abp.Castle.Core": "10.6.0",
+          "Volo.Abp.EventBus": "10.6.0",
+          "Volo.Abp.ExceptionHandling": "10.6.0",
+          "Volo.Abp.Http": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.RemoteServices": "10.6.0",
+          "Volo.Abp.Threading": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.Http.Client.IdentityModel": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "MPXmtArjkosgNXDjhqteigSWhVQfvmjFAUHDeAYDcqL7aY0Q30FkjeANd70DjvSJ8ujpLEk/DR/O1fLfh5f7lw==",
+        "dependencies": {
+          "Volo.Abp.Http.Client": "10.6.0",
+          "Volo.Abp.IdentityModel": "10.6.0"
+        }
+      },
+      "Volo.Abp.Http.Client.IdentityModel.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "4F/qVGY0OZX314Zsgwv/YWdVLpK/bwg2VukGIIH1uummTKDViqMpeTYFSI/lfSVyaST77Ll168Aev3ovua1B1A==",
+        "dependencies": {
+          "Microsoft.AspNetCore.Components.WebAssembly.Authentication": "10.0.9",
+          "Volo.Abp.AspNetCore.Components.WebAssembly": "10.6.0",
+          "Volo.Abp.Http.Client.IdentityModel": "10.6.0"
+        }
+      },
+      "Volo.Abp.Identity.Application.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "muAa549IcP/7sHKYzkTupzh3HH956Vdzo1Qx42mn4rmsQw5U2ERag3ruLshtltgOedVPMw6aN8JJUj6ZRg46Lg==",
+        "dependencies": {
+          "Volo.Abp.Authorization": "10.6.0",
+          "Volo.Abp.Identity.Domain.Shared": "10.6.0",
+          "Volo.Abp.PermissionManagement.Application.Contracts": "10.6.0",
+          "Volo.Abp.Users.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.Identity.Blazor": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "jUKHskDnaI8KklVjbUqSKw+RJAAL1PC80MCY2hkBMfZb8E0u982MtLv19EtVpvgRObMRE8g6H6nfNPEq9R58hA==",
+        "dependencies": {
+          "Volo.Abp.Identity.Application.Contracts": "10.6.0",
+          "Volo.Abp.Mapperly": "10.6.0",
+          "Volo.Abp.PermissionManagement.Blazor": "10.6.0"
+        }
+      },
+      "Volo.Abp.Identity.Blazor.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "K2Vy0pFVUdbAvJ6xniU56H2EtFRqN4WjFc81e7tnXrx07PIXndu+oX3x6FPX5jX4tbDxAdBSlvyNC1RriIO3Xg==",
+        "dependencies": {
+          "Volo.Abp.Identity.Blazor": "10.6.0",
+          "Volo.Abp.Identity.HttpApi.Client": "10.6.0",
+          "Volo.Abp.PermissionManagement.Blazor.WebAssembly": "10.6.0"
+        }
+      },
+      "Volo.Abp.Identity.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "bF/ZkTwhpvdbUFpx7nlPLtkNsXf3NMUNTnTfd2E8TPp9AsyAGDMGzFK1pV7SVr6yiVA4RdtkJI4Y+JmjF53Qig==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Auditing.Contracts": "10.6.0",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.Users.Domain.Shared": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.Identity.HttpApi.Client": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "I8LvQ8UfN3yzidO7/o7XkHidXApfnDag/VGuE5Gx5X6u4aMKIrcZpHKoxAhJ9XjxKG0/tCoE60RjhCl/K4DLqQ==",
+        "dependencies": {
+          "Volo.Abp.Http.Client": "10.6.0",
+          "Volo.Abp.Identity.Application.Contracts": "10.6.0"
+        }
+      },
+      "Volo.Abp.IdentityModel": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "OOxJWN3ZE5hqHT8nC4S+8e0hkTXl5hSiV+AgCSQ0VcK91D02S4GO574tsq4omxPz61dHEPKNsEyNXXHsXYoOJA==",
+        "dependencies": {
+          "Duende.IdentityModel": "7.1.0",
+          "Volo.Abp.Caching": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.Threading": "10.6.0"
+        }
+      },
+      "Volo.Abp.Json": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "B1RnD0hL4shBSmrnawEXfoGX9fWAe4FO0B08A6+VRYHuyi523La9m/iaMt9FQi0jQeyu0KZqQRAm0GTjJflAFQ==",
+        "dependencies": {
+          "Volo.Abp.Json.SystemTextJson": "10.6.0"
+        }
+      },
+      "Volo.Abp.Json.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "58VcDyiEJ3/p7We47RtJBAgCpx2XLPqwOe3IpbyTzbOWIkfdsIisqPrmh+G5qRDEL1GejvZGpERIvrRyD1s0aA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Json.SystemTextJson": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "MsMsYswkUnJHUvTbEykRjIERvNz66Ji67XKR0W2Qf/4c8xFjCUrbgOHc8RhYmF11G+8iwObB1+Q1eS/LOoJ58A==",
+        "dependencies": {
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Json.Abstractions": "10.6.0",
+          "Volo.Abp.Timing": "10.6.0"
+        }
+      },
+      "Volo.Abp.Localization": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "TsRv7kKwT+jn0bnqWUhV8cMMsRi3IZvT5a12jt97pXlVvUtQT3mX6R8g17U+Pj79/J4un275tvEU+0K4Trybow==",
+        "dependencies": {
+          "Volo.Abp.Localization.Abstractions": "10.6.0",
+          "Volo.Abp.Settings": "10.6.0",
+          "Volo.Abp.Threading": "10.6.0",
+          "Volo.Abp.VirtualFileSystem": "10.6.0"
+        }
+      },
+      "Volo.Abp.Localization.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "CNLRG58HPIAnczuNn4hSAqPtaN/JcmkA934tu0kRoNLDH2r49YUxNPnRUXgH6VbI8r4Mv0wUzcwoTe/h2EZYwA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Mapperly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "rq59RFpZlzCm3cF4vBor5/wCc8kzNKnVXOMpMM5Nzr44FTIndjlzu+R/YbOLjpUDFtOMmY0wrV9JUTP8PS4KqA==",
+        "dependencies": {
+          "Riok.Mapperly": "4.3.1",
+          "Volo.Abp.Auditing": "10.6.0",
+          "Volo.Abp.ObjectExtending": "10.6.0",
+          "Volo.Abp.ObjectMapping": "10.6.0"
+        }
+      },
+      "Volo.Abp.Minify": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "QRqiMPfX9wGb5Ht+DAnxUs7g5wtU6w2++bgFy369EuS/ApS47+HHJjKt98WGjh8Psv8g1SHm3gy58+OYOPeRwQ==",
+        "dependencies": {
+          "NUglify": "1.21.17",
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.MultiTenancy": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "iNQcbGhfQSi1qk+ywbhG1+oo6txOjTYncC2nKA+qpiSCH27jMcDDzSY94yVfOi55WmBOKSOD9pU7++3QyrwPLA==",
+        "dependencies": {
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.EventBus.Abstractions": "10.6.0",
+          "Volo.Abp.MultiTenancy.Abstractions": "10.6.0",
+          "Volo.Abp.Security": "10.6.0",
+          "Volo.Abp.Settings": "10.6.0"
+        }
+      },
+      "Volo.Abp.MultiTenancy.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "Fb+pGPHHp2cVm4xHFNiOrq9ppfswrZJNtnvBKhURmrMfLxOxn5Mj1s/v46TWd+7N+6oSXQoV3Sa2LPmC3P0dLQ==",
+        "dependencies": {
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.VirtualFileSystem": "10.6.0"
+        }
+      },
+      "Volo.Abp.ObjectExtending": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "J1IHjorODeqcQ1LjlY2oAtHqb3eDH7qL2b0oOb7D/U7BoSW6ZcV6ZC1+RBN5m0YNelw9NHxTsyhOEr+8CzSDmw==",
+        "dependencies": {
+          "Volo.Abp.Localization.Abstractions": "10.6.0",
+          "Volo.Abp.Validation.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.ObjectMapping": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "S7+s3Azu7WCYe/tS8bOTEgWlpTvCoSUKdDEEPwQ3oC0oeOPecoco8tLG8FKdTQS3YhAU/I/HJKCd0TTrD/G/uQ==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.OpenIddict.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "AyTP5bRhLoPJ276vjbq9m07aN78SrmWNrpJt53U6PewK+XFFU9PcbT3nlLnWMUK/3sA+YKPHpzDYFg3AeQjXZA==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "OpenIddict.Abstractions": "7.5.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.PermissionManagement.Application.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "uliL9FD3yRt6hGeMqghxWsjJDsWbJ6HxmYXXHvsCwrD4CYfS/7hX5T9UyK2jmkYRI07f6Z04bGzaTdQbigEudQ==",
+        "dependencies": {
+          "Volo.Abp.Authorization.Abstractions": "10.6.0",
+          "Volo.Abp.Ddd.Application.Contracts": "10.6.0",
+          "Volo.Abp.PermissionManagement.Domain.Shared": "10.6.0"
+        }
+      },
+      "Volo.Abp.PermissionManagement.Blazor": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "teSHymHrbdBHVZzVJ64TYqYDY53vr1Cc14+WTtLmqXLQ1IC6+LUSFwuiP55qZjBHFmVRpDkMZrrb1XlagNk52w==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Web.Theming": "10.6.0",
+          "Volo.Abp.PermissionManagement.Application.Contracts": "10.6.0"
+        }
+      },
+      "Volo.Abp.PermissionManagement.Blazor.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "gytRPnhTYqayhvNL6aUuwDbmBJRik8nM1EHpc9Mv20C3WArhGXYuIOhoRKt9N2KqzjtYQJeZAMVvOhFRvw0OdA==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.WebAssembly.Theming": "10.6.0",
+          "Volo.Abp.PermissionManagement.Blazor": "10.6.0",
+          "Volo.Abp.PermissionManagement.HttpApi.Client": "10.6.0"
+        }
+      },
+      "Volo.Abp.PermissionManagement.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "jsszG9FyUD+kI4R7QT4Wrqtwt5ffzmgvaNAv5UVBvtMU0NfFvvET8DsxPSIakzX9tzMY0DpjIBKn1AHs+5C45Q==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.PermissionManagement.HttpApi.Client": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "Ort5Vitxv9LPbgd9678LI9zJRTutd3ixv3JlveNhJPKb7S7UJLn88FeMPeH0umFNHmH2CYbYGwOFprGrhzbS0g==",
+        "dependencies": {
+          "Volo.Abp.Http.Client": "10.6.0",
+          "Volo.Abp.PermissionManagement.Application.Contracts": "10.6.0"
+        }
+      },
+      "Volo.Abp.RemoteServices": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "7ccenuX7g7n4iwltM2gSBJRR3cymD31I5mmslUqZ05SKz1ABQgDsXgAqHzNIeD9MIEdVFJ4AmgRNty238cmT0w==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0",
+          "Volo.Abp.MultiTenancy.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.Security": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "qs853fpvbGNJD0+CooZ0OthePdIhBp5BNgqrq7CScUfwclGc3izDFgZfB6Y8qPydj8Ne8y3ReL3lq9OBXQu4VA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Serialization": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "nlnWb5P1thGbZMcsmnk1j7cUISmSqua4LMPpFPK2AuQze3ef4hTrZupxzkp6/tYEPL1L8RVRAmlxIFjwhQt8yg==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.SettingManagement.Application.Contracts": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "6QTj+A3tzPpAhL+F7AxMldJX4toO9JlZhrik9KC78wSR0bJ6LqgLbU4cZzRjTDFOP64avpLAo/6mzOhmabUMLQ==",
+        "dependencies": {
+          "Volo.Abp.Authorization.Abstractions": "10.6.0",
+          "Volo.Abp.Ddd.Application.Contracts": "10.6.0",
+          "Volo.Abp.SettingManagement.Domain.Shared": "10.6.0"
+        }
+      },
+      "Volo.Abp.SettingManagement.Blazor": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "QpaNGoVwYGNWeroK6p0NcEEKrZPg2JSDUUgea3qb+9zphNUm3FTjideWnT1LaIiWTMvRpBfto0gRsz82hs+Uzg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.Web.Theming": "10.6.0",
+          "Volo.Abp.Mapperly": "10.6.0",
+          "Volo.Abp.SettingManagement.Application.Contracts": "10.6.0"
+        }
+      },
+      "Volo.Abp.SettingManagement.Blazor.WebAssembly": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "jSZcPOJdKQic3CEzTllcYUYKOjTmDAuZ4YHcEdYNJbXytI1NFIgdCKfzl0PPH86v/Nsx5qb5Hv3zBHmAcwp5vg==",
+        "dependencies": {
+          "Volo.Abp.AspNetCore.Components.WebAssembly.Theming": "10.6.0",
+          "Volo.Abp.SettingManagement.Blazor": "10.6.0",
+          "Volo.Abp.SettingManagement.HttpApi.Client": "10.6.0"
+        }
+      },
+      "Volo.Abp.SettingManagement.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "UqaStDx1eb1UQGi8+NDrSJH/4W0/5yJUKrKIZCjmN4K+c3E+xB0GOwjrXpLx0vA4wc9Nf7Hw4Q/XG+s5eShP0g==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.Validation": "10.6.0"
+        }
+      },
+      "Volo.Abp.SettingManagement.HttpApi.Client": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "AfvIEO0YXTp46awqUuoKxKLAcRW9z3Eftsl1+WlHopwtEy2wOrNv2gmeAOo/omwvjQai9LgKlH2TdDUutEBvRw==",
+        "dependencies": {
+          "Volo.Abp.Http.Client": "10.6.0",
+          "Volo.Abp.SettingManagement.Application.Contracts": "10.6.0"
+        }
+      },
+      "Volo.Abp.Settings": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "q1ANNNi9TPmgn8pbRuKirhWCfBH/qHLeNjMc9SLjE4CK3YxhfpXgfIDh9iECDvDLUHXtJTz08I3l4paaSAhW3Q==",
+        "dependencies": {
+          "Volo.Abp.Data": "10.6.0",
+          "Volo.Abp.Localization.Abstractions": "10.6.0",
+          "Volo.Abp.Security": "10.6.0"
+        }
+      },
+      "Volo.Abp.Specifications": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "W3L8ta4qLUrdFYrviUCI0suno9tgesCQDR/gyCsZoIB/8ttd4Wxy3kHRXCp3LQM6cltVcZ4beMRkccAGaSeTeQ==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Threading": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "zSEgvz2nRwVHhT3jmQPJCIcEZyPiWpf5V5aSbFlttUkZvfCj2ZnKmXNrqiINzwmbNlRtYM0NqZ8dj16s4qu+jg==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Timing": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "FNfJ8BveB8CKKZ1yftgaP0/RfdmCQvwgVy5+bEgwT6Qg+wLAHCloPxer9Wt+oRvVu3Dgz8GsxQgot+pwKyspuQ==",
+        "dependencies": {
+          "TimeZoneConverter": "7.2.0",
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.Settings": "10.6.0"
+        }
+      },
+      "Volo.Abp.UI": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "yKzssHp53hcZV7pVlGx2QgqEgo8iW+e1L4bluf10vO4AVUOIOqnBgLf3mXchkJ5GfdgD9PMIoDfb80K5GyBWHQ==",
+        "dependencies": {
+          "Volo.Abp.ExceptionHandling": "10.6.0"
+        }
+      },
+      "Volo.Abp.UI.Navigation": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "2fFFD4MlviqJxDguuuWUGUFUCjZAxFWiqo7IFoslb1mzkoJnh52a/R71tc05Q26UeMVwx4aMyIoA5Dt/DhBDLA==",
+        "dependencies": {
+          "Volo.Abp.Authorization": "10.6.0",
+          "Volo.Abp.Features": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0",
+          "Volo.Abp.UI": "10.6.0"
+        }
+      },
+      "Volo.Abp.Uow": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "xZIFjlNRwJeMSDfY+Ys4sInTefULweL2NVZE7s24j1XSc1BDSSwj+5sfI5RvNOU/8krmWnkrxaY6XHNr8erymQ==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Users.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "yKth9hSVPWrIgjfuJYpgxm45YtFInaVuP5j6STzOgyLYBHKAZGDBIByVytvfFQzPFTuLfTq1qopXA4eMVNNg2g==",
+        "dependencies": {
+          "Volo.Abp.EventBus": "10.6.0",
+          "Volo.Abp.MultiTenancy": "10.6.0"
+        }
+      },
+      "Volo.Abp.Users.Domain.Shared": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "lh6mStfqvBhI1/MMYx1J2xcsGyoJt5MHPXGBui/hLKrQCk5riL8xP5UPCyOaXA99uaAKtvWkoAkV+Z5QvnWJLw==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.Validation": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "LaGR8WiZTlbjm/dBhu8k3gv9pWvizDHFLAJzbSSO0vf1ZcPB22gtba26tFufkwrjXR3AtzvZwbHU26l0rS7nBw==",
+        "dependencies": {
+          "Volo.Abp.Localization": "10.6.0",
+          "Volo.Abp.Validation.Abstractions": "10.6.0"
+        }
+      },
+      "Volo.Abp.Validation.Abstractions": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "awLqSSaES/kJhjPWt+tSqDv0eXmMsP+/v9uW5PrTmaodi0S2ZZ3doXggTHqMUQJtVmwzouiJAsTD20kjP1dGxA==",
+        "dependencies": {
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "Volo.Abp.VirtualFileSystem": {
+        "type": "Transitive",
+        "resolved": "10.6.0",
+        "contentHash": "yim9ZYVA4+ICOHgYdD+XtRusbsgpYeERf34l2ZexhhfEiWxsGE6COSVSv3PntzpwQV6fcNP5L951YJdUliVLPg==",
+        "dependencies": {
+          "Microsoft.Extensions.FileProviders.Embedded": "10.0.9",
+          "Volo.Abp.Core": "10.6.0"
+        }
+      },
+      "hcs.application.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "HCS.Domain.Shared": "[1.0.0, )",
+          "Volo.Abp.Account.Application.Contracts": "[10.6.0, )",
+          "Volo.Abp.FeatureManagement.Application.Contracts": "[10.6.0, )",
+          "Volo.Abp.Identity.Application.Contracts": "[10.6.0, )",
+          "Volo.Abp.PermissionManagement.Application.Contracts": "[10.6.0, )",
+          "Volo.Abp.SettingManagement.Application.Contracts": "[10.6.0, )"
+        }
+      },
+      "hcs.bff": {
+        "type": "Project",
+        "dependencies": {
+          "Microsoft.AspNetCore.DataProtection.StackExchangeRedis": "[10.0.10, )"
+        }
+      },
+      "hcs.blazor.client": {
+        "type": "Project",
+        "dependencies": {
+          "Blazorise.Bootstrap5": "[2.3.0, )",
+          "Blazorise.Components": "[2.3.0, )",
+          "Blazorise.Icons.FontAwesome": "[2.3.0, )",
+          "Blazorise.PdfViewer": "[2.3.0, )",
+          "HCS.BusManagementService.Contracts": "[1.0.0, )",
+          "HCS.CollaborationService.Contracts": "[1.0.0, )",
+          "HCS.HttpApi.Client": "[1.0.0, )",
+          "Microsoft.AspNetCore.Components.WebAssembly": "[10.0.9, )",
+          "Microsoft.AspNetCore.Components.WebAssembly.DevServer": "[10.0.9, )",
+          "Microsoft.AspNetCore.SignalR.Client": "[10.0.9, )",
+          "Microsoft.DotNet.HotReload.WebAssembly.Browser": "[10.0.101, )",
+          "Volo.Abp.AspNetCore.Components.WebAssembly.LeptonXLiteTheme": "[5.6.0, )",
+          "Volo.Abp.Autofac.WebAssembly": "[10.6.0, )",
+          "Volo.Abp.FeatureManagement.Blazor.WebAssembly": "[10.6.0, )",
+          "Volo.Abp.Identity.Blazor.WebAssembly": "[10.6.0, )",
+          "Volo.Abp.SettingManagement.Blazor.WebAssembly": "[10.6.0, )"
+        }
+      },
+      "hcs.busmanagementservice.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "HCS.IntegrationEvents": "[1.0.0, )"
+        }
+      },
+      "hcs.collaborationservice.contracts": {
+        "type": "Project",
+        "dependencies": {
+          "Volo.Abp.Ddd.Application.Contracts": "[10.6.0, )",
+          "Volo.Abp.EventBus.Abstractions": "[10.6.0, )"
+        }
+      },
+      "hcs.domain.shared": {
+        "type": "Project",
+        "dependencies": {
+          "HCS.IntegrationEvents": "[1.0.0, )",
+          "Microsoft.Extensions.FileProviders.Embedded": "[10.0.9, )",
+          "Volo.Abp.AuditLogging.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.BackgroundJobs.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.BlobStoring.Database.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.FeatureManagement.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.GlobalFeatures": "[10.6.0, )",
+          "Volo.Abp.Identity.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.OpenIddict.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.PermissionManagement.Domain.Shared": "[10.6.0, )",
+          "Volo.Abp.SettingManagement.Domain.Shared": "[10.6.0, )"
+        }
+      },
+      "hcs.httpapi.client": {
+        "type": "Project",
+        "dependencies": {
+          "HCS.Application.Contracts": "[1.0.0, )",
+          "Volo.Abp.Account.HttpApi.Client": "[10.6.0, )",
+          "Volo.Abp.FeatureManagement.HttpApi.Client": "[10.6.0, )",
+          "Volo.Abp.Identity.HttpApi.Client": "[10.6.0, )",
+          "Volo.Abp.PermissionManagement.HttpApi.Client": "[10.6.0, )",
+          "Volo.Abp.SettingManagement.HttpApi.Client": "[10.6.0, )"
+        }
+      },
+      "hcs.integrationevents": {
+        "type": "Project",
+        "dependencies": {
+          "Volo.Abp.EventBus": "[10.6.0, )"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,1107 @@
+/* Shared HCS page primitives. Domain-specific styles stay in main.css. */
+
+.hcs-login-redirect {
+    align-items: center;
+    color: var(--hcs-color-muted);
+    display: flex;
+    gap: var(--hcs-space-3);
+    justify-content: center;
+    min-height: min(60dvh, 24rem);
+    padding: var(--hcs-space-6) var(--hcs-page-gutter);
+    text-align: center;
+}
+
+.hcs-login-redirect__spinner {
+    animation: hcs-login-redirect-spin var(--hcs-motion-duration-spinner, 1200ms) linear infinite;
+    border: .18rem solid #d7e2e8;
+    border-radius: 50%;
+    border-top-color: var(--hcs-color-primary);
+    display: inline-block;
+    height: 1.25rem;
+    width: 1.25rem;
+}
+
+@keyframes hcs-login-redirect-spin {
+    to { transform: rotate(360deg); }
+}
+
+.hcs-app-shell :where(a, button, input, select, textarea, summary):focus-visible,
+.hcs-auth-login-page :where(a, button, input, select, textarea, summary):focus-visible {
+    outline: 3px solid var(--hcs-color-primary, var(--color-primary, #00B4A9));
+    outline-offset: 2px;
+}
+
+.hcs-app-shell .hcs-touch-target,
+.hcs-app-shell .btn,
+.hcs-app-shell button,
+.hcs-app-shell [role="button"] {
+    min-height: var(--hcs-touch-target);
+}
+
+.hcs-app-shell input:not([type="checkbox"]):not([type="radio"]),
+.hcs-app-shell select,
+.hcs-app-shell textarea {
+    font-size: 1rem;
+}
+
+.hcs-page {
+    margin: 0 auto;
+    max-width: var(--hcs-content-max-width);
+    min-width: 0;
+    width: 100%;
+}
+
+.hcs-page__header {
+    align-items: flex-end;
+    display: flex;
+    gap: var(--hcs-space-4);
+    justify-content: space-between;
+    margin-bottom: var(--hcs-space-4);
+}
+
+.hcs-page__header h1,
+.hcs-page__header h2 {
+    color: var(--hcs-color-ink);
+    letter-spacing: -.025em;
+    margin: 0;
+    text-wrap: balance;
+}
+
+.hcs-page__header p {
+    color: var(--hcs-color-muted);
+    margin: var(--hcs-space-2) 0 0;
+    max-width: 65ch;
+}
+
+.hcs-page__actions,
+.hcs-toolbar,
+.hcs-filter-bar,
+.hcs-modal-actions {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hcs-space-2);
+}
+
+.hcs-page__actions,
+.hcs-modal-actions {
+    justify-content: flex-end;
+}
+
+.hcs-toolbar,
+.hcs-filter-bar {
+    justify-content: space-between;
+    margin-bottom: var(--hcs-space-4);
+}
+
+.hcs-filter-panel {
+    background: var(--hcs-color-surface-muted);
+    border: 1px solid var(--hcs-color-border);
+    border-radius: var(--hcs-radius-md);
+    padding: var(--hcs-space-4);
+}
+
+.hcs-data-surface {
+    background: var(--hcs-color-surface);
+    border: 1px solid var(--hcs-color-border);
+    border-radius: var(--hcs-radius-md);
+    box-shadow: var(--hcs-shadow-sm);
+    min-width: 0;
+}
+
+.hcs-table-wrap {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hcs-table-wrap--scroll {
+    scrollbar-color: #9aafbc transparent;
+    scrollbar-width: thin;
+}
+
+.hcs-table-scroll-hint {
+    color: var(--hcs-color-muted);
+    display: none;
+    font-size: .82rem;
+    margin: 0;
+    padding: 0 var(--hcs-space-4) var(--hcs-space-3);
+}
+
+.hcs-mobile-list {
+    display: grid;
+    gap: var(--hcs-space-3);
+}
+
+.hcs-mobile-list > * {
+    min-width: 0;
+}
+
+.hcs-state {
+    align-items: center;
+    color: var(--hcs-color-muted);
+    display: grid;
+    gap: var(--hcs-space-2);
+    justify-items: center;
+    min-height: 10rem;
+    padding: var(--hcs-space-6) var(--hcs-space-4);
+    text-align: center;
+}
+
+.hcs-state h2,
+.hcs-state p {
+    margin: 0;
+}
+
+.hcs-state h2 {
+    color: var(--hcs-color-ink);
+    font-size: 1.1rem;
+}
+
+.hcs-state--error {
+    color: var(--hcs-color-danger);
+}
+
+.hcs-state--error h2 {
+    color: var(--hcs-color-danger);
+}
+
+.hcs-app-shell .hcs-status-badge,
+.hcs-app-shell .hcs-priority-badge,
+.hcs-app-shell .hcs-progress-badge {
+    line-height: 1.25;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.hcs-app-shell .hcs-icon-button,
+.hcs-app-shell .hcs-nav-toggle,
+.hcs-app-shell .hcs-user-menu summary,
+.hcs-app-shell .hcs-nav-menu__panel a,
+.hcs-app-shell .hcs-nav-menu__trigger {
+    min-height: var(--hcs-touch-target);
+}
+
+.hcs-app-shell .hcs-catalog-grid-card,
+.hcs-app-shell .card {
+    min-width: 0;
+}
+
+/* Contain wide data grids at the data surface. A grid item defaults to its
+   min-content width; without this guard a 900px table can widen the whole
+   .hcs-document-layout and make the page/header appear horizontally clipped. */
+.hcs-app-shell .hcs-document-layout,
+.hcs-app-shell .hcs-document-layout > *,
+.hcs-app-shell .hcs-catalog-page {
+    max-width: 100%;
+    min-width: 0;
+}
+
+.hcs-app-shell .hcs-catalog-grid-card {
+    max-width: 100%;
+    overflow: hidden;
+}
+
+.hcs-app-shell .hcs-catalog-grid-card > .card-body,
+.hcs-app-shell .hcs-catalog-grid-card .table-responsive {
+    box-sizing: border-box;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hcs-sr-only {
+    border: 0 !important;
+    clip: rect(0 0 0 0) !important;
+    clip-path: inset(50%) !important;
+    height: 1px !important;
+    margin: -1px !important;
+    overflow: hidden !important;
+    padding: 0 !important;
+    position: absolute !important;
+    white-space: nowrap !important;
+    width: 1px !important;
+}
+
+.hcs-stack {
+    display: grid;
+    gap: var(--hcs-space-4);
+}
+
+.hcs-cluster {
+    align-items: center;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--hcs-space-2);
+}
+
+.hcs-truncate {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hcs-only-mobile {
+    display: none !important;
+}
+
+.hcs-only-desktop {
+    display: block !important;
+}
+
+@media (max-width: 767.98px) {
+    .hcs-only-mobile {
+        display: block !important;
+    }
+
+    .hcs-only-desktop {
+        display: none !important;
+    }
+
+    .hcs-page__header,
+    .hcs-toolbar,
+    .hcs-filter-bar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .hcs-page__header h1 {
+        font-size: clamp(1.5rem, 7vw, 1.85rem);
+    }
+
+    .hcs-page__actions,
+    .hcs-modal-actions {
+        justify-content: stretch;
+        width: 100%;
+    }
+
+    .hcs-page__actions > .btn,
+    .hcs-page__actions > button,
+    .hcs-modal-actions > .btn,
+    .hcs-modal-actions > button {
+        flex: 1 1 12rem;
+    }
+
+    .hcs-filter-panel {
+        padding: var(--hcs-space-3);
+    }
+
+    .hcs-app-shell .hcs-catalog-form .form-control,
+    .hcs-app-shell .hcs-catalog-form .form-select,
+    .hcs-app-shell .hcs-catalog-form .numeric-picker,
+    .hcs-app-shell .hcs-catalog-form .b-is-datepicker,
+    .hcs-app-shell .hcs-catalog-form .b-is-datepicker .form-control,
+    .hcs-app-shell .hcs-document-page input.form-control:not(textarea),
+    .hcs-app-shell .hcs-document-page .form-select,
+    .hcs-app-shell .hcs-catalog-search .form-control,
+    .hcs-app-shell .hcs-catalog-search .input-group-text,
+    .hcs-app-shell .hcs-catalog-search .btn,
+    .hcs-app-shell .hcs-catalog-filter-toggle,
+    .hcs-app-shell .hcs-users-search-input,
+    .hcs-app-shell .hcs-users-search-bar .btn,
+    .hcs-app-shell .hcs-users-filter-toggle {
+        height: auto;
+        max-height: none !important;
+        min-height: var(--hcs-control-height);
+    }
+
+    .hcs-table-scroll-hint {
+        display: block;
+    }
+
+    .hcs-table-wrap--scroll table {
+        min-width: 48rem;
+    }
+
+    .hcs-app-shell .hcs-catalog-grid-card .card-body {
+        padding: var(--hcs-space-4);
+    }
+
+    .hcs-app-shell .hcs-catalog-grid {
+        min-width: 760px;
+    }
+
+    .hcs-app-shell .hcs-catalog-grid td:has(.hcs-row-actions) {
+        background: var(--hcs-color-surface);
+        position: sticky;
+        right: 0;
+        z-index: 2;
+    }
+
+    .hcs-app-shell .hcs-catalog-grid td:has(.hcs-row-actions)::before {
+        background: rgba(19, 47, 70, .08);
+        content: "";
+        inset: 0 auto 0 -.4rem;
+        pointer-events: none;
+        position: absolute;
+        width: .4rem;
+    }
+}
+
+@media (min-width: 768px) {
+    .hcs-app-shell .hcs-catalog-grid-card .card-body {
+        overflow-x: auto;
+    }
+}
+
+/* Cross-page responsive defaults. Keep complex data grids scrollable; opt simple
+   four-column tables into the stacked pattern with .hcs-table-wrap--stacked. */
+.hcs-app-shell .hcs-workspace {
+    --ws-pink: var(--hcs-color-primary);
+    --ws-pink-light: var(--hcs-color-primary-soft);
+    --ws-text: var(--hcs-color-ink);
+    --ws-muted: var(--hcs-color-muted);
+    --ws-faint: #718694;
+    --ws-line: var(--hcs-color-border);
+    --ws-bg: var(--hcs-color-background);
+}
+
+.hcs-app-shell .hcs-workspace :where(.hcs-ws-search, .hcs-ws-action, .hcs-ws-view, .hcs-ws-dn),
+.hcs-app-shell .hcs-chat-page :where(.hcs-chat__compose, .hcs-chat__icon, .hcs-chat__close, .hcs-chat__tabs button),
+.hcs-app-shell .hcs-account-page :where(.hcs-account-tab, .hcs-account-avatar__upload),
+.hcs-app-shell .hcs-notification-panel :where(button, a),
+.hcs-app-shell .hcs-signatures-panel :where(button, label[role="button"]) {
+    min-height: var(--hcs-touch-target);
+}
+
+.hcs-app-shell :where(.hcs-chat__compose, .hcs-chat__icon, .hcs-chat__close) {
+    height: var(--hcs-touch-target);
+    width: var(--hcs-touch-target);
+}
+
+.hcs-app-shell .hcs-chat__tabs button {
+    padding-block: var(--hcs-space-3);
+}
+
+.hcs-app-shell :where(.hcs-chat__contact-filter, .hcs-chat__search, .hcs-chat__composer-field) {
+    font-size: 1rem;
+    min-height: var(--hcs-control-height);
+}
+
+.hcs-app-shell :where(.hcs-table-wrap, .table-responsive, .hcs-users-grid-card .card-body) {
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.hcs-app-shell :where(.hcs-catalog-grid, .hcs-users-grid) {
+    min-width: 48rem;
+}
+
+.hcs-app-shell :where(.hcs-catalog-grid, .hcs-users-grid) th,
+.hcs-app-shell :where(.hcs-catalog-grid, .hcs-users-grid) td {
+    vertical-align: middle;
+}
+
+.hcs-app-shell :where(.hcs-modal-actions, .hcs-signature-dialog__actions) {
+    gap: var(--hcs-space-2);
+}
+
+.hcs-app-shell .modal-dialog {
+    max-width: min(100% - 2rem, 48rem);
+}
+
+.hcs-app-shell .modal-content {
+    max-height: calc(100dvh - 2rem);
+}
+
+.hcs-app-shell .modal-body {
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.hcs-table-mobile-hint {
+    color: var(--hcs-color-muted);
+    display: none;
+    font-size: .82rem;
+    margin: 0;
+    padding: var(--hcs-space-3) var(--hcs-space-4) 0;
+}
+
+.hcs-table-wrap--stacked table {
+    width: 100%;
+}
+
+@media (max-width: 767.98px) {
+    .hcs-app-shell .hcs-workspace .hcs-ws-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .hcs-app-shell .hcs-workspace .hcs-ws-card-hd {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .hcs-app-shell .hcs-workspace .hcs-ws-action {
+        flex: 1 1 100%;
+        justify-content: center;
+    }
+
+    .hcs-app-shell .hcs-chat {
+        border-inline: 0;
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hcs-app-shell .hcs-chat--info-open {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .hcs-app-shell .hcs-chat__conversations,
+    .hcs-app-shell .hcs-chat__info {
+        display: none;
+    }
+
+    .hcs-app-shell .hcs-chat--info-open .hcs-chat__info {
+        display: flex;
+        inset: var(--hcs-header-h, 4rem) 0 0;
+        position: fixed;
+        z-index: var(--hcs-z-drawer);
+    }
+
+    .hcs-app-shell .hcs-account-tabs {
+        max-width: 100%;
+        overflow-x: auto;
+        scrollbar-width: none;
+    }
+
+    .hcs-app-shell .hcs-account-tabs::-webkit-scrollbar {
+        display: none;
+    }
+
+    .hcs-app-shell .hcs-account-tab {
+        flex: 0 0 max-content;
+    }
+
+    .hcs-app-shell .hcs-users-grid-card .card-body {
+        padding-inline: var(--hcs-space-3);
+    }
+
+    .hcs-table-mobile-hint {
+        display: block;
+    }
+
+    .hcs-table-wrap--stacked {
+        overflow: visible;
+    }
+
+    .hcs-table-wrap--stacked table,
+    .hcs-table-wrap--stacked tbody,
+    .hcs-table-wrap--stacked tr,
+    .hcs-table-wrap--stacked td {
+        display: block;
+        width: 100%;
+    }
+
+    .hcs-table-wrap--stacked thead {
+        height: 1px;
+        overflow: hidden;
+        position: absolute;
+        width: 1px;
+        clip: rect(0 0 0 0);
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+
+    .hcs-table-wrap--stacked tbody {
+        display: grid;
+        gap: var(--hcs-space-3);
+        padding: var(--hcs-space-3);
+    }
+
+    .hcs-table-wrap--stacked tr {
+        background: var(--hcs-color-surface);
+        border: 1px solid var(--hcs-color-border);
+        border-radius: var(--hcs-radius-md);
+        box-shadow: var(--hcs-shadow-sm);
+        padding: var(--hcs-space-2) var(--hcs-space-4);
+    }
+
+    .hcs-table-wrap--stacked td {
+        border: 0;
+        display: grid;
+        gap: var(--hcs-space-2);
+        grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+        padding: var(--hcs-space-3) 0;
+        text-align: start;
+    }
+
+    .hcs-table-wrap--stacked td + td {
+        border-top: 1px solid var(--hcs-color-border);
+    }
+
+    .hcs-table-wrap--stacked td::before {
+        color: var(--hcs-color-muted);
+        content: attr(data-label);
+        font-size: .78rem;
+        font-weight: 600;
+    }
+}
+
+@media (max-width: 419.98px) {
+    .hcs-app-shell .hcs-workspace .hcs-ws-kpis {
+        grid-template-columns: 1fr;
+    }
+
+    .hcs-table-wrap--stacked td {
+        grid-template-columns: 1fr;
+        gap: var(--hcs-space-1);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hcs-app-shell *,
+    .hcs-auth-login-page * {
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+    }
+
+    .hcs-login-redirect__spinner {
+        animation: none;
+    }
+}
+
+/* Enterprise visual layer. Keep these selectors on HCS wrappers so the
+   LeptonX and Blazorise packages remain untouched and upgradeable. */
+.hcs-app-shell {
+    color-scheme: light;
+    color: var(--hcs-color-ink);
+    font-family: var(--hcs-font-family);
+
+    /* Bootstrap bridge is scoped to the HCS shell, leaving vendor theme
+       defaults intact for login and other host-owned surfaces. */
+    --bs-primary: var(--hcs-color-primary);
+    --bs-primary-rgb: 0, 180, 169;
+    --bs-secondary: var(--color-secondary, #007F7C);
+    --bs-secondary-rgb: 0, 127, 124;
+    --bs-success: var(--hcs-color-success);
+    --bs-success-rgb: 0, 127, 124;
+    --bs-warning: #d68a23;
+    --bs-warning-rgb: 214, 138, 35;
+    --bs-danger: var(--hcs-color-danger);
+    --bs-danger-rgb: 227, 30, 36;
+    --bs-info: var(--hcs-color-info);
+    --bs-info-rgb: 0, 180, 169;
+    --bs-body-color: var(--hcs-color-ink);
+    --bs-body-bg: var(--hcs-color-background);
+    --bs-border-color: var(--hcs-color-border);
+    --bs-border-radius: 6px;
+    --bs-border-radius-sm: 5px;
+    --bs-border-radius-lg: 8px;
+    --bs-link-color: var(--hcs-color-primary);
+    --bs-link-hover-color: var(--hcs-color-primary-strong);
+}
+
+.hcs-app-shell :where(.hcs-page, .hcs-catalog-page, .hcs-document-page, .hcs-admin-page, .hcs-account-page, .hcs-workspace) {
+    max-width: var(--hcs-content-max-width);
+    min-width: 0;
+    width: 100%;
+}
+
+.hcs-app-shell .hcs-catalog-page {
+    background: transparent;
+    margin: 0 auto;
+    min-height: auto;
+    padding: 0;
+}
+
+.hcs-app-shell :where(.hcs-page__header, .hcs-document-page__header, .hcs-catalog-titlebar) {
+    align-items: flex-end;
+    border-bottom: 1px solid transparent;
+    gap: var(--hcs-space-4);
+    margin-bottom: var(--hcs-space-5);
+}
+
+.hcs-app-shell :where(.hcs-page__header h1, .hcs-page__header h2, .hcs-document-page__header h1, .hcs-catalog-titlebar h1) {
+    color: var(--hcs-color-ink);
+    font-size: clamp(1.35rem, 2vw, 1.75rem);
+    font-weight: 700;
+    letter-spacing: -.025em;
+    line-height: 1.2;
+}
+
+.hcs-app-shell :where(.hcs-page__header p, .hcs-document-page__header p, .hcs-catalog-titlebar__eyebrow) {
+    color: var(--hcs-color-muted);
+    font-size: .88rem;
+}
+
+.hcs-app-shell :where(.card, .hcs-data-surface, .hcs-catalog-grid-card) {
+    background: var(--hcs-color-surface);
+    border: 1px solid var(--hcs-color-border);
+    border-radius: var(--hcs-radius-md);
+    box-shadow: var(--hcs-shadow-sm);
+}
+
+.hcs-app-shell :where(.card-header, .card-footer) {
+    background: var(--hcs-color-surface);
+    border-color: var(--hcs-color-border);
+    padding: var(--hcs-space-4) var(--hcs-space-5);
+}
+
+.hcs-app-shell :where(.card-header strong, .card-header h2, .card-header h3) {
+    color: var(--hcs-color-ink);
+    font-size: .98rem;
+    font-weight: 700;
+}
+
+.hcs-app-shell :where(.card-body, .hcs-catalog-grid-card .card-body) { padding: var(--hcs-space-5); }
+
+.hcs-app-shell .btn:not(.btn-sm):not(.btn-lg) {
+    align-items: center;
+    box-sizing: border-box;
+    border-radius: var(--hcs-radius-sm);
+    display: inline-flex;
+    font-size: .86rem;
+    font-weight: 600;
+    justify-content: center;
+    line-height: var(--hcs-button-line-height);
+    max-height: none;
+    min-height: var(--hcs-button-height);
+    transition: background var(--hcs-motion-fast) var(--hcs-motion-ease), border-color var(--hcs-motion-fast) var(--hcs-motion-ease), box-shadow var(--hcs-motion-fast) var(--hcs-motion-ease), color var(--hcs-motion-fast) var(--hcs-motion-ease);
+}
+
+/* Keep small button and anchor variants on the same baseline as Blazorise
+   buttons. Explicit Bootstrap spacing utilities remain opt-in overrides. */
+.hcs-app-shell .btn.btn-sm {
+    align-items: center;
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    line-height: var(--hcs-button-line-height);
+    max-height: none;
+    min-height: var(--hcs-button-height-sm);
+}
+
+.hcs-app-shell .btn:not(.btn-sm):not(.btn-lg):not(.p-0):not(.px-0):not(.py-0) {
+    padding: var(--hcs-button-padding-y) var(--hcs-button-padding-x);
+}
+
+.hcs-app-shell .btn.btn-sm:not(.p-0):not(.px-0):not(.py-0) {
+    padding: var(--hcs-button-padding-y-sm) var(--hcs-button-padding-x-sm);
+}
+
+.hcs-app-shell .btn.p-0,
+.hcs-app-shell .btn:not(.btn-sm):not(.btn-lg).p-0 {
+    align-items: center;
+    display: inline-flex;
+    line-height: var(--hcs-button-line-height);
+    min-height: var(--hcs-button-height-sm);
+    padding: 0;
+}
+
+.hcs-app-shell .btn:not(.btn-sm):not(.btn-lg).px-0 {
+    padding-block: var(--hcs-button-padding-y);
+    padding-inline: 0;
+}
+
+.hcs-app-shell .btn:not(.btn-sm):not(.btn-lg).py-0 {
+    padding-block: 0;
+    padding-inline: var(--hcs-button-padding-x);
+}
+
+.hcs-app-shell .btn.btn-sm.px-0 {
+    padding-block: var(--hcs-button-padding-y-sm);
+    padding-inline: 0;
+}
+
+.hcs-app-shell .btn.btn-sm.py-0 {
+    padding-block: 0;
+    padding-inline: var(--hcs-button-padding-x-sm);
+}
+
+/* Grid items stretch by default; standalone form actions should size to their
+   content so an <a class="btn"> and a <Button> look identical. */
+.hcs-app-shell .hcs-catalog-form > .btn {
+    justify-self: start;
+    max-width: 100%;
+}
+
+/* Icon/text actions in data rows use one predictable hit area across pages. */
+.hcs-app-shell .hcs-row-actions > .btn,
+.hcs-app-shell .hcs-action-button {
+    align-items: center;
+    box-sizing: border-box;
+    display: inline-flex;
+    justify-content: center;
+    line-height: 1;
+    max-height: none;
+    min-height: var(--hcs-action-button-size);
+    min-width: var(--hcs-action-button-size);
+    padding: var(--hcs-action-button-padding);
+}
+
+/* The kanban overflow trigger is icon-only, but still needs the same usable
+   hit area as other small controls. */
+.hcs-app-shell .hcs-kanban-menu__toggle {
+    height: var(--hcs-button-height-sm);
+    max-height: none;
+    min-height: var(--hcs-button-height-sm);
+    padding: 0 !important;
+    width: var(--hcs-button-height-sm);
+}
+
+.hcs-app-shell .btn-primary { background: var(--hcs-color-primary); border-color: var(--hcs-color-primary); color: #fff; }
+.hcs-app-shell .btn-primary:hover:not(:disabled), .hcs-app-shell .btn-primary:focus-visible { background: var(--hcs-color-primary-strong); border-color: var(--hcs-color-primary-strong); box-shadow: var(--hcs-focus-ring); color: #fff; }
+.hcs-app-shell .btn-secondary { background: var(--color-secondary, #007F7C); border-color: var(--color-secondary, #007F7C); color: #fff; }
+.hcs-app-shell .btn-outline-primary { border-color: var(--hcs-color-primary); color: var(--hcs-color-primary); }
+.hcs-app-shell .btn-outline-primary:hover:not(:disabled), .hcs-app-shell .btn-outline-primary:focus-visible { background: var(--hcs-color-primary-soft); border-color: var(--hcs-color-primary); color: var(--hcs-color-primary-strong); }
+.hcs-app-shell .btn-light,
+.hcs-app-shell .btn-outline-light,
+.hcs-app-shell .hcs-catalog-filter-reset,
+.hcs-app-shell .hcs-users-filter-reset { background: transparent; border-color: var(--hcs-color-primary); color: var(--hcs-color-primary); }
+.hcs-app-shell .btn-light:hover:not(:disabled),
+.hcs-app-shell .btn-light:focus-visible,
+.hcs-app-shell .btn-outline-light:hover:not(:disabled),
+.hcs-app-shell .btn-outline-light:focus-visible,
+.hcs-app-shell .hcs-catalog-filter-reset:hover:not(:disabled),
+.hcs-app-shell .hcs-catalog-filter-reset:focus-visible,
+.hcs-app-shell .hcs-users-filter-reset:hover:not(:disabled),
+.hcs-app-shell .hcs-users-filter-reset:focus-visible { background: var(--hcs-color-primary-soft); border-color: var(--hcs-color-primary); color: var(--hcs-color-primary-strong); }
+.hcs-app-shell .btn-danger, .hcs-app-shell .btn-outline-danger { color: var(--hcs-color-danger); }
+.hcs-app-shell .btn-danger { background: var(--hcs-color-danger); border-color: var(--hcs-color-danger); color: #fff; }
+
+.hcs-app-shell :where(.form-control, .form-select, select, textarea, .b-is-datepicker .form-control, .select2-container .select2-selection) {
+    background-color: var(--hcs-color-surface);
+    border-color: var(--hcs-color-border);
+    border-radius: var(--hcs-radius-sm);
+    color: var(--hcs-color-ink);
+    min-height: var(--hcs-control-height);
+}
+
+.hcs-app-shell :where(.form-control, .form-select, select, textarea):focus,
+.hcs-app-shell .select2-container--focus .select2-selection,
+.hcs-app-shell .select2-container--open .select2-selection { border-color: var(--hcs-color-primary); box-shadow: var(--hcs-focus-ring); }
+.hcs-app-shell :where(.form-label, .field-label, label) { color: var(--hcs-color-ink); font-size: .82rem; font-weight: 600; }
+.hcs-app-shell :where(.form-text, .invalid-feedback, .validation-message) { font-size: .76rem; }
+.hcs-app-shell .invalid-feedback, .hcs-app-shell .validation-message { color: var(--hcs-color-danger); }
+
+.hcs-app-shell :where(.table, .b-table) { --bs-table-bg: var(--hcs-color-surface); --bs-table-border-color: var(--hcs-color-border); color: var(--hcs-color-ink); margin-bottom: 0; }
+.hcs-app-shell :where(.table, .b-table) > :not(caption) > * > * { padding: .78rem .85rem; vertical-align: middle; }
+.hcs-app-shell :where(.table, .b-table) > thead > tr > th { background: var(--hcs-color-surface-muted); color: var(--hcs-color-muted); font-size: .7rem; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; white-space: nowrap; }
+.hcs-app-shell :where(.table, .b-table) > tbody > tr { transition: background var(--hcs-motion-fast) var(--hcs-motion-ease); }
+.hcs-app-shell :where(.table, .b-table) > tbody > tr:hover { background: #f8fbfc; }
+.hcs-app-shell :where(.table, .b-table) > tbody > tr > td { font-size: .86rem; }
+.hcs-app-shell :where(.table-responsive, .hcs-table-wrap, .hcs-catalog-grid-card .card-body) { scrollbar-color: #a6b8c4 transparent; scrollbar-width: thin; }
+
+.hcs-app-shell .pagination { gap: .25rem; }
+.hcs-app-shell .pagination .page-link { border-color: var(--hcs-color-border); border-radius: var(--hcs-radius-sm); color: var(--hcs-color-ink); min-height: var(--hcs-touch-target); min-width: var(--hcs-touch-target); text-align: center; }
+.hcs-app-shell .pagination .page-item.active .page-link { background: var(--hcs-color-primary); border-color: var(--hcs-color-primary); color: #fff; }
+
+.hcs-app-shell :where(.modal-content, .hcs-catalog-modal) { border: 1px solid var(--hcs-color-border); border-radius: var(--hcs-radius-lg); box-shadow: var(--hcs-shadow-md); overflow: hidden; }
+.hcs-app-shell :where(.modal-header, .hcs-catalog-modal__header, .modal-footer, .hcs-catalog-modal__footer) { background: var(--hcs-color-surface); border-color: var(--hcs-color-border); padding: var(--hcs-space-4) var(--hcs-space-5); }
+.hcs-app-shell :where(.modal-title, .hcs-catalog-modal__header .modal-title) { color: var(--hcs-color-ink); font-size: 1.05rem; font-weight: 700; }
+.hcs-app-shell :where(.modal-body, .hcs-catalog-modal__body) { background: var(--hcs-color-surface); padding: var(--hcs-space-5); }
+.hcs-app-shell :where(.alert) { border-radius: var(--hcs-radius-md); font-size: .86rem; }
+
+.hcs-app-shell :where(.hcs-status-badge, .hcs-priority-badge, .hcs-progress-badge) { border: 1px solid transparent; border-radius: 999px; font-size: .72rem; font-weight: 700; padding: .55rem; }
+.hcs-app-shell .hcs-status-badge--success, .hcs-app-shell .hcs-progress-badge--done { background: #e3f3ed; color: #12634f; }
+.hcs-app-shell .hcs-status-badge--danger, .hcs-app-shell .hcs-priority-badge--high { background: #fbe8e7; color: #9b2118; }
+.hcs-app-shell .hcs-status-badge--warning, .hcs-app-shell .hcs-priority-badge--normal { background: #fff2d9; color: #8a4d00; }
+.hcs-app-shell .hcs-status-badge--info { background: #e7efff; color: #1d4ed8; }
+
+@media (max-width: 767.98px) {
+    .hcs-app-shell :where(.card-body, .hcs-catalog-grid-card .card-body, .modal-body, .hcs-catalog-modal__body) { padding: var(--hcs-space-4); }
+    .hcs-app-shell :where(.hcs-page__header, .hcs-document-page__header, .hcs-catalog-titlebar) { align-items: stretch; flex-direction: column; margin-bottom: var(--hcs-space-4); }
+    .hcs-app-shell :where(.hcs-page__actions, .hcs-catalog-page__actions) { width: 100%; }
+    .hcs-app-shell :where(.hcs-page__actions > .btn, .hcs-catalog-page__actions > .btn) { flex: 1 1 auto; }
+    .hcs-app-shell .hcs-main-content:has(.hcs-chat-page) { padding: var(--hcs-space-4) var(--hcs-page-gutter) calc(var(--hcs-space-6) + env(safe-area-inset-bottom)); }
+}
+
+@media (max-width: 1100px) {
+    .hcs-app-shell .hcs-main-content:has(.hcs-chat-page) { padding: var(--hcs-space-4) var(--hcs-page-gutter) calc(var(--hcs-space-6) + env(safe-area-inset-bottom)); }
+}
+
+.hcs-app-shell .hcs-main-content:has(.hcs-chat-page) {
+    height: auto;
+    margin-left: 0;
+    max-width: none;
+    padding: clamp(1rem, 2.2vw, 2rem) var(--hcs-page-gutter) calc(2rem + env(safe-area-inset-bottom));
+}
+
+.hcs-app-shell .hcs-survey-results__filter-row { align-items: flex-end; gap: var(--hcs-space-3); }
+.hcs-app-shell .hcs-survey-results__location-filter { min-width: 0; }
+.hcs-app-shell .hcs-survey-results__location-filter .select2-container { display: block; width: 100% !important; }
+
+.hcs-app-shell select.hcs-catalog-select2 + .select2-container .select2-selection--single {
+    align-items: center;
+    box-sizing: border-box;
+    display: flex;
+    height: var(--hcs-button-max-height) !important;
+    max-height: var(--hcs-button-max-height) !important;
+    min-height: var(--hcs-button-max-height) !important;
+    overflow: hidden;
+}
+
+.hcs-app-shell select.hcs-catalog-select2 + .select2-container .select2-selection__rendered {
+    align-items: center;
+    display: flex;
+    height: 100%;
+    line-height: 1 !important;
+    min-width: 0;
+    overflow: hidden;
+    padding-inline: .75rem 2.25rem !important;
+    width: 100%;
+}
+
+.hcs-app-shell select.hcs-user-select2 + .select2-container .hcs-user-option {
+    align-items: center;
+    display: flex;
+    gap: .5rem;
+    min-width: 0;
+    width: 100%;
+}
+
+.hcs-app-shell select.hcs-user-select2 + .select2-container .select2-selection--single .hcs-user-option__avatar {
+    flex: 0 0 28px;
+    height: 28px;
+    width: 28px;
+}
+
+.hcs-app-shell select.hcs-user-select2 + .select2-container .select2-selection--single .hcs-user-option__copy {
+    display: block;
+    min-width: 0;
+    overflow: hidden;
+}
+
+.hcs-app-shell select.hcs-user-select2 + .select2-container .select2-selection--single .hcs-user-option__name {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+@media (max-width: 767.98px) {
+    .hcs-app-shell .hcs-survey-results__filter-row { align-items: stretch; }
+    .hcs-app-shell .hcs-survey-results__location-filter { max-width: none; }
+}
+
+/* === Enterprise motion system ===
+   Keep motion purposeful, tokenized and limited to compositor-friendly
+   properties. Component logic owns state; these rules only express it. */
+@keyframes hcs-motion-surface-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(0, var(--hcs-motion-distance-md), 0) scale(.99);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
+}
+
+@keyframes hcs-motion-dashboard-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(0, var(--hcs-motion-distance-md), 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes hcs-motion-validation-enter {
+    from {
+        opacity: 0;
+        transform: translate3d(0, calc(var(--hcs-motion-distance-sm) * -1), 0);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes hcs-motion-validation-shake {
+    0%, 100% { transform: translate3d(0, 0, 0); }
+    25% { transform: translate3d(-3px, 0, 0); }
+    50% { transform: translate3d(3px, 0, 0); }
+    75% { transform: translate3d(-2px, 0, 0); }
+}
+
+@keyframes hcs-motion-skeleton-pulse {
+    0%, 100% { opacity: .62; }
+    50% { opacity: 1; }
+}
+
+.hcs-app-shell .btn,
+.hcs-app-shell .hcs-action-button,
+.hcs-app-shell .hcs-icon-button,
+.hcs-app-shell .hcs-nav-toggle,
+.hcs-app-shell .hcs-ws-action,
+.hcs-app-shell .hcs-ws-icon-action,
+.hcs-app-shell .hcs-ws-view,
+.hcs-app-shell .hcs-signature-button,
+.hcs-app-shell .hcs-signature-upload-cta,
+.hcs-app-shell .hcs-signature-icon-button {
+    transition: background-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        border-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        box-shadow var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        opacity var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        transform var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard);
+}
+
+.hcs-app-shell .btn:active:not(:disabled),
+.hcs-app-shell .hcs-action-button:active:not(:disabled),
+.hcs-app-shell .hcs-icon-button:active:not(:disabled),
+.hcs-app-shell .hcs-nav-toggle:active:not(:disabled),
+.hcs-app-shell .hcs-ws-action:active:not(:disabled),
+.hcs-app-shell .hcs-ws-icon-action:active:not(:disabled),
+.hcs-app-shell .hcs-ws-view:active,
+.hcs-app-shell .hcs-signature-button:active:not(:disabled),
+.hcs-app-shell .hcs-signature-upload-cta:active:not(:disabled),
+.hcs-app-shell .hcs-signature-icon-button:active:not(:disabled) {
+    transform: translateY(1px) scale(var(--hcs-motion-press-scale));
+}
+
+.hcs-app-shell .hcs-nav-menu__trigger,
+.hcs-app-shell .hcs-user-menu__panel a,
+.hcs-app-shell .hcs-user-menu__action,
+.hcs-app-shell .hcs-lang-switch__trigger,
+.hcs-app-shell .hcs-lang-switch__item,
+.hcs-app-shell .hcs-nav-menu__panel a,
+.hcs-app-shell .hcs-notification-panel__list a,
+.hcs-app-shell .hcs-notification-panel__mark-all,
+.hcs-app-shell .hcs-account-tab,
+.hcs-app-shell .hcs-user-tabs button,
+.hcs-app-shell .hcs-signing-tab,
+.hcs-app-shell .hcs-chat__tabs button,
+.hcs-app-shell .hcs-survey-tabs button,
+.hcs-app-shell .nav-tabs .nav-link,
+.hcs-app-shell .nav-pills .nav-link {
+    transition: background-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        border-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        box-shadow var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        opacity var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        transform var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard);
+}
+
+.hcs-app-shell .hcs-account-tab:active,
+.hcs-app-shell .hcs-user-tabs button:active,
+.hcs-app-shell .hcs-signing-tab:active,
+.hcs-app-shell .hcs-chat__tabs button:active,
+.hcs-app-shell .hcs-survey-tabs button:active,
+.hcs-app-shell .nav-tabs .nav-link:active,
+.hcs-app-shell .nav-pills .nav-link:active {
+    transform: translateY(1px) scale(var(--hcs-motion-press-scale));
+}
+
+.hcs-app-shell .form-control,
+.hcs-app-shell .form-select,
+.hcs-app-shell select,
+.hcs-app-shell textarea,
+.hcs-app-shell .select2-container .select2-selection {
+    transition: background-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        border-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        box-shadow var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard),
+        color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard);
+}
+
+.hcs-app-shell .invalid-feedback,
+.hcs-app-shell .validation-message,
+.hcs-app-shell .hcs-account-field-error {
+    animation: hcs-motion-validation-enter var(--hcs-motion-duration-standard) var(--hcs-motion-ease-enter) both;
+}
+
+.hcs-app-shell .is-invalid,
+.hcs-app-shell [aria-invalid="true"] {
+    animation: hcs-motion-validation-shake var(--hcs-motion-duration-standard) var(--hcs-motion-ease-standard) both;
+}
+
+.hcs-app-shell .modal.fade .modal-dialog {
+    transform: translate3d(0, var(--hcs-motion-distance-md), 0) scale(.99);
+    transition: transform var(--hcs-motion-duration-standard) var(--hcs-motion-ease-exit);
+}
+
+.hcs-app-shell .modal.show .modal-dialog {
+    transform: translate3d(0, 0, 0) scale(1);
+    transition-duration: var(--hcs-motion-duration-modal);
+    transition-timing-function: var(--hcs-motion-ease-enter);
+}
+
+.modal-backdrop.fade {
+    opacity: 0;
+    transition: opacity var(--hcs-motion-duration-standard) var(--hcs-motion-ease-standard);
+}
+
+.modal-backdrop.show { opacity: var(--hcs-motion-scrim-opacity); }
+
+.hcs-app-shell .dropdown-menu,
+.hcs-app-shell .hcs-lang-switch__panel,
+.hcs-app-shell .hcs-notification-panel {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-quick) var(--hcs-motion-ease-enter) both;
+    transform-origin: top right;
+}
+
+.hcs-app-shell .hcs-chat-modal {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-standard) var(--hcs-motion-ease-standard) both;
+}
+
+.hcs-app-shell .hcs-chat-modal__panel {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-standard) var(--hcs-motion-ease-enter) both;
+    transform-origin: top center;
+}
+
+.hcs-app-shell .hcs-user-tab-panel:not([hidden]),
+.hcs-app-shell .hcs-account-panel,
+.hcs-app-shell .hcs-signatures-panel {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-standard) var(--hcs-motion-ease-enter) both;
+}
+
+.hcs-app-shell .hcs-skeleton span,
+.hcs-app-shell .hcs-account-skeleton,
+.hcs-app-shell .hcs-signature-card--skeleton span {
+    animation: hcs-motion-skeleton-pulse var(--hcs-motion-duration-skeleton) var(--hcs-motion-ease-ambient) infinite;
+}
+
+.hcs-app-shell .hcs-loading {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-standard) var(--hcs-motion-ease-enter) both;
+}
+
+.hcs-app-shell .hcs-loading .fa-spin {
+    animation-duration: var(--hcs-motion-duration-spinner);
+}
+
+.hcs-app-shell .hcs-notification-toast {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-standard) var(--hcs-motion-ease-enter) both;
+    transform-origin: top right;
+}
+
+.hcs-app-shell .hcs-workspace > .hcs-ws-filter,
+.hcs-app-shell .hcs-workspace > .hcs-ws-kpis,
+.hcs-app-shell .hcs-workspace > .hcs-ws-grid-73,
+.hcs-app-shell .hcs-workspace > .hcs-ws-grid-37 {
+    animation: hcs-motion-dashboard-enter var(--hcs-motion-duration-slow) var(--hcs-motion-ease-enter) both;
+    animation-delay: calc(var(--hcs-motion-stagger) * var(--hcs-motion-index, 0));
+}
+
+.hcs-app-shell .hcs-workspace > .hcs-ws-filter { --hcs-motion-index: 0; }
+.hcs-app-shell .hcs-workspace > .hcs-ws-kpis { --hcs-motion-index: 1; }
+.hcs-app-shell .hcs-workspace > .hcs-ws-grid-73 { --hcs-motion-index: 2; }
+.hcs-app-shell .hcs-workspace > .hcs-ws-grid-37:nth-child(4) { --hcs-motion-index: 3; }
+.hcs-app-shell .hcs-workspace > .hcs-ws-grid-37:nth-child(5) { --hcs-motion-index: 4; }
+.hcs-app-shell .hcs-workspace > .hcs-ws-grid-37:nth-child(6) { --hcs-motion-index: 5; }
+
+@media (prefers-reduced-motion: reduce) {
+    .hcs-app-shell .hcs-workspace > .hcs-ws-filter,
+    .hcs-app-shell .hcs-workspace > .hcs-ws-kpis,
+    .hcs-app-shell .hcs-workspace > .hcs-ws-grid-73,
+    .hcs-app-shell .hcs-workspace > .hcs-ws-grid-37,
+    .hcs-app-shell .hcs-loading,
+    .hcs-app-shell .hcs-notification-toast,
+    .hcs-app-shell .hcs-notification-panel,
+    .hcs-app-shell .hcs-chat-modal,
+    .hcs-app-shell .hcs-chat-modal__panel {
+        animation: none;
+    }
+}

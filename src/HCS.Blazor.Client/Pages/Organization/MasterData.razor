@@ -1,0 +1,66 @@
+@page "/master-datas"
+@attribute [Authorize(Policy = "HCS.Organization.MasterData")]
+@page "/document-types"
+@page "/sectors"
+@page "/urgency-levels"
+@page "/confidentiality-levels"
+@page "/processing-methods"
+@page "/document-status"
+@page "/signing-methods"
+@page "/even-types"
+@page "/event-types"
+@using Microsoft.AspNetCore.Components.Routing
+@inherits HCSComponentBase
+@inject NavigationManager Navigation
+
+<PageTitle>@title · HCS</PageTitle>
+<OrganizationCatalog @key="@masterType" Kind="OrganizationCatalogKind.MasterData" MasterType="@masterType" />
+
+@code {
+    private string masterType = "";
+    private string title = "Danh mục dùng chung";
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Navigation.LocationChanged += OnLocationChanged;
+        ApplyRoute();
+    }
+
+    protected override void OnParametersSet() => ApplyRoute();
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var previousType = masterType;
+        ApplyRoute();
+        if (!string.Equals(previousType, masterType, StringComparison.Ordinal))
+        {
+            _ = InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private void ApplyRoute()
+    {
+        var route = Navigation.ToBaseRelativePath(Navigation.Uri).Split('?', '#')[0].Trim('/').ToLowerInvariant();
+        if (OrganizationCatalogRouteMap.TryResolve(route, out var definition))
+        {
+            masterType = definition.Type;
+            title = L[definition.TitleKey].Value;
+        }
+        else
+        {
+            masterType = "";
+            title = L["Catalog:MasterDataTitle"].Value;
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Navigation.LocationChanged -= OnLocationChanged;
+        }
+
+        base.Dispose(disposing);
+    }
+}

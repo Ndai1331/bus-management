@@ -1,0 +1,269 @@
+@page "/calendar-events"
+@attribute [Authorize(Policy = "WorkManagement.Calendar")]
+@inherits HCSComponentBase
+@using System.Globalization
+@inject WorkManagementClient Work
+@inject OrganizationCatalogClient Catalog
+@inject CollaborationClient Chat
+@inject NavigationManager Navigation
+
+<PageTitle>@L["Menu:CalendarEvents"] · HCS</PageTitle>
+<section class="hcs-catalog-page">
+    <header class="hcs-catalog-titlebar">
+        <div><h1>@L["Feature:CalendarTitle"]</h1></div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreate"><Icon Name="@IconName.Add" /> @L["Catalog:New"]</Button>
+        </div>
+    </header>
+    <div class="hcs-cal-toolbar">
+        <div class="hcs-cal-toolbar__nav">
+            <Button Color="Color.Primary" Outline="true" Class="hcs-cal-toolbar__button" Clicked="PrevAsync">@L["Feature:Prev"]</Button>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-cal-toolbar__button" Clicked="NextAsync">@L["Feature:Next"]</Button>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-cal-toolbar__button" Clicked="TodayAsync">@L["Feature:Today"]</Button>
+        </div>
+        <strong class="hcs-cal-toolbar__title">@viewTitle</strong>
+        <div class="hcs-cal-toolbar__views">
+            <Button Color="Color.Primary" Outline="@(!IsView(MonthView))" Clicked="() => SetViewAsync(MonthView)">@L["Feature:MonthView"]</Button>
+            <Button Color="Color.Primary" Outline="@(!IsView(WeekView))" Clicked="() => SetViewAsync(WeekView)">@L["Feature:WeekView"]</Button>
+            <Button Color="Color.Primary" Outline="@(!IsView(DayView))" Clicked="() => SetViewAsync(DayView)">@L["Feature:DayView"]</Button>
+            <Button Color="Color.Primary" Outline="@(!IsView(ListView))" Clicked="() => SetViewAsync(ListView)">@L["Feature:ListView"]</Button>
+        </div>
+    </div>
+    <Card Class="mb-2 hcs-catalog-filter-card"><CardBody>
+        <div class="hcs-catalog-filter-row">
+            <Addons Class="hcs-catalog-search">
+                <Addon AddonType="AddonType.Body"><TextInput @bind-Value="filter" Placeholder="@L["Catalog:SearchPlaceholder"]" /></Addon>
+                <Addon AddonType="AddonType.End">
+                    <Button Color="Color.Primary" Clicked="ApplySearch"><i class="fa fa-search me-1"></i> @L["Catalog:SearchButton"]</Button>
+                </Addon>
+            </Addons>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetSearch">@L["Catalog:Reset"]</Button>
+            <div class="hcs-cal-legend" aria-label="@L["Feature:CalendarTitle"]">
+                <span class="hcs-cal-legend__item hcs-cal-legend__item--project">@L["Feature:CalendarLegendProject"]</span>
+                <span class="hcs-cal-legend__item hcs-cal-legend__item--task">@L["Feature:CalendarLegendTask"]</span>
+                <span class="hcs-cal-legend__item hcs-cal-legend__item--event">@L["Feature:CalendarLegendEvent"]</span>
+            </div>
+        </div>
+    </CardBody></Card>
+    @if (isLoading && events.Count == 0) { <p>@L["Catalog:Loading"]</p> }
+    <Card Class="hcs-catalog-grid-card hcs-cal-card">
+        <CardBody Class="p-0">
+            <HcsCalendar @ref="calendar"
+                         Events="MappedEvents"
+                         EventClicked="OnEventClicked"
+                         DatesChanged="OnDatesChanged" />
+        </CardBody>
+    </Card>
+</section>
+<Modal @ref="modal" Size="ModalSize.Large"><ModalContent Centered Class="hcs-catalog-modal">
+    <ModalHeader Class="hcs-catalog-modal__header"><ModalTitle>@L["Feature:EventCreate"]</ModalTitle><CloseButton /></ModalHeader>
+    <ModalBody Class="hcs-catalog-modal__body">
+        <div class="hcs-catalog-form">
+        <Field><FieldLabel>@L["Feature:Event"]</FieldLabel><HcsIsolatedTextInput @bind-Value="form.Title" Name="hcsEventTitle" /></Field>
+        <Field><FieldLabel>@L["Feature:Description"]</FieldLabel><textarea class="form-control" rows="2" @bind="form.Description" autocomplete="off"></textarea></Field>
+        <div class="hcs-form-row hcs-form-row--equal">
+            <Field><FieldLabel>@L["Feature:StartDate"]</FieldLabel><HcsDatePicker TValue="DateTime" @bind-Value="form.Start" InputMode="DateInputMode.DateTime" ShowTodayButton ShowClearButton /></Field>
+            <Field><FieldLabel>@L["Feature:EndDate"]</FieldLabel><HcsDatePicker TValue="DateTime" @bind-Value="form.End" InputMode="DateInputMode.DateTime" ShowTodayButton ShowClearButton /></Field>
+        </div>
+        <div class="hcs-form-row hcs-form-row--equal">
+            <Field><FieldLabel>@L["Catalog:EventTypeTitle"]</FieldLabel>
+                <Select TValue="string" @bind-Value="form.EventType">
+                    <SelectItem Value="@("Meeting")">Meeting</SelectItem>
+                    @foreach (var type in eventTypes) { <SelectItem Value="@type.Name">@type.Name</SelectItem> }
+                </Select>
+            </Field>
+            <Field><FieldLabel>@L["Feature:Visibility"]</FieldLabel>
+                <Select TValue="string" @bind-Value="form.Visibility">
+                    <SelectItem Value="@("Private")">Private</SelectItem>
+                    <SelectItem Value="@("Participants")">Participants</SelectItem>
+                    <SelectItem Value="@("Public")">Public</SelectItem>
+                </Select>
+            </Field>
+        </div>
+        <Field><FieldLabel>@L["Feature:RelatedType"]</FieldLabel>
+            <Select TValue="string" Value="form.RelatedType" ValueChanged="OnRelatedTypeChanged">
+                <SelectItem Value="@("NONE")">NONE</SelectItem>
+                <SelectItem Value="@("PROJECT")">PROJECT</SelectItem>
+                <SelectItem Value="@("TASK")">TASK</SelectItem>
+            </Select>
+        </Field>
+        @if (form.RelatedType is "PROJECT" or "TASK")
+        {
+            <Field><FieldLabel>@L["Work:RelatedEntity"]</FieldLabel>
+                <CatalogSelect2 Value="form.RelatedId"
+                                ValueChanged="value => form.RelatedId = value"
+                                Placeholder="@L["Catalog:SearchPlaceholder"]"
+                                Search="SearchRelatedAsync" />
+            </Field>
+        }
+        <Field><FieldLabel>@L["Chat:SelectContacts"]</FieldLabel>
+            @foreach (var contact in contacts)
+            {
+                <Check TValue="bool" Checked="form.Participants.Contains(contact.Id)" CheckedChanged="@((bool value) => Toggle(contact.Id, value))">@contact.DisplayName</Check>
+            }
+        </Field>
+        </div>
+    </ModalBody>
+    <ModalFooter Class="hcs-catalog-modal__footer">
+        <Button Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="() => modal!.Hide()">@L["Catalog:Cancel"]</Button>
+        <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="CreateAsync">@L["Catalog:Create"]</Button>
+    </ModalFooter>
+</ModalContent></Modal>
+<ProjectTaskViewModal @ref="taskModal" />
+@code {
+    private const string MonthView = "dayGridMonth";
+    private const string WeekView = "timeGridWeek";
+    private const string DayView = "timeGridDay";
+    private const string ListView = "listWeek";
+    private HcsCalendar? calendar;
+    private readonly List<CalendarEventDto> events = [];
+    private readonly List<MasterDataCatalogDto> eventTypes = [];
+    private readonly List<HCS.CollaborationService.Contracts.ChatContactDto> contacts = [];
+    private EventForm form = new();
+    private Modal? modal;
+    private ProjectTaskViewModal? taskModal;
+    private bool isLoading;
+    private string filter = "", search = "";
+    private string viewType = MonthView;
+    private string viewTitle = "";
+    private string lastRangeKey = "";
+    private DateTime rangeFrom = DateTime.Today.AddDays(-7);
+    private DateTime rangeTo = DateTime.Today.AddMonths(1).AddDays(7);
+
+    private IReadOnlyList<HcsCalendarJsEvent> MappedEvents => CalendarEventDisplay.ToJs(VisibleEvents);
+    private List<CalendarEventDto> VisibleEvents => string.IsNullOrWhiteSpace(search)
+        ? events
+        : events.Where(x => x.Title.Contains(search, StringComparison.OrdinalIgnoreCase)
+            || x.EventType.Contains(search, StringComparison.OrdinalIgnoreCase)).ToList();
+
+    private bool IsView(string view) => viewType == view;
+    private void ApplySearch() => search = SearchText.Normalize(filter);
+    private void ResetSearch() { filter = search = ""; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            if (eventTypes.Count == 0)
+            {
+                var page = await Catalog.GetMasterDataAsync("EventType", new OrganizationCatalogQuery(null, true, 0, 100));
+                eventTypes.AddRange(page.Items);
+            }
+            if (contacts.Count == 0) contacts.AddRange(await Chat.GetContactsAsync(null, 50));
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+    }
+
+    private Task PrevAsync() => calendar?.PrevAsync() ?? Task.CompletedTask;
+    private Task NextAsync() => calendar?.NextAsync() ?? Task.CompletedTask;
+    private Task TodayAsync() => calendar?.TodayAsync() ?? Task.CompletedTask;
+    private Task SetViewAsync(string view) => calendar?.ChangeViewAsync(view) ?? Task.CompletedTask;
+
+    private async Task OnDatesChanged(HcsCalendarRange range)
+    {
+        viewType = range.ViewType;
+        viewTitle = FormatTitle(range);
+        var key = range.Start + "|" + range.End;
+        if (key == lastRangeKey) return;
+        lastRangeKey = key;
+        rangeFrom = ParseIso(range.Start) ?? rangeFrom;
+        rangeTo = ParseIso(range.End) ?? rangeTo;
+        await LoadEventsAsync();
+    }
+
+    private async Task LoadEventsAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var loaded = await Work.GetCalendarAsync(rangeFrom, rangeTo);
+            events.Clear();
+            events.AddRange(loaded);
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+        finally { isLoading = false; }
+    }
+
+    private async Task OpenCreate() { form = new(); if (modal is not null) await modal.Show(); }
+
+    private async Task OnEventClicked(string id)
+    {
+        if (!Guid.TryParse(id, out var eventId)) return;
+        var item = events.FirstOrDefault(x => x.Id == eventId);
+        if (item is null) return;
+        if (string.Equals(item.RelatedType, "TASK", StringComparison.OrdinalIgnoreCase) && Guid.TryParse(item.RelatedId, out var taskId))
+        {
+            if (taskModal is not null) await taskModal.ShowAsync(taskId);
+            return;
+        }
+        Navigation.NavigateTo(WorkUi.EventHref(item.RelatedType, item.RelatedId, item.Id));
+    }
+
+    private void OnRelatedTypeChanged(string value)
+    {
+        if (!string.Equals(form.RelatedType, value, StringComparison.Ordinal)) form.RelatedId = null;
+        form.RelatedType = value;
+    }
+    private void Toggle(Guid id, bool selected) { if (selected) form.Participants.Add(id); else form.Participants.Remove(id); }
+    private async Task CreateAsync()
+    {
+        try
+        {
+            await Work.CreateCalendarEventAsync(new UpsertCalendarEventRequest(form.Title.Trim(), string.IsNullOrWhiteSpace(form.Description) ? null : form.Description, form.Start, form.End, false, form.EventType, null, form.RelatedType, form.RelatedId?.ToString(), form.Visibility, form.Participants.ToList()));
+            if (modal is not null) await modal.Hide();
+            await LoadEventsAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+    private async Task<CatalogSelect2SearchResponse> SearchRelatedAsync(string term, int page)
+    {
+        var skip = Math.Max(page - 1, 0) * 20;
+        if (form.RelatedType == "TASK")
+        {
+            var tasks = await Work.GetTasksAsync(null, new WorkListQuery(term, null, skip, 20));
+            return new(
+                tasks.Items.Select(x => new CatalogSelect2Item(x.Id.ToString(), CatalogSelect2Text.CodeName(x.Code, x.Title))).ToList(),
+                skip + tasks.Items.Count < tasks.TotalCount);
+        }
+        var projects = await Work.GetProjectsAsync(new WorkListQuery(term, null, skip, 20));
+        return new(
+            projects.Items.Select(x => new CatalogSelect2Item(x.Id.ToString(), CatalogSelect2Text.CodeName(x.Code, x.Name))).ToList(),
+            skip + projects.Items.Count < projects.TotalCount);
+    }
+
+    private string FormatTitle(HcsCalendarRange range)
+    {
+        var culture = CultureInfo.CurrentUICulture;
+        var current = ParseIso(range.CurrentStart)?.ToLocalTime() ?? DateTime.Today;
+        return range.ViewType switch
+        {
+            DayView => current.ToString("D", culture),
+            WeekView or ListView => FormatWeekTitle(current, culture),
+            _ => current.ToString("MMMM yyyy", culture).ToUpper(culture)
+        };
+    }
+
+    private static string FormatWeekTitle(DateTime start, CultureInfo culture)
+    {
+        var end = start.AddDays(6);
+        return start.Year == end.Year
+            ? $"{start.ToString("dd MMM", culture)} – {end.ToString("dd MMM yyyy", culture)}"
+            : $"{start.ToString("dd MMM yyyy", culture)} – {end.ToString("dd MMM yyyy", culture)}";
+    }
+
+    private static DateTime? ParseIso(string value) =>
+        DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var parsed) ? parsed : null;
+
+    private sealed class EventForm
+    {
+        public string Title { get; set; } = "";
+        public string Description { get; set; } = "";
+        public DateTime Start { get; set; } = DateTime.Now;
+        public DateTime End { get; set; } = DateTime.Now.AddHours(1);
+        public string EventType { get; set; } = "Meeting";
+        public string Visibility { get; set; } = "Private";
+        public string RelatedType { get; set; } = "NONE";
+        public Guid? RelatedId { get; set; }
+        public HashSet<Guid> Participants { get; } = [];
+    }
+}

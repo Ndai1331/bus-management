@@ -1,0 +1,44 @@
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+
+<div style="position: relative; height: 300px;">
+    <canvas id="@ChartId" width="400" height="300"></canvas>
+</div>
+@code {
+    [Parameter] public string ChartId { get; set; } = Guid.NewGuid().ToString("n");
+    [Parameter] public List<string> Labels { get; set; } = [];
+    [Parameter] public List<double> Data { get; set; } = [];
+    [Parameter] public List<string> BackgroundColors { get; set; } = [];
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public string? XAxisLabel { get; set; }
+    [Parameter] public string? YAxisLabel { get; set; }
+    [Parameter] public bool Horizontal { get; set; }
+    [Parameter] public double? MaxValue { get; set; }
+
+    private bool rendered;
+    private string lastSignature = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (Labels.Count == 0 || Labels.Count != Data.Count) return;
+        var signature = string.Join("|", Labels) + "#" + string.Join("|", Data) + "#" + Horizontal + MaxValue + Title;
+        var colors = BackgroundColors.Count > 0 ? BackgroundColors : new List<string> { "#3498db", "#2ecc71", "#e74c3c", "#f39c12", "#9b59b6" };
+        if (!rendered)
+        {
+            await Js.InvokeVoidAsync("hcsCharts.createBar", ChartId, Labels, Data, colors, Title, XAxisLabel, YAxisLabel, Horizontal, MaxValue);
+            rendered = true;
+            lastSignature = signature;
+            return;
+        }
+        if (signature == lastSignature) return;
+        await Js.InvokeVoidAsync("hcsCharts.updateBar", ChartId, Labels, Data, colors);
+        lastSignature = signature;
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await Js.InvokeVoidAsync("hcsCharts.destroy", ChartId); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+}

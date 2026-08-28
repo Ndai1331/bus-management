@@ -1,0 +1,47 @@
+@inject IJSRuntime Js
+@implements IAsyncDisposable
+
+<div style="position: relative; height: 300px;">
+    <canvas id="@ChartId" width="400" height="300"></canvas>
+</div>
+@code {
+    [Parameter] public string ChartId { get; set; } = Guid.NewGuid().ToString("n");
+    [Parameter] public List<string> Labels { get; set; } = [];
+    [Parameter] public List<double> Data { get; set; } = [];
+    [Parameter] public List<string> BackgroundColors { get; set; } = [];
+    [Parameter] public bool IsDoughnut { get; set; }
+    [Parameter] public string? Title { get; set; }
+    [Parameter] public bool ShowLegend { get; set; } = true;
+
+    private bool rendered;
+    private string lastSignature = "";
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!HasData()) return;
+        var signature = BuildSignature();
+        if (!rendered)
+        {
+            await Js.InvokeVoidAsync("hcsCharts.createPie", ChartId, Labels, Data, Colors(), IsDoughnut, Title, ShowLegend);
+            rendered = true;
+            lastSignature = signature;
+            return;
+        }
+        if (signature == lastSignature) return;
+        await Js.InvokeVoidAsync("hcsCharts.updatePie", ChartId, Labels, Data, Colors());
+        lastSignature = signature;
+    }
+
+    private bool HasData() => Labels.Count > 0 && Labels.Count == Data.Count;
+    private List<string> Colors() => BackgroundColors.Count > 0
+        ? BackgroundColors
+        : ["#3498db", "#2ecc71", "#e74c3c", "#f39c12", "#9b59b6", "#1abc9c"];
+    private string BuildSignature() => string.Join("|", Labels) + "#" + string.Join("|", Data) + "#" + IsDoughnut + Title;
+
+    public async ValueTask DisposeAsync()
+    {
+        try { await Js.InvokeVoidAsync("hcsCharts.destroy", ChartId); }
+        catch (JSDisconnectedException) { }
+        catch (TaskCanceledException) { }
+    }
+}

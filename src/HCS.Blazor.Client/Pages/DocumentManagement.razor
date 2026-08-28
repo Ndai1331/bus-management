@@ -1,0 +1,335 @@
+@page "/manage-documents"
+@page "/my-documents"
+@page "/document-assignments"
+@page "/document-files"
+@page "/document-histories"
+@attribute [Authorize(Policy = "Documents.View")]
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+@inject CollaborationClient Chat
+@inject OrganizationCatalogClient Catalog
+@inject NavigationManager Navigation
+@implements IDisposable
+@using System.Threading
+
+<PageTitle>@PageTitle · HCS</PageTitle>
+<section class="hcs-catalog-page" @key="SourceType">
+    <header class="hcs-catalog-titlebar">
+        <div><h1>@PageTitle</h1></div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-export" Clicked="LoadAsync">@L["Catalog:Refresh"]</Button>
+            @if (CanCreate)
+            {
+                <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreate"><Icon Name="@IconName.Add" /> @L["Catalog:New"]</Button>
+            }
+        </div>
+    </header>
+    <div class="hcs-document-layout">
+        <aside class="hcs-document-type-sidebar" aria-label="@L["Menu:DocumentTypes"]">
+            <button type="button" class="hcs-document-type-tree-item @(selectedTypeId is null ? "active" : null)" @onclick="() => SelectType(null)">
+                @L["Catalog:AllStatuses"]
+            </button>
+            @foreach (var type in documentTypes)
+            {
+                <button type="button" class="hcs-document-type-tree-item @(selectedTypeId == type.Id ? "active" : null)" @onclick="() => SelectType(type.Id)">
+                    @type.Name
+                </button>
+            }
+        </aside>
+        <div>
+            <Card Class="mb-2 hcs-catalog-filter-card hcs-document-filter-card"><CardBody>
+                <div class="hcs-catalog-filter-row hcs-document-filter-row">
+                    <Addons Class="hcs-catalog-search">
+                        <Addon AddonType="AddonType.Body"><TextInput @bind-Value="filter" Placeholder="@L["Catalog:SearchPlaceholder"]" /></Addon>
+                        <Addon AddonType="AddonType.End">
+                            <Button Color="Color.Primary" Clicked="SearchAsync"><i class="fa fa-search me-1"></i> @L["Catalog:SearchButton"]</Button>
+                        </Addon>
+                    </Addons>
+                    <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-toggle" Clicked="() => showFilters = !showFilters">
+                        <i class="fa fa-sliders me-2"></i>@L["Catalog:Filter"]
+                        <i class="fa @(showFilters ? "fa-chevron-up" : "fa-chevron-down") ms-2"></i>
+                    </Button>
+                </div>
+                @if (showFilters)
+                {
+                    <div class="hcs-catalog-advanced-filter hcs-document-advanced-filter">
+                        <Field>
+                            <FieldLabel>@L["Feature:DocumentTitleField"]</FieldLabel>
+                            <TextInput @bind-Value="titleFilter" />
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Feature:DocumentNumber"]</FieldLabel>
+                            <TextInput @bind-Value="numberFilter" />
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                            <Select TValue="string" @bind-Value="statusFilter">
+                                <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                                @foreach (var status in Enum.GetValues<DocumentStatus>())
+                                {
+                                    <SelectItem Value="@status.ToString()">@L[DocumentStatusUi.TextKey(status)]</SelectItem>
+                                }
+                            </Select>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Menu:Sectors"]</FieldLabel>
+                            <Select TValue="string" @bind-Value="sectorFilter">
+                                <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                                @foreach (var item in sectors) { <SelectItem Value="@item.Id.ToString()">@item.Name</SelectItem> }
+                            </Select>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Menu:UrgencyLevels"]</FieldLabel>
+                            <Select TValue="string" @bind-Value="urgencyFilter">
+                                <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                                @foreach (var item in urgencies) { <SelectItem Value="@item.Id.ToString()">@item.Name</SelectItem> }
+                            </Select>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Menu:ConfidentialityLevels"]</FieldLabel>
+                            <Select TValue="string" @bind-Value="confidentialityFilter">
+                                <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                                @foreach (var item in confidentialities) { <SelectItem Value="@item.Id.ToString()">@item.Name</SelectItem> }
+                            </Select>
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Feature:StartDate"]</FieldLabel>
+                            <HcsDatePicker TValue="DateTime?" @bind-Value="fromDate" />
+                        </Field>
+                        <Field>
+                            <FieldLabel>@L["Feature:EndDate"]</FieldLabel>
+                            <HcsDatePicker TValue="DateTime?" @bind-Value="toDate" />
+                        </Field>
+                        <Button Color="Color.Light" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetSearchAsync">@L["Catalog:Reset"]</Button>
+                    </div>
+                }
+            </CardBody></Card>
+            <Card Class="hcs-catalog-grid-card"><CardBody>
+                <DataGrid TItem="DocumentDto" Data="@items" TotalItems="@totalCount" ReadData="OnReadAsync"
+                          ShowPager="true" ShowPageSizes="true" PageSizes="@pageSizes" PageSize="@pageSize"
+                          Responsive="true" Striped="true" Hoverable="true" Class="hcs-catalog-grid">
+                    <EmptyTemplate>
+                        <div class="hcs-empty py-5"><i class="fa fa-inbox"></i><h2>@L["Catalog:EmptyTitle"]</h2></div>
+                    </EmptyTemplate>
+                    <LoadingTemplate>
+                        <div class="hcs-loading py-5"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div>
+                    </LoadingTemplate>
+                    <DataGridColumns>
+                        <DataGridColumn TItem="DocumentDto" Caption="@L["Catalog:Actions"].Value">
+                            <DisplayTemplate Context="cell">
+                                <div class="hcs-row-actions">
+                                    <Button Size="Size.Small" Color="Color.Primary" Outline="true" Class="hcs-action-button hcs-action-button--preview" Clicked="() => PreviewAsync(cell.Item)" Title="@L["Work:PdfPreview"]" aria-label="@L["Work:PdfPreview"]"><i class="fa fa-eye" aria-hidden="true"></i></Button>
+                                    <Button Size="Size.Small" Color="Color.Primary" Outline="true" Class="hcs-action-button hcs-action-button--edit" Clicked="() => Navigation.NavigateTo(DetailHref(cell.Item.Id))" Title="@L["Catalog:Edit"]" aria-label="@L["Catalog:Edit"]"><i class="fa fa-pen" aria-hidden="true"></i></Button>
+                                    @if (CanManage)
+                                    {
+                                        <AuthorizeView Policy="Documents.Assign">
+                                            <Authorized>
+                                                <Button Size="Size.Small" Color="Color.Info" Outline="true" Class="hcs-action-button hcs-action-button--send" Clicked="() => OpenSend(cell.Item)" Title="@L["Feature:SendDocument"]" aria-label="@L["Feature:SendDocument"]"><i class="fa fa-paper-plane" aria-hidden="true"></i></Button>
+                                            </Authorized>
+                                        </AuthorizeView>
+                                        <AuthorizeView Policy="Documents.Workflow.Start">
+                                            <Authorized>
+                                                        <Button Size="Size.Small" Color="Color.Primary" Outline="true" Class="hcs-action-button hcs-action-button--sign" Clicked="() => OpenSubmit(cell.Item)" Title="@L["Work:SubmitWorkflow"]" aria-label="@L["Work:SubmitWorkflow"]"><i class="fa fa-signature" aria-hidden="true"></i></Button>
+                                            </Authorized>
+                                        </AuthorizeView>
+                                    }
+                                </div>
+                            </DisplayTemplate>
+                        </DataGridColumn>
+                        <DataGridColumn TItem="DocumentDto" Caption="@L["Feature:DocumentNumber"].Value">
+                            <DisplayTemplate Context="cell"><span class="hcs-catalog-code">#@cell.Item.Number</span></DisplayTemplate>
+                        </DataGridColumn>
+                        <DataGridColumn TItem="DocumentDto" Caption="@L["Feature:DocumentTitleField"].Value">
+                            <DisplayTemplate Context="cell">
+                                <a href="@DetailHref(cell.Item.Id)"><strong>@cell.Item.Title</strong></a>
+                                <span class="hcs-catalog-desc">@cell.Item.CreationTime.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</span>
+                            </DisplayTemplate>
+                        </DataGridColumn>
+                        <DataGridColumn TItem="DocumentDto" Caption="@L["Catalog:Status"].Value">
+                            <DisplayTemplate Context="cell"><span class="hcs-status-badge @DocumentStatusUi.BadgeClass(cell.Item.Status)">@L[DocumentStatusUi.TextKey(cell.Item.Status)]</span></DisplayTemplate>
+                        </DataGridColumn>
+                        <DataGridColumn TItem="DocumentDto" Caption="@L["Feature:Files"].Value">
+                            <DisplayTemplate Context="cell">@cell.Item.Files.Count</DisplayTemplate>
+                        </DataGridColumn>
+                    </DataGridColumns>
+                </DataGrid>
+            </CardBody></Card>
+        </div>
+    </div>
+</section>
+<DocumentPdfPreviewModal @ref="previewModal" ShowAssignTask="true" OnAssignTask="AssignFromPreviewAsync" />
+<ProjectTaskCreateModal @ref="taskModal" />
+<SubmitWorkflowModal @ref="submitModal" OnSubmitted="LoadAsync" />
+<Modal @ref="sendModal"><ModalContent Centered Class="hcs-catalog-modal">
+    <ModalHeader Class="hcs-catalog-modal__header"><ModalTitle>@L["Feature:SendDocument"]</ModalTitle><CloseButton /></ModalHeader>
+    <ModalBody Class="hcs-catalog-modal__body">
+        <Field><FieldLabel>@L["Chat:SelectContacts"]</FieldLabel>
+            <UserSelect2 Value="sendReceiverId" ValueChanged="value => sendReceiverId = value"
+                         SelectedItem="@ContactItem(sendReceiverId)"
+                         Placeholder="@L["Chat:SelectContacts"]" SelectedText="@ContactName(sendReceiverId)"
+                         Search="SearchContactsAsync" />
+        </Field>
+    </ModalBody>
+    <ModalFooter Class="hcs-catalog-modal__footer">
+        <Button Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="() => sendModal!.Hide()">@L["Catalog:Cancel"]</Button>
+        <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="SendAsync">@L["Feature:SendDocument"]</Button>
+    </ModalFooter>
+</ModalContent></Modal>
+@code {
+    [SupplyParameterFromQuery(Name = "sourceType")] public int? SourceTypeQuery { get; set; }
+
+    private static readonly int[] pageSizes = [10, 20, 50, 100];
+    private readonly List<DocumentDto> items = [];
+    private readonly List<ChatContactDto> contacts = [];
+    private readonly List<MasterDataCatalogDto> documentTypes = [];
+    private readonly List<MasterDataCatalogDto> sectors = [];
+    private readonly List<MasterDataCatalogDto> urgencies = [];
+    private readonly List<MasterDataCatalogDto> confidentialities = [];
+    private DocumentPdfPreviewModal? previewModal;
+    private ProjectTaskCreateModal? taskModal;
+    private SubmitWorkflowModal? submitModal;
+    private Modal? sendModal;
+    private DocumentDto? sending;
+    private DocumentDto? previewing;
+    private Guid? sendReceiverId, selectedTypeId;
+    private string filter = "", titleFilter = "", numberFilter = "", statusFilter = "", sectorFilter = "", urgencyFilter = "", confidentialityFilter = "";
+    private DateTime? fromDate, toDate;
+    private bool showFilters, catalogsLoaded;
+    private int lastLoadedSource = int.MinValue;
+    private int loadGeneration, totalCount, pageSize = 20, currentPage = 1;
+
+    private int SourceType
+    {
+        get
+        {
+            var relative = Navigation.ToBaseRelativePath(Navigation.Uri);
+            if (relative.Contains("my-documents", StringComparison.OrdinalIgnoreCase)) return 1;
+            if (SourceTypeQuery is >= 0 and <= 2) return SourceTypeQuery.Value;
+            return 0;
+        }
+    }
+    private bool CanCreate => SourceType is 0 or 1;
+    private bool CanManage => SourceType is 0 or 1;
+    private string PageTitle => SourceType switch
+    {
+        1 => L["Menu:MyDocuments"],
+        2 => L["Menu:DocumentsSentToMe"],
+        _ => L["Menu:DocumentList"]
+    };
+
+    protected override void OnInitialized() => Navigation.LocationChanged += OnLocationChanged;
+    protected override async Task OnParametersSetAsync() => await ReloadIfSourceChangedAsync(resetFilter: lastLoadedSource != int.MinValue);
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args) =>
+        _ = InvokeAsync(() => ReloadIfSourceChangedAsync(resetFilter: true));
+    public void Dispose() => Navigation.LocationChanged -= OnLocationChanged;
+
+    private async Task ReloadIfSourceChangedAsync(bool resetFilter)
+    {
+        var source = SourceType;
+        if (source == lastLoadedSource) return;
+        if (resetFilter) ResetFilters();
+        lastLoadedSource = source;
+        currentPage = 1;
+        await EnsureCatalogsAsync();
+    }
+
+    private async Task EnsureCatalogsAsync()
+    {
+        if (catalogsLoaded) return;
+        catalogsLoaded = true;
+        var query = new OrganizationCatalogQuery(null, true, 0, 100);
+        try
+        {
+            documentTypes.AddRange((await Catalog.GetMasterDataAsync("DocumentType", query)).Items);
+            sectors.AddRange((await Catalog.GetMasterDataAsync("Sector", query)).Items);
+            urgencies.AddRange((await Catalog.GetMasterDataAsync("UrgencyLevel", query)).Items);
+            confidentialities.AddRange((await Catalog.GetMasterDataAsync("ConfidentialityLevel", query)).Items);
+        }
+        catch { /* catalog permission is optional */ }
+    }
+
+    private Task SearchAsync() { currentPage = 1; return LoadAsync(); }
+    private Task ResetSearchAsync() { ResetFilters(); showFilters = false; currentPage = 1; return LoadAsync(); }
+    private void ResetFilters()
+    {
+        filter = titleFilter = numberFilter = statusFilter = sectorFilter = urgencyFilter = confidentialityFilter = "";
+        fromDate = toDate = null;
+        selectedTypeId = null;
+    }
+    private Task SelectType(Guid? id) { selectedTypeId = id; currentPage = 1; return LoadAsync(); }
+
+    private async Task OnReadAsync(DataGridReadDataEventArgs<DocumentDto> args)
+    {
+        currentPage = Math.Max(args.Page, 1);
+        pageSize = Math.Clamp(args.PageSize, 10, 100);
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        var generation = Interlocked.Increment(ref loadGeneration);
+        try
+        {
+            var search = CombinedFilter();
+            DocumentStatus? status = Enum.TryParse<DocumentStatus>(statusFilter, out var parsed) ? parsed : null;
+            var page = await Documents.GetDocumentsAsync(new DocumentListQuery(
+                search, status?.ToString(), SourceType == 1, (currentPage - 1) * pageSize, pageSize, SourceType,
+                selectedTypeId, ParseGuid(sectorFilter), ParseGuid(urgencyFilter), ParseGuid(confidentialityFilter),
+                fromDate, toDate));
+            if (generation != loadGeneration) return;
+            items.Clear(); items.AddRange(page.Items);
+            totalCount = (int)page.TotalCount;
+        }
+        catch (Exception ex) { if (generation == loadGeneration) await NotifyErrorAsync(ex); }
+    }
+
+    private string? CombinedFilter()
+    {
+        if (!string.IsNullOrWhiteSpace(numberFilter)) return SearchText.Normalize(numberFilter);
+        if (!string.IsNullOrWhiteSpace(titleFilter)) return SearchText.Normalize(titleFilter);
+        return SearchText.NormalizeOrNull(filter);
+    }
+
+    private static Guid? ParseGuid(string value) => Guid.TryParse(value, out var id) ? id : null;
+    private string DetailHref(Guid id) => $"/document-detail/{id}?sourceType={SourceType}";
+    private void OpenCreate() => Navigation.NavigateTo($"/document-detail?sourceType={SourceType}");
+    private Task PreviewAsync(DocumentDto item)
+    {
+        previewing = item;
+        return previewModal?.ShowAsync(item.Id, item.Files, item.Title) ?? Task.CompletedTask;
+    }
+    private Task AssignFromPreviewAsync() =>
+        taskModal?.ShowAsync(linkedDocumentId: previewing?.Id) ?? Task.CompletedTask;
+    private Task OpenSubmit(DocumentDto item) => submitModal?.ShowAsync(item.Id) ?? Task.CompletedTask;
+    private async Task OpenSend(DocumentDto item)
+    {
+        sending = item;
+        sendReceiverId = null;
+        if (contacts.Count == 0)
+        {
+            try { contacts.AddRange(await Chat.GetContactsAsync(null, 50)); }
+            catch { }
+        }
+        if (sendModal is not null) await sendModal.Show();
+    }
+    private async Task SendAsync()
+    {
+        if (sending is null || sendReceiverId is null) { await NotifyErrorAsync(L["Catalog:TypeRequired"]); return; }
+        try
+        {
+            await Documents.SendDocumentAsync(sending.Id, new SendDocumentRequest(sendReceiverId));
+            if (sendModal is not null) await sendModal.Hide();
+            await NotifySuccessAsync(L["Catalog:Updated"]);
+            await LoadAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+    private string ContactName(Guid? id) => id is null ? "" : contacts.FirstOrDefault(x => x.Id == id)?.DisplayName ?? "";
+    private CatalogSelect2Item? ContactItem(Guid? id) =>
+        id is { } userId ? contacts.Where(x => x.Id == userId).Select(CatalogSelect2Cache.UserItem).FirstOrDefault() : null;
+    private async Task<CatalogSelect2SearchResponse> SearchContactsAsync(string term, int page)
+    {
+        var found = await Chat.GetContactsAsync(term, 50);
+        return CatalogSelect2Cache.Merge(contacts, found, x => x.Id, x => x.DisplayName, false, CatalogSelect2Cache.UserItem);
+    }
+}

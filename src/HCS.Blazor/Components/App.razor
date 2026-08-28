@@ -1,0 +1,86 @@
+﻿@using System.Globalization
+@using Microsoft.Extensions.Hosting
+@using Volo.Abp.AspNetCore.Components.Server.LeptonXLiteTheme.Bundling
+@using Volo.Abp.Localization
+@using Volo.Abp.AspNetCore.Components.Web.Theming.Bundling
+@inject IHostEnvironment Env
+@{
+    var rtl = CultureHelper.IsRtl ? "rtl" : string.Empty;
+}
+
+<!DOCTYPE html>
+<html lang="@CultureInfo.CurrentCulture.Name" dir="@rtl" data-enhance-nav="false">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HCS</title>
+    <base href="/" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet" />
+
+    <AbpStyles BundleName="@BlazorLeptonXLiteThemeBundles.Styles.Global" />
+
+    <link href="HCS.Blazor.styles.css" rel="stylesheet"/>
+    <link href="HCS.Blazor.Client.styles.css" rel="stylesheet"/>
+    <link href="hcs-tokens.css" rel="stylesheet"/>
+    <link href="main.css" rel="stylesheet"/>
+    <link href="hcs-components.css" rel="stylesheet"/>
+    <link href="libs/select2/css/select2.min.css" rel="stylesheet"/>
+    <link href="_content/Blazorise.PdfViewer/vendors/pdf_viewer.min.css" rel="stylesheet"/>
+    <HeadOutlet />
+</head>
+<body class="abp-application-layout @rtl">
+    <div id="hcs-boot-screen" class="hcs-boot-screen" role="status" aria-live="polite" aria-busy="true">
+        <div class="hcs-boot-screen__card">
+            <img class="hcs-boot-screen__logo" src="/images/logo/logo.png" alt="HCS" width="88" height="62" />
+            <div class="hcs-boot-screen__spinner" aria-hidden="true"></div>
+            <p class="hcs-boot-screen__title">Đang tải hệ thống</p>
+            <p class="hcs-boot-screen__brand">HCS · Hành chính số</p>
+            <p class="hcs-boot-screen__hint" aria-label="@HintText">
+                @for (var i = 0; i < HintText.Length; i++)
+                {
+                    var ch = HintText[i] == ' ' ? "\u00A0" : HintText[i].ToString();
+                    <span style="--i: @i">@ch</span>
+                }
+            </p>
+        </div>
+    </div>
+
+    <Routes @rendermode="@(new InteractiveWebAssemblyRenderMode(prerender: false))" />
+
+    <div id="blazor-error-ui">
+        @if (Env.IsDevelopment())
+        {
+            <text>An unhandled exception has occurred. See browser dev tools for details.</text>
+        }
+        else if (Env.IsStaging() || Env.IsProduction())
+        {
+            <text>An error has occurred. This application may no longer respond until reloaded.</text>
+        }
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">&times;</a>
+    </div>
+    
+    <AbpScripts BundleName="@BlazorLeptonXLiteThemeBundles.Scripts.Global" WebAssemblyScriptFiles="GlobalScripts" />
+
+    <script src="libs/select2/js/select2.full.min.js"></script>
+    <script src="js/hcs-catalog-select2.js"></script>
+    <script src="js/hcs-charts.js"></script>
+    <script src="js/hcs-calendar.js"></script>
+    <script src="js/hcs-chat.js"></script>
+    <script src="global-scripts.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+
+</body>
+</html>
+
+@code{
+    private const string HintText = "Vui lòng đợi trong giây lát…";
+
+    private List<string> GlobalScripts =>
+    [
+        "global.js"
+    ];
+
+}

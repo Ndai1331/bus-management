@@ -1,0 +1,263 @@
+@page "/survey-criterias"
+@attribute [Authorize(Policy = "WorkManagement.SurveyManagement")]
+@inherits HCSComponentBase
+@inject WorkManagementClient Work
+@inject IJSRuntime JsRuntime
+@inject SurveyCatalogCache Cache
+@inject IUiMessageService UiMessage
+
+<PageTitle>@L["Menu:SurveyCriterias"] · HCS</PageTitle>
+<section class="hcs-catalog-page" aria-labelledby="survey-criterias-title">
+    <header class="hcs-catalog-titlebar">
+        <div class="min-w-0">
+            <h1 id="survey-criterias-title">@L["Menu:SurveyCriterias"]</h1>
+        </div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-export" Clicked="ExportAsync" Disabled="@(pageItems.Count == 0 || isLoading)">
+                <i class="fa fa-download me-1" aria-hidden="true"></i> @L["Catalog:Export"]
+            </Button>
+            <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenCreate">
+                <Icon Name="@IconName.Add" /> @L["Catalog:New"]
+            </Button>
+        </div>
+    </header>
+    <Card Class="mb-2 hcs-catalog-filter-card"><CardBody>
+        <div class="hcs-catalog-filter-row">
+            <Addons Class="hcs-catalog-search">
+                <Addon AddonType="AddonType.Body">
+                    <TextInput @bind-Value="filter" Placeholder="@L["Catalog:SearchPlaceholder"]" Autofocus="true" />
+                </Addon>
+                <Addon AddonType="AddonType.End">
+                    <Button Color="Color.Primary" Clicked="SearchAsync" Disabled="@isLoading">
+                        <i class="fa fa-search me-1"></i> @L["Catalog:SearchButton"]
+                    </Button>
+                </Addon>
+            </Addons>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-toggle" Clicked="() => showFilters = !showFilters">
+                <i class="fa fa-sliders me-2"></i>@L["Catalog:Filter"]
+                <i class="fa @(showFilters ? "fa-chevron-up" : "fa-chevron-down") ms-2"></i>
+            </Button>
+        </div>
+        @if (showFilters)
+        {
+            <div class="hcs-catalog-advanced-filter">
+                <Field>
+                    <FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                    <Select TValue="string" @bind-Value="statusFilter">
+                        <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                        <SelectItem Value="@("true")">@L["Catalog:Active"]</SelectItem>
+                        <SelectItem Value="@("false")">@L["Catalog:Inactive"]</SelectItem>
+                    </Select>
+                </Field>
+                <Button Color="Color.Light" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetSearchAsync">@L["Catalog:Reset"]</Button>
+            </div>
+        }
+    </CardBody></Card>
+    <Card Class="hcs-catalog-grid-card"><CardBody>
+        <DataGrid TItem="SurveyCriteriaDto" Data="@pageItems" TotalItems="@totalCount" ReadData="OnReadAsync"
+                  ShowPager="true" ShowPageSizes="true" PageSizes="@pageSizes" PageSize="@pageSize"
+                  Responsive="true" Striped="true" Hoverable="true" Class="hcs-catalog-grid">
+            <EmptyTemplate>
+                <div class="hcs-empty py-5"><i class="fa fa-inbox" aria-hidden="true"></i><h2>@L["Catalog:EmptyTitle"]</h2><p>@L["Catalog:EmptyDescription"]</p></div>
+            </EmptyTemplate>
+            <LoadingTemplate>
+                <div class="hcs-loading py-5" role="status"><i class="fa fa-spinner fa-spin" aria-hidden="true"></i><span>@L["Catalog:Loading"]</span></div>
+            </LoadingTemplate>
+            <DataGridColumns>
+                <DataGridColumn TItem="SurveyCriteriaDto" Caption="">
+                    <DisplayTemplate><input class="hcs-row-check" type="checkbox" disabled tabindex="-1" aria-hidden="true" /></DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="SurveyCriteriaDto" Field="@nameof(SurveyCriteriaDto.Code)" Caption="@L["Catalog:Code"].Value" />
+                <DataGridColumn TItem="SurveyCriteriaDto" Field="@nameof(SurveyCriteriaDto.Name)" Caption="@L["Catalog:Name"].Value" />
+                <DataGridColumn TItem="SurveyCriteriaDto" Field="@nameof(SurveyCriteriaDto.SortOrder)" Caption="@L["Catalog:SortOrder"].Value" />
+                <DataGridColumn TItem="SurveyCriteriaDto" Caption="@L["SurveyCriteria:Location"].Value">
+                    <DisplayTemplate Context="cell">@LocationName(cell.Item.LocationId)</DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="SurveyCriteriaDto" Caption="@L["Catalog:Status"].Value">
+                    <DisplayTemplate Context="cell">
+                        <span class="hcs-status-icon @(cell.Item.IsActive ? "hcs-status-icon--active" : "hcs-status-icon--inactive")" title="@(cell.Item.IsActive ? L["Catalog:Active"].Value : L["Catalog:Inactive"].Value)">
+                            <i class="fa @(cell.Item.IsActive ? "fa-check" : "fa-xmark")" aria-hidden="true"></i>
+                        </span>
+                    </DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="SurveyCriteriaDto" Caption="@L["Catalog:Actions"].Value">
+                    <DisplayTemplate Context="cell">
+                        <div class="hcs-row-actions">
+                            <Button Color="Color.Primary" Outline="true" Size="Size.Small" Class="hcs-action-button hcs-action-button--edit" Title="@L["Catalog:Edit"]" Clicked="() => OpenEdit(cell.Item)"><Icon Name="@IconName.Edit" /></Button>
+                            <Button Color="Color.Danger" Outline="true" Size="Size.Small" Class="hcs-action-button hcs-action-button--delete" Title="@L["Catalog:Delete"]" Clicked="() => DeleteAsync(cell.Item)"><Icon Name="@IconName.Delete" /></Button>
+                        </div>
+                    </DisplayTemplate>
+                </DataGridColumn>
+            </DataGridColumns>
+        </DataGrid>
+    </CardBody></Card>
+</section>
+
+<Modal @ref="modal"><ModalContent Centered Class="hcs-catalog-modal">
+    <ModalHeader Class="hcs-catalog-modal__header">
+        <ModalTitle>@(editingId is null ? L["Catalog:Create"] : L["Catalog:Edit"])</ModalTitle>
+        <CloseButton />
+    </ModalHeader>
+    <ModalBody Class="hcs-catalog-modal__body">
+        <div class="hcs-catalog-form">
+            <div class="hcs-form-row">
+                <Field><FieldLabel>@L["Catalog:Code"]</FieldLabel><HcsIsolatedTextInput @bind-Value="form.Code" Name="hcsSurveyCriteriaCode" MaxLength="64" Disabled="@(editingId is not null)" /></Field>
+                <Field><FieldLabel>@L["Catalog:Name"]</FieldLabel><HcsIsolatedTextInput @bind-Value="form.Name" Name="hcsSurveyCriteriaName" /></Field>
+            </div>
+            <Field><FieldLabel>@L["Catalog:SortOrder"]</FieldLabel><NumericPicker TValue="int" @bind-Value="form.SortOrder" /></Field>
+            <div class="hcs-form-row">
+                <Field><FieldLabel>@L["SurveyCriteria:Location"]</FieldLabel>
+                    <Select TValue="Guid?" @bind-Value="form.LocationId">
+                        <SelectItem TValue="Guid?" Value="null">@L["All"]</SelectItem>
+                        @foreach (var location in locations) { <SelectItem TValue="Guid?" Value="@((Guid?)location.Id)">@location.Name</SelectItem> }
+                    </Select>
+                </Field>
+                <Field><FieldLabel>@L["SurveyCriteria:ImageUrl"]</FieldLabel><HcsIsolatedTextInput @bind-Value="form.Image" Name="hcsSurveyCriteriaImage" MaxLength="512" /></Field>
+            </div>
+            @if (editingId is not null)
+            {
+                <Field><Check TValue="bool" @bind-Checked="form.IsActive">@L["Catalog:Active"]</Check></Field>
+            }
+        </div>
+    </ModalBody>
+    <ModalFooter Class="hcs-catalog-modal__footer">
+        <Button Color="Color.Secondary" Class="hcs-catalog-cancel" Clicked="() => modal!.Hide()">@L["Catalog:Cancel"]</Button>
+        <Button Color="Color.Primary" Class="hcs-catalog-save" Clicked="SaveAsync" Disabled="@isSaving">@L["Catalog:SaveChanges"]</Button>
+    </ModalFooter>
+</ModalContent></Modal>
+@code {
+    private static readonly int[] pageSizes = [10, 20, 50, 100];
+    private readonly List<SurveyCriteriaDto> allItems = [];
+    private readonly List<SurveyCriteriaDto> pageItems = [];
+    private readonly CriteriaForm form = new();
+    private readonly List<SurveyLocationDto> locations = [];
+    private Modal? modal;
+    private Guid? editingId;
+    private string filter = "";
+    private string statusFilter = "";
+    private bool isLoading, isSaving, showFilters, loaded;
+    private int totalCount, pageSize = 20, currentPage = 1;
+
+    private async Task OnReadAsync(DataGridReadDataEventArgs<SurveyCriteriaDto> args)
+    {
+        currentPage = Math.Max(args.Page, 1);
+        pageSize = Math.Clamp(args.PageSize, 10, 100);
+        if (!loaded) await LoadAsync();
+        else ApplyPage();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            allItems.Clear();
+            allItems.AddRange(await Work.GetCriteriaAsync());
+            if (locations.Count == 0) locations.AddRange(await Work.GetLocationsAsync());
+            Cache.Set(true, allItems.Select(x => new SurveyCatalogItem(x.Id, x.Code, x.Name, x.SortOrder, x.IsActive)).ToList());
+            loaded = true;
+            ApplyPage();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+        finally { isLoading = false; }
+    }
+
+    private void ApplyPage()
+    {
+        var filtered = allItems.Where(Matches).ToList();
+        totalCount = filtered.Count;
+        pageItems.Clear();
+        pageItems.AddRange(filtered.Skip((currentPage - 1) * pageSize).Take(pageSize));
+    }
+
+    private bool Matches(SurveyCriteriaDto item)
+    {
+        if (!string.IsNullOrWhiteSpace(filter))
+        {
+            var term = SearchText.Normalize(filter);
+            if (item.Code.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0 &&
+                item.Name.IndexOf(term, StringComparison.OrdinalIgnoreCase) < 0)
+                return false;
+        }
+        if (statusFilter == "true") return item.IsActive;
+        if (statusFilter == "false") return !item.IsActive;
+        return true;
+    }
+
+    private Task SearchAsync() { currentPage = 1; ApplyPage(); return Task.CompletedTask; }
+    private Task ResetSearchAsync() { filter = statusFilter = ""; showFilters = false; currentPage = 1; ApplyPage(); return Task.CompletedTask; }
+
+    private async Task OpenCreate()
+    {
+        editingId = null;
+        form.Reset();
+        if (modal is not null) await modal.Show();
+    }
+
+    private async Task OpenEdit(SurveyCriteriaDto item)
+    {
+        editingId = item.Id;
+        form.Code = item.Code;
+        form.Name = item.Name;
+        form.SortOrder = item.SortOrder;
+        form.LocationId = item.LocationId;
+        form.Image = item.Image ?? "";
+        form.IsActive = item.IsActive;
+        if (modal is not null) await modal.Show();
+    }
+
+    private async Task SaveAsync()
+    {
+        isSaving = true;
+        try
+        {
+            if (editingId is { } id)
+                await Work.UpdateCriteriaAsync(id, new UpdateSurveyCriteriaRequest(form.Name.Trim(), form.SortOrder, form.IsActive, form.LocationId, Blank(form.Image)));
+            else
+                await Work.CreateCriteriaAsync(new CreateSurveyCriteriaRequest(form.Code.Trim(), form.Name.Trim(), form.SortOrder, form.LocationId, Blank(form.Image)));
+            await NotifySuccessAsync(editingId is null ? L["Catalog:Created"] : L["Catalog:Updated"]);
+            if (modal is not null) await modal.Hide();
+            await LoadAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+
+    private string LocationName(Guid? id) => id is null ? L["All"].Value : locations.FirstOrDefault(x => x.Id == id)?.Name ?? id.Value.ToString("N")[..8];
+    private static string? Blank(string value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private async Task DeleteAsync(SurveyCriteriaDto item)
+    {
+        if (!await UiMessage.Confirm(string.Format(L["Catalog:DeleteConfirmation"], item.Name))) return;
+        try
+        {
+            await Work.DeleteCriteriaAsync(item.Id);
+            await NotifySuccessAsync(L["Catalog:Deleted"]);
+            await LoadAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Delete); }
+    }
+
+    private async Task ExportAsync()
+    {
+        try
+        {
+            await CsvDownload.DownloadAsync(JsRuntime, $"survey-criterias-{DateTime.Now:yyyyMMdd-HHmm}.csv",
+                [L["Catalog:Code"], L["Catalog:Name"], L["Catalog:SortOrder"], L["Catalog:Status"]],
+                pageItems.Select(item => (IReadOnlyList<string>)[item.Code, item.Name, item.SortOrder.ToString(), item.IsActive ? L["Catalog:Active"] : L["Catalog:Inactive"]]));
+            await UiMessage.Success(L["Catalog:Exported"]);
+        }
+        catch { await UiMessage.Error(L["Catalog:ExportError"]); }
+    }
+
+    private sealed class CriteriaForm
+    {
+        public string Code { get; set; } = "";
+        public string Name { get; set; } = "";
+        public Guid? LocationId { get; set; }
+        public string Image { get; set; } = "";
+        public int SortOrder { get; set; }
+        public bool IsActive { get; set; } = true;
+        public void Reset() { Code = Name = Image = ""; LocationId = null; SortOrder = 0; IsActive = true; }
+    }
+}

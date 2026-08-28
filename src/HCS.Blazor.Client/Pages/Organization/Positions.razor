@@ -1,0 +1,6 @@
+@page "/positions"
+@attribute [Authorize(Policy = "HCS.Organization.Positions")]
+@inherits HCSComponentBase
+
+<PageTitle>@L["Catalog:PositionTitle"] · HCS</PageTitle>
+<OrganizationCatalog Kind="OrganizationCatalogKind.Position" />

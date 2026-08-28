@@ -1,0 +1,96 @@
+@inherits HCSComponentBase
+
+<div class="table-responsive">
+    <table class="table table-hover align-middle mb-0 hcs-catalog-grid hcs-task-tree">
+        <thead>
+            <tr>
+                <th style="width:2.5rem"></th>
+                <th>@L["Catalog:Code"]</th>
+                <th>@L["Feature:TaskTitle"]</th>
+                <th>@L["Work:DateRange"]</th>
+                <th>@L["Catalog:Status"]</th>
+                <th>@L["Feature:Priority"]</th>
+                <th>@L["Feature:Progress"]</th>
+                <th>@L["Catalog:Actions"]</th>
+            </tr>
+        </thead>
+        <tbody>
+            @if (!Tasks.Any(x => x.ParentTaskId is null))
+            {
+                <tr><td colspan="8"><div class="hcs-empty py-4 mb-0"><i class="fa fa-inbox"></i><h2>@L["Feature:NoTasks"]</h2></div></td></tr>
+            }
+            else
+            {
+                @RenderLevel(null, 0)
+            }
+        </tbody>
+    </table>
+</div>
+
+@code {
+    [Parameter] public IReadOnlyList<ProjectTaskDto> Tasks { get; set; } = [];
+    [Parameter] public EventCallback<ProjectTaskDto> ViewClicked { get; set; }
+    [Parameter] public EventCallback<ProjectTaskDto?> CreateClicked { get; set; }
+    [Parameter] public Func<Guid, string>? ProjectNameOf { get; set; }
+
+    private readonly HashSet<Guid> expanded = [];
+
+    private IEnumerable<ProjectTaskDto> ChildrenOf(Guid? parentId) =>
+        Tasks.Where(x => x.ParentTaskId == parentId);
+
+    private RenderFragment RenderLevel(Guid? parentId, int level) => builder =>
+    {
+        var sequence = 0;
+        foreach (var task in ChildrenOf(parentId))
+        {
+            var children = ChildrenOf(task.Id).ToList();
+            var open = expanded.Contains(task.Id);
+            builder.AddContent(sequence++, Row(task, level, children.Count > 0, open));
+            if (open && children.Count > 0)
+            {
+                builder.AddContent(sequence++, RenderLevel(task.Id, level + 1));
+            }
+        }
+    };
+
+    private RenderFragment Row(ProjectTaskDto task, int level, bool hasChildren, bool open) => __builder =>
+    {
+        <tr>
+            <td style="@($"padding-left:{level * 1.25 + 0.5}rem")">
+                @if (hasChildren)
+                {
+                    <button type="button" class="btn btn-link p-0" @onclick="() => Toggle(task.Id)">
+                        <i class="fa @(open ? "fa-chevron-up" : "fa-chevron-down")"></i>
+                    </button>
+                }
+            </td>
+            <td><span class="hcs-catalog-code">#@task.Code</span></td>
+            <td>
+                <button type="button" class="btn btn-link p-0 text-start" @onclick="() => ViewClicked.InvokeAsync(task)">
+                    <strong>@task.Title</strong>
+                </button>
+                @if (ProjectNameOf is not null)
+                {
+                    <span class="hcs-catalog-desc">@ProjectNameOf(task.ProjectId)</span>
+                }
+            </td>
+            <td>@WorkUi.FormatRange(task.StartDate, task.DueDate)</td>
+            <td><span class="@WorkUi.TaskBadgeClass(task.Status)">@L[WorkUi.TaskStatusKey(task.Status)]</span></td>
+            <td><span class="@WorkUi.PriorityBadgeClass(task.Priority)">@L[WorkUi.PriorityKey(task.Priority)]</span></td>
+            <td>@task.ProgressPercent%</td>
+            <td>
+                <div class="hcs-row-actions">
+                    <Button Color="Color.Primary" Outline="true" Size="Size.Small" Class="hcs-action-button" Clicked="() => ViewClicked.InvokeAsync(task)">@L["Work:View"]</Button>
+                    <Button Color="Color.Light" Outline="true" Size="Size.Small" Class="hcs-action-button" Clicked="() => CreateClicked.InvokeAsync(task)" Title="@L["Feature:AddTask"]">
+                        <Icon Name="@IconName.Add" />
+                    </Button>
+                </div>
+            </td>
+        </tr>
+    };
+
+    private void Toggle(Guid id)
+    {
+        if (!expanded.Add(id)) expanded.Remove(id);
+    }
+}

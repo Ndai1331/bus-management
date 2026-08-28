@@ -1,0 +1,238 @@
+@page "/workflow-instances"
+@page "/document-workflow-instances"
+@page "/document-workflow-instances/{InstanceId:guid}"
+@attribute [Authorize(Policy = "Documents.Workflow.View")]
+@inherits HCSComponentBase
+@inject DocumentClient Documents
+
+<PageTitle>@L["Menu:WorkflowInstances"] · HCS</PageTitle>
+<section class="hcs-catalog-page">
+    <header class="hcs-catalog-titlebar">
+        <div class="min-w-0"><h1>@L["Menu:WorkflowInstances"]</h1></div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-export" Clicked="LoadAsync" Disabled="@isLoading">@L["Catalog:Refresh"]</Button>
+            <AuthorizeView Policy="Documents.Workflow.Start">
+                <Authorized>
+                    <Button Color="Color.Primary" Class="hcs-catalog-create" Clicked="OpenStart"><Icon Name="@IconName.Add" /> @L["Work:SubmitWorkflow"]</Button>
+                </Authorized>
+            </AuthorizeView>
+        </div>
+    </header>
+    <Card Class="mb-2 hcs-catalog-filter-card"><CardBody>
+        <div class="hcs-catalog-filter-row">
+            <Addons Class="hcs-catalog-search">
+                <Addon AddonType="AddonType.Body"><TextInput @bind-Value="filter" Placeholder="@L["Catalog:SearchPlaceholder"]" /></Addon>
+                <Addon AddonType="AddonType.End"><Button Color="Color.Primary" Clicked="ApplyFilter"><i class="fa fa-search me-1"></i> @L["Catalog:SearchButton"]</Button></Addon>
+            </Addons>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-toggle" Clicked="() => showFilters = !showFilters">
+                <i class="fa fa-sliders me-2"></i>@L["Catalog:Filter"]
+                <i class="fa @(showFilters ? "fa-chevron-up" : "fa-chevron-down") ms-2"></i>
+            </Button>
+        </div>
+        @if (showFilters)
+        {
+            <div class="hcs-catalog-advanced-filter">
+                <Field>
+                    <FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                    <Select TValue="string" @bind-Value="statusFilter" @bind-Value:after="OnStatusChanged">
+                        <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                        @foreach (var status in Enum.GetValues<WorkflowInstanceStatus>())
+                        {
+                            <SelectItem Value="@status.ToString()">@status</SelectItem>
+                        }
+                    </Select>
+                </Field>
+                <Button Color="Color.Light" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetSearch">@L["Catalog:Reset"]</Button>
+            </div>
+        }
+    </CardBody></Card>
+    <Card Class="hcs-catalog-grid-card"><CardBody>
+        <DataGrid TItem="WorkflowInstanceDto" Data="@pageItems" TotalItems="@totalCount" ReadData="OnReadAsync"
+                  ShowPager="true" ShowPageSizes="true" PageSizes="@pageSizes" PageSize="@pageSize"
+                  Responsive="true" Striped="true" Hoverable="true" Class="hcs-catalog-grid">
+            <EmptyTemplate>
+                <div class="hcs-empty py-5"><i class="fa fa-inbox"></i><h2>@L["Catalog:EmptyTitle"]</h2><p>@L["Catalog:EmptyDescription"]</p></div>
+            </EmptyTemplate>
+            <LoadingTemplate>
+                <div class="hcs-loading py-5"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div>
+            </LoadingTemplate>
+            <DataGridColumns>
+                <DataGridColumn TItem="WorkflowInstanceDto" Caption="@L["Menu:Documents"].Value">
+                    <DisplayTemplate Context="cell"><a href="@($"/document-detail/{cell.Item.DocumentId}")"><strong>@DocumentName(cell.Item.DocumentId)</strong></a></DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="WorkflowInstanceDto" Caption="@L["Catalog:Status"].Value">
+                    <DisplayTemplate Context="cell"><span class="hcs-status-badge hcs-status-badge--planning">@cell.Item.Status</span></DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="WorkflowInstanceDto" Caption="@L["Feature:AddStep"].Value">
+                    <DisplayTemplate Context="cell">@cell.Item.CurrentStep / @cell.Item.Tasks.Count</DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="WorkflowInstanceDto" Caption="@L["Catalog:Actions"].Value">
+                    <DisplayTemplate Context="cell">
+                        <a class="btn btn-sm btn-outline-primary hcs-action-button" href="@($"/document-workflow-instances/{cell.Item.Id}")">@L["Work:View"]</a>
+                        <Button Size="Size.Small" Color="Color.Light" Outline="true" Class="hcs-action-button" Clicked="() => PreviewAsync(cell.Item)">@L["Work:PdfPreview"]</Button>
+                    </DisplayTemplate>
+                </DataGridColumn>
+            </DataGridColumns>
+        </DataGrid>
+    </CardBody></Card>
+
+    @if (selected is not null)
+    {
+        <Card Class="hcs-catalog-grid-card mt-4">
+            <CardHeader>@L["Work:View"] · @selected.Id</CardHeader>
+            <CardBody>
+                <p class="mb-3"><span class="hcs-status-badge hcs-status-badge--info">@selected.Status</span> · @L["Feature:AddStep"] @selected.CurrentStep</p>
+                @if (selected.Status == WorkflowInstanceStatus.Returned)
+                {
+                    <AuthorizeView Policy="Documents.Workflow.Start">
+                        <Authorized>
+                            <Button Color="Color.Primary" Class="mb-3" Clicked="ResubmitAsync">@L["Work:Resubmit"]</Button>
+                        </Authorized>
+                    </AuthorizeView>
+                }
+                @foreach (var task in selected.Tasks)
+                {
+                    <div class="border rounded p-3 mb-2">
+                        <strong>@task.StepCode</strong> · @task.Status
+                        @if (task.DueAt is { } due)
+                        {
+                            <small class="text-muted ms-2">@due.ToLocalTime().ToString("dd/MM/yyyy")</small>
+                        }
+                        @if (task.Status == ApprovalTaskStatus.Pending)
+                        {
+                            <textarea class="form-control mt-2" rows="2" @bind="decisionComment" placeholder="@L["Feature:DecisionComment"]"></textarea>
+                            <AuthorizeView Policy="Documents.Workflow.Decide">
+                                <Authorized>
+                                    <div class="mt-2 d-flex gap-2 flex-wrap">
+                                        <Button Color="Color.Success" Clicked="() => DecideAsync(task.Id, true)">@L["Feature:Approve"]</Button>
+                                        <Button Color="Color.Danger" Clicked="() => DecideAsync(task.Id, false)">@L["Feature:Reject"]</Button>
+                                        @if (StepAllowsReturn(task.StepCode))
+                                        {
+                                            <Button Color="Color.Warning" Clicked="() => ReturnAsync(task.Id)">@L["Work:Return"]</Button>
+                                        }
+                                    </div>
+                                </Authorized>
+                            </AuthorizeView>
+                        }
+                    </div>
+                }
+            </CardBody>
+        </Card>
+    }
+</section>
+
+<SubmitWorkflowModal @ref="submitModal" OnSubmitted="LoadAsync" />
+<DocumentPdfPreviewModal @ref="previewModal" />
+@code {
+    [Parameter] public Guid? InstanceId { get; set; }
+    private static readonly int[] pageSizes = [10, 20, 50, 100];
+    private readonly List<DocumentDto> documents = [];
+    private readonly List<WorkflowDefinitionDto> definitions = [];
+    private readonly List<WorkflowInstanceDto> instances = [];
+    private readonly List<WorkflowInstanceDto> pageItems = [];
+    private SubmitWorkflowModal? submitModal;
+    private DocumentPdfPreviewModal? previewModal;
+    private WorkflowInstanceDto? selected;
+    private string filter = "", search = "", statusFilter = "";
+    private string decisionComment = "";
+    private bool isLoading, showFilters, loaded;
+    private int totalCount, pageSize = 20, currentPage = 1;
+
+    private List<WorkflowInstanceDto> FilteredInstances
+    {
+        get
+        {
+            IEnumerable<WorkflowInstanceDto> query = instances;
+            if (!string.IsNullOrWhiteSpace(search))
+                query = query.Where(x => DocumentName(x.DocumentId).Contains(search, StringComparison.OrdinalIgnoreCase));
+            if (Enum.TryParse<WorkflowInstanceStatus>(statusFilter, out var status))
+                query = query.Where(x => x.Status == status);
+            return query.ToList();
+        }
+    }
+
+    private async Task OnReadAsync(DataGridReadDataEventArgs<WorkflowInstanceDto> args)
+    {
+        currentPage = Math.Max(args.Page, 1);
+        pageSize = Math.Clamp(args.PageSize, 10, 100);
+        if (!loaded) await LoadAsync();
+        else ApplyPage();
+    }
+
+    private void ApplyFilter() { search = SearchText.Normalize(filter); currentPage = 1; ApplyPage(); }
+    private void ResetSearch() { filter = search = statusFilter = ""; showFilters = false; currentPage = 1; ApplyPage(); }
+    private void OnStatusChanged() { currentPage = 1; ApplyPage(); }
+    private void ApplyPage()
+    {
+        var filtered = FilteredInstances;
+        totalCount = filtered.Count;
+        pageItems.Clear();
+        pageItems.AddRange(filtered.Skip((currentPage - 1) * pageSize).Take(pageSize));
+    }
+    private Task PreviewAsync(WorkflowInstanceDto instance)
+    {
+        var document = documents.FirstOrDefault(x => x.Id == instance.DocumentId);
+        return document is null
+            ? Task.CompletedTask
+            : previewModal?.ShowAsync(document.Id, document.Files, document.Title) ?? Task.CompletedTask;
+    }
+    private Task OpenStart() => submitModal?.ShowAsync() ?? Task.CompletedTask;
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            var page = await Documents.GetDocumentsAsync(new DocumentListQuery(null, null, false, 0, 100, 3));
+            documents.Clear(); documents.AddRange(page.Items);
+            definitions.Clear(); definitions.AddRange(await Documents.GetDefinitionsAsync());
+            instances.Clear(); instances.AddRange(await Documents.GetInstancesAsync());
+            selected = InstanceId is { } id
+                ? await Documents.GetInstanceAsync(id)
+                : null;
+            loaded = true;
+            ApplyPage();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex); }
+        finally { isLoading = false; }
+    }
+    private Task DecideAsync(Guid taskId, bool approve) =>
+        SubmitDecisionAsync(taskId, approve, returnStep: false, approve ? L["Feature:Approve"] : L["Feature:Reject"]);
+    private Task ReturnAsync(Guid taskId) =>
+        SubmitDecisionAsync(taskId, approve: false, returnStep: true, L["Work:Return"]);
+    private async Task SubmitDecisionAsync(Guid taskId, bool approve, bool returnStep, string successMessage)
+    {
+        try
+        {
+            var comment = string.IsNullOrWhiteSpace(decisionComment) ? null : decisionComment;
+            selected = await Documents.DecideAsync(taskId, new DecideApprovalTaskRequest(approve, comment, Guid.NewGuid().ToString("N"), Return: returnStep));
+            decisionComment = "";
+            await NotifySuccessAsync(successMessage);
+            await RefreshInstancesAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+    private async Task ResubmitAsync()
+    {
+        if (selected is null) return;
+        try
+        {
+            selected = await Documents.ResubmitWorkflowAsync(selected.Id, Guid.NewGuid().ToString("N"));
+            await NotifySuccessAsync(L["Work:Resubmit"]);
+            await RefreshInstancesAsync();
+        }
+        catch (Exception ex) { await NotifyErrorAsync(ex, BffErrorKind.Save); }
+    }
+    private async Task RefreshInstancesAsync()
+    {
+        instances.Clear();
+        instances.AddRange(await Documents.GetInstancesAsync());
+        ApplyPage();
+    }
+    private bool StepAllowsReturn(string stepCode)
+    {
+        if (selected is null) return false;
+        var definition = definitions.FirstOrDefault(x => x.Id == selected.DefinitionId);
+        return definition?.Steps.FirstOrDefault(x => string.Equals(x.Code, stepCode, StringComparison.OrdinalIgnoreCase))?.AllowReturn == true;
+    }
+    private string DocumentName(Guid id) => documents.FirstOrDefault(x => x.Id == id) is { } d ? $"{d.Number} · {d.Title}" : id.ToString("N")[..8];
+}

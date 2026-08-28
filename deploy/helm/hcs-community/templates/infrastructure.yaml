@@ -1,0 +1,129 @@
+{{- if .Values.infrastructure.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata: { name: postgres-init }
+data:
+  10-databases.sql: |
+    CREATE DATABASE hcs_identity;
+    CREATE DATABASE hcs_organization;
+    CREATE DATABASE hcs_document;
+    CREATE DATABASE hcs_work;
+    CREATE DATABASE hcs_collaboration;
+    CREATE DATABASE hcs_bus_management;
+    CREATE DATABASE hcs_keycloak;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: postgres-data }
+spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: {{ .Values.infrastructure.postgres.storage }} } } }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: document-data-protection }
+spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: 1Gi } } }
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: { name: postgres }
+spec:
+  serviceName: postgres
+  selector: { matchLabels: { app: postgres } }
+  template:
+    metadata: { labels: { app: postgres } }
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.infrastructure.postgres.image }}
+          env:
+            - { name: POSTGRES_USER, value: hcs }
+            - { name: POSTGRES_DB, value: postgres }
+            - { name: POSTGRES_PASSWORD, valueFrom: { secretKeyRef: { name: {{ .Values.runtimeSecretName }}, key: HCS_POSTGRES_PASSWORD } } }
+          ports: [{ name: postgres, containerPort: 5432 }]
+          volumeMounts:
+            - { name: data, mountPath: /var/lib/postgresql/data }
+            - { name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true }
+      volumes:
+        - { name: data, persistentVolumeClaim: { claimName: postgres-data } }
+        - { name: init, configMap: { name: postgres-init } }
+---
+apiVersion: v1
+kind: Service
+metadata: { name: postgres }
+spec: { selector: { app: postgres }, ports: [{ name: postgres, port: 5432, targetPort: postgres }] }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: redis-data }
+spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: {{ .Values.infrastructure.redis.storage }} } } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: redis }
+spec:
+  selector: { matchLabels: { app: redis } }
+  template:
+    metadata: { labels: { app: redis } }
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.infrastructure.redis.image }}
+          args: [redis-server, --appendonly, "yes"]
+          ports: [{ name: redis, containerPort: 6379 }]
+          volumeMounts: [{ name: data, mountPath: /data }]
+      volumes: [{ name: data, persistentVolumeClaim: { claimName: redis-data } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: redis }
+spec: { selector: { app: redis }, ports: [{ name: redis, port: 6379, targetPort: redis }] }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: rabbitmq }
+spec:
+  selector: { matchLabels: { app: rabbitmq } }
+  template:
+    metadata: { labels: { app: rabbitmq } }
+    spec:
+      containers:
+        - name: rabbitmq
+          image: {{ .Values.infrastructure.rabbitmq.image }}
+          env:
+            - { name: RABBITMQ_DEFAULT_USER, valueFrom: { secretKeyRef: { name: {{ .Values.runtimeSecretName }}, key: HCS_RABBITMQ_USER } } }
+            - { name: RABBITMQ_DEFAULT_PASS, valueFrom: { secretKeyRef: { name: {{ .Values.runtimeSecretName }}, key: HCS_RABBITMQ_PASSWORD } } }
+          ports: [{ name: amqp, containerPort: 5672 }, { name: management, containerPort: 15672 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: rabbitmq }
+spec: { selector: { app: rabbitmq }, ports: [{ name: amqp, port: 5672, targetPort: amqp }, { name: management, port: 15672, targetPort: management }] }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: { name: minio-data }
+spec: { accessModes: [ReadWriteOnce], resources: { requests: { storage: {{ .Values.infrastructure.minio.storage }} } } }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: minio }
+spec:
+  selector: { matchLabels: { app: minio } }
+  template:
+    metadata: { labels: { app: minio } }
+    spec:
+      containers:
+        - name: minio
+          image: {{ .Values.infrastructure.minio.image }}
+          args: [server, /data, --console-address, ":9001"]
+          env:
+            - { name: MINIO_ROOT_USER, valueFrom: { secretKeyRef: { name: {{ .Values.runtimeSecretName }}, key: HCS_MINIO_ROOT_USER } } }
+            - { name: MINIO_ROOT_PASSWORD, valueFrom: { secretKeyRef: { name: {{ .Values.runtimeSecretName }}, key: HCS_MINIO_ROOT_PASSWORD } } }
+          ports: [{ name: api, containerPort: 9000 }, { name: console, containerPort: 9001 }]
+          volumeMounts: [{ name: data, mountPath: /data }]
+      volumes: [{ name: data, persistentVolumeClaim: { claimName: minio-data } }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: minio }
+spec: { selector: { app: minio }, ports: [{ name: api, port: 9000, targetPort: api }, { name: console, port: 9001, targetPort: console }] }
+{{- end }}

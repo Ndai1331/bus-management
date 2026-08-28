@@ -1,0 +1,76 @@
+@implements IAsyncDisposable
+@using Microsoft.JSInterop
+
+<select id="@selectId" class="@CssClass form-select" aria-label="@AriaLabel"></select>
+
+@code {
+    private readonly string selectId = "hcs-provider-select2-" + Guid.NewGuid().ToString("n");
+    private DotNetObjectReference<ProviderSelect2>? dotNetRef;
+    private bool initialized;
+    private string lastSignature = "";
+
+    [Inject] private IJSRuntime Js { get; set; } = default!;
+
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<CatalogSelect2Item> Items { get; set; } = [];
+    [Parameter] public string? Placeholder { get; set; }
+    [Parameter] public string? AriaLabel { get; set; }
+    [Parameter] public string CssClass { get; set; } = "hcs-catalog-select2";
+    [Parameter] public Func<string, int, Task<CatalogSelect2SearchResponse>> Search { get; set; } = default!;
+
+    [JSInvokable]
+    public Task<CatalogSelect2SearchResponse> SearchAsync(string term, int page) =>
+        Search.Invoke(CatalogSelect2Text.NormalizeSearch(term), page <= 0 ? 1 : page);
+
+    [JSInvokable]
+    public Task OnSelectionChangeAsync(string[]? rawIds)
+    {
+        var value = rawIds?.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x))?.Trim();
+        return ValueChanged.InvokeAsync(string.IsNullOrWhiteSpace(value) ? null : value);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            dotNetRef = DotNetObjectReference.Create(this);
+            lastSignature = CurrentSignature();
+            await Js.InvokeVoidAsync("hcsCatalogSelect2.init", selectId, dotNetRef, new
+            {
+                placeholder = Placeholder ?? string.Empty,
+                minimumInputLength = 0,
+                multiple = false,
+                userTemplate = false
+            }, InitialItems());
+            initialized = true;
+            return;
+        }
+
+        if (!initialized) return;
+        var signature = CurrentSignature();
+        if (signature == lastSignature) return;
+        lastSignature = signature;
+        await Js.InvokeVoidAsync("hcsCatalogSelect2.setSelection", selectId, InitialItems());
+    }
+
+    private string CurrentSignature() => Value?.Trim() ?? string.Empty;
+
+    private List<CatalogSelect2Item> InitialItems()
+    {
+        if (string.IsNullOrWhiteSpace(Value)) return [];
+        var selected = Items.FirstOrDefault(x => string.Equals(x.Id, Value, StringComparison.OrdinalIgnoreCase));
+        return selected is not null ? [selected] : [new CatalogSelect2Item(Value, Value)];
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (initialized)
+        {
+            try { await Js.InvokeVoidAsync("hcsCatalogSelect2.destroy", selectId); }
+            catch (JSDisconnectedException) { }
+            catch (TaskCanceledException) { }
+        }
+        dotNetRef?.Dispose();
+    }
+}

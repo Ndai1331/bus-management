@@ -1,0 +1,259 @@
+@page "/notifications"
+@attribute [Authorize(Policy = CollaborationPermissions.Notifications)]
+@inherits HCSComponentBase
+@inject CollaborationClient Chat
+@inject NavigationManager Navigation
+@using HCS.Blazor.Client.Collaboration
+@using HCS.CollaborationService.Contracts
+
+<PageTitle>@L["Notifications:Title"] · HCS</PageTitle>
+<section class="hcs-catalog-page" aria-labelledby="notifications-title">
+    <header class="hcs-catalog-titlebar">
+        <div class="min-w-0">
+            <h1 id="notifications-title">@L["Notifications:Title"]</h1>
+        </div>
+        <div class="hcs-catalog-page__actions">
+            <Button Color="Color.Primary" Outline="true" Clicked="MarkAllReadAsync" Disabled="@(!allItems.Any(x => !x.IsRead) || isLoading)">
+                @L["Notifications:MarkAllAsRead"]
+            </Button>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-export" Clicked="LoadAsync" Disabled="@isLoading">
+                @L["Catalog:Refresh"]
+            </Button>
+        </div>
+    </header>
+    <Card Class="mb-2 hcs-catalog-filter-card"><CardBody>
+        <div class="hcs-catalog-filter-row">
+            <Addons Class="hcs-catalog-search">
+                <Addon AddonType="AddonType.Body">
+                    <TextInput @bind-Value="filter" Placeholder="@L["Catalog:SearchPlaceholder"]" />
+                </Addon>
+                <Addon AddonType="AddonType.End">
+                    <Button Color="Color.Primary" Clicked="SearchAsync" Disabled="@isLoading">
+                        <i class="fa fa-search me-1"></i> @L["Catalog:SearchButton"]
+                    </Button>
+                </Addon>
+            </Addons>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-toggle" Clicked="() => showFilters = !showFilters">
+                <i class="fa fa-sliders me-2"></i>@L["Catalog:Filter"]
+                <i class="fa @(showFilters ? "fa-chevron-up" : "fa-chevron-down") ms-2"></i>
+            </Button>
+        </div>
+        @if (showFilters)
+        {
+            <div class="hcs-catalog-advanced-filter">
+                <Field>
+                    <FieldLabel>@L["Catalog:Status"]</FieldLabel>
+                    <Select TValue="string" @bind-Value="statusFilter" @bind-Value:after="OnStatusChanged">
+                        <SelectItem Value="@string.Empty">@L["Catalog:AllStatuses"]</SelectItem>
+                        <SelectItem Value="@("unread")">@L["Work:Unread"]</SelectItem>
+                        <SelectItem Value="@("read")">@L["Notifications:Read"]</SelectItem>
+                    </Select>
+                </Field>
+                <Button Color="Color.Light" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetSearchAsync">@L["Catalog:Reset"]</Button>
+            </div>
+        }
+    </CardBody></Card>
+    <Card Class="hcs-catalog-grid-card"><CardBody>
+        <DataGrid TItem="NotificationDto" Data="@pageItems" TotalItems="@totalCount" ReadData="OnReadAsync"
+                  ShowPager="true" ShowPageSizes="true" PageSizes="@pageSizes" PageSize="@pageSize"
+                  Responsive="true" Striped="true" Hoverable="true" Class="hcs-catalog-grid">
+            <EmptyTemplate>
+                <div class="hcs-empty py-5">
+                    <i class="fa fa-bell" aria-hidden="true"></i>
+                    <h2>@L["Catalog:EmptyTitle"]</h2>
+                    <p>@L["Work:NoRecentNotifications"]</p>
+                </div>
+            </EmptyTemplate>
+            <LoadingTemplate>
+                <div class="hcs-loading py-5" role="status">
+                    <i class="fa fa-spinner fa-spin" aria-hidden="true"></i>
+                    <span>@L["Catalog:Loading"]</span>
+                </div>
+            </LoadingTemplate>
+            <DataGridColumns>
+                <DataGridColumn TItem="NotificationDto" Caption="@L["Notifications:TitleColumn"].Value">
+                    <DisplayTemplate Context="cell">
+                        <strong class="@(cell.Item.IsRead ? null : "fw-semibold")">@NotificationText.Localize(L, cell.Item.Title)</strong>
+                    </DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="NotificationDto" Caption="@L["Notifications:Body"].Value">
+                    <DisplayTemplate Context="cell">
+                        <span class="text-muted">@NotificationText.Localize(L, cell.Item.Body)</span>
+                    </DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="NotificationDto" Caption="@L["Catalog:Status"].Value">
+                    <DisplayTemplate Context="cell">
+                        @if (cell.Item.IsRead)
+                        {
+                            <span class="hcs-status-badge hcs-status-badge--success">@L["Notifications:Read"]</span>
+                        }
+                        else
+                        {
+                            <span class="hcs-status-badge hcs-status-badge--warning">@L["Work:Unread"]</span>
+                        }
+                    </DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="NotificationDto" Caption="@L["Notifications:CreatedAt"].Value">
+                    <DisplayTemplate Context="cell">
+                        @NotificationText.FormatLocal(cell.Item.CreatedAt, "dd/MM/yyyy HH:mm")
+                    </DisplayTemplate>
+                </DataGridColumn>
+                <DataGridColumn TItem="NotificationDto" Caption="@L["Catalog:Actions"].Value">
+                    <DisplayTemplate Context="cell">
+                        <div class="hcs-row-actions">
+                            <Button Size="Size.Small" Color="Color.Primary" Outline="true"
+                                    Class="hcs-action-button hcs-action-button--preview"
+                                    Clicked="() => OpenAsync(cell.Item)"
+                                    title="@L["Work:ViewDetail"]">
+                                <i class="fa fa-eye"></i>
+                            </Button>
+                            @if (!cell.Item.IsRead)
+                            {
+                                <Button Size="Size.Small" Color="Color.Primary" Outline="true"
+                                        Class="hcs-action-button"
+                                        Clicked="() => MarkReadAsync(cell.Item)"
+                                        title="@L["Notifications:MarkAsRead"]">
+                                    <i class="fa fa-check"></i>
+                                </Button>
+                            }
+                        </div>
+                    </DisplayTemplate>
+                </DataGridColumn>
+            </DataGridColumns>
+        </DataGrid>
+    </CardBody></Card>
+</section>
+
+@code {
+    private static readonly int[] pageSizes = [10, 20, 50, 100];
+    private readonly List<NotificationDto> allItems = [];
+    private readonly List<NotificationDto> pageItems = [];
+    private string filter = "", statusFilter = "";
+    private bool isLoading, showFilters, loaded;
+    private int totalCount, pageSize = 20, currentPage = 1;
+
+    private async Task OnReadAsync(DataGridReadDataEventArgs<NotificationDto> args)
+    {
+        currentPage = Math.Max(args.Page, 1);
+        pageSize = Math.Clamp(args.PageSize, 10, 100);
+        if (!loaded) await LoadAsync();
+        else ApplyPage();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            allItems.Clear();
+            const int batch = 100;
+            for (var skip = 0; ; skip += batch)
+            {
+                var items = await Chat.GetNotificationsAsync(unreadOnly: false, skip: skip, take: batch);
+                if (items.Count == 0) break;
+                allItems.AddRange(items);
+                if (items.Count < batch) break;
+            }
+
+            loaded = true;
+            ApplyPage();
+        }
+        catch (Exception ex)
+        {
+            allItems.Clear();
+            pageItems.Clear();
+            totalCount = 0;
+            await NotifyErrorAsync(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private void ApplyPage()
+    {
+        var filtered = allItems
+            .Where(Matches)
+            .OrderByDescending(x => x.CreatedAt)
+            .ThenByDescending(x => x.Id)
+            .ToList();
+        totalCount = filtered.Count;
+        pageItems.Clear();
+        pageItems.AddRange(filtered.Skip((currentPage - 1) * pageSize).Take(pageSize));
+    }
+
+    private bool Matches(NotificationDto item)
+    {
+        if (statusFilter == "unread" && item.IsRead) return false;
+        if (statusFilter == "read" && !item.IsRead) return false;
+        if (string.IsNullOrWhiteSpace(filter)) return true;
+
+        var term = SearchText.Normalize(filter);
+        var title = NotificationText.Localize(L, item.Title);
+        var body = NotificationText.Localize(L, item.Body);
+        return title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || body.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || item.Title.Contains(term, StringComparison.OrdinalIgnoreCase)
+            || item.Body.Contains(term, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private Task SearchAsync()
+    {
+        currentPage = 1;
+        ApplyPage();
+        return Task.CompletedTask;
+    }
+
+    private Task ResetSearchAsync()
+    {
+        filter = statusFilter = "";
+        showFilters = false;
+        currentPage = 1;
+        ApplyPage();
+        return Task.CompletedTask;
+    }
+
+    private void OnStatusChanged()
+    {
+        currentPage = 1;
+        ApplyPage();
+    }
+
+    private async Task OpenAsync(NotificationDto item)
+    {
+        if (!item.IsRead)
+        {
+            try { await Chat.MarkNotificationReadAsync(item.Id); } catch { /* navigate anyway */ }
+        }
+
+        Navigation.NavigateTo(NotificationText.ResolveLink(item));
+    }
+
+    private async Task MarkReadAsync(NotificationDto item)
+    {
+        try
+        {
+            await Chat.MarkNotificationReadAsync(item.Id);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex);
+        }
+    }
+
+    private async Task MarkAllReadAsync()
+    {
+        try
+        {
+            await Chat.MarkAllNotificationsReadAsync();
+            await NotifySuccessAsync(L["Notifications:MarkedAllAsRead"]);
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex);
+        }
+    }
+}

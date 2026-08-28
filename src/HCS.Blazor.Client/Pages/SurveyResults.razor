@@ -1,0 +1,248 @@
+@page "/survey-results"
+@attribute [Authorize(Policy = "WorkManagement.Surveys")]
+@inherits HCSComponentBase
+@inject WorkManagementClient Work
+
+<PageTitle>@L["Feature:SurveyResults"] · HCS</PageTitle>
+
+<section class="hcs-catalog-page">
+    <header class="hcs-catalog-titlebar">
+        <div class="min-w-0"><h1>@L["Feature:SurveyResults"]</h1><p class="text-muted mb-0">@L["SurveyResults:Subtitle"]</p></div>
+    </header>
+    <Card Class="mb-3 hcs-catalog-filter-card"><CardBody>
+        <div class="hcs-catalog-filter-row hcs-survey-results__filter-row">
+            <div class="hcs-survey-results__location-filter">
+                <span id="survey-location-label" class="form-label">@L["SurveyLocation"]</span>
+                <ProviderSelect2 Value="selectedLocationId"
+                                 ValueChanged="OnLocationChanged"
+                                 Items="LocationItems"
+                                 Placeholder="@L["All"]"
+                                 AriaLabel="@L["SurveyLocation"]"
+                                 Search="SearchLocationsAsync" />
+            </div>
+            <Button Color="Color.Primary" Outline="true" Class="hcs-catalog-filter-reset" Clicked="ResetAsync">@L["Catalog:Reset"]</Button>
+        </div>
+    </CardBody></Card>
+    <Card Class="hcs-catalog-grid-card"><CardBody>
+        @if (isLoading)
+        {
+            <div class="hcs-loading py-5" role="status"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div>
+        }
+        else
+        {
+            <div class="hcs-survey-tabs" role="tablist">
+                <button type="button" class="@(activeTab == "chart" ? "is-active" : null)" @onclick='() => activeTab = "chart"'>@L["Feature:ChartStatistics"]</button>
+                <button type="button" class="@(activeTab == "detail" ? "is-active" : null)" @onclick='() => activeTab = "detail"'>@L["Feature:DetailData"]</button>
+            </div>
+            @if (activeTab == "chart")
+            {
+                <div class="hcs-survey-results__headline"><span>@L["RatingDistributionTotal"]</span><strong>@(statistics?.TotalReviews ?? 0)</strong></div>
+                <div class="hcs-survey-results__section">
+                    <h2>@L["RatingDistribution"]</h2>
+                    @foreach (var star in Enumerable.Range(0, WorkUi.MaxStars + 1).Reverse())
+                    {
+                        var count = statistics?.ScoreDistribution.GetValueOrDefault(star) ?? 0;
+                        var total = statistics?.TotalReviews ?? 0;
+                        var width = total == 0 ? 0 : (double)count * 100 / total;
+                        <div class="hcs-survey-bar"><span class="hcs-survey-bar__label">@($"{star}★")</span><div class="hcs-survey-bar__track"><div class="hcs-survey-bar__fill" style="@($"width:{width:0}%")"></div></div><span class="hcs-survey-bar__value">@count</span></div>
+                    }
+                </div>
+                <div class="hcs-survey-results__section">
+                    <h2>@L["CriteriaAverageRating"]</h2>
+                    @if (statistics?.CriteriaAverageScores.Count > 0)
+                    {
+                        @foreach (var item in statistics.CriteriaAverageScores.OrderBy(x => x.Key))
+                        {
+                            var averagePercent = item.Value;
+                            <div class="hcs-survey-bar"><span class="hcs-survey-bar__label">@item.Key</span><div class="hcs-survey-bar__track"><div class="hcs-survey-bar__fill" style="@($"width:{averagePercent:0}%")"></div></div><span class="hcs-survey-bar__value">@($"{averagePercent / 20m:0.#}/5")</span></div>
+                        }
+                    }
+                    else
+                    {
+                        <div class="hcs-empty py-4"><i class="fa fa-inbox"></i><p>@L["NoSurveyData"]</p></div>
+                    }
+                </div>
+            }
+            else if (summaries.Items.Count == 0)
+            {
+                <div class="hcs-empty py-5"><i class="fa fa-inbox"></i><h2>@L["Catalog:EmptyTitle"]</h2><p>@L["NoSurveyData"]</p></div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0 hcs-catalog-grid">
+                        <thead><tr><th>@L["Feature:StarRating"]</th><th>@L["Menu:SurveyCriterias"]</th><th>@L["FullName"]</th><th>@L["PhoneNumber"]</th><th>@L["SurveyTime"]</th><th></th></tr></thead>
+                        <tbody>
+                            @foreach (var item in summaries.Items)
+                            {
+                                <tr><td><span class="hcs-status-badge hcs-status-badge--info">@($"{WorkUi.ScoreToStars(item.Score)}★")</span></td><td>@item.SurveyCriteriaName</td><td>@(item.FullName ?? "—")</td><td>@(item.PhoneNumber ?? "—")</td><td>@item.SurveyTime.ToString("dd/MM/yyyy HH:mm")</td><td><button type="button" class="btn btn-sm btn-outline-primary" @onclick="() => OpenDetailAsync(item)"><i class="fa fa-eye me-1"></i>@L["ViewDetail"]</button></td></tr>
+                            }
+                        </tbody>
+                    </table>
+                </div>
+                <div class="hcs-survey-results__pager"><span>@($"{summaries.TotalCount} {L["SurveyResults:Records"]}")</span><div><button type="button" class="btn btn-sm btn-light me-2" @onclick="PreviousPageAsync" disabled="@(page == 0)">@L["Previous"]</button><button type="button" class="btn btn-sm btn-light" @onclick="NextPageAsync" disabled="@(!HasNextPage)">@L["Next"]</button></div></div>
+            }
+        }
+    </CardBody></Card>
+</section>
+
+@if (showDetail)
+{
+    <div class="hcs-public-survey__backdrop" role="presentation">
+        <div class="hcs-public-survey__dialog" role="dialog" aria-modal="true" aria-labelledby="survey-detail-title">
+            <div class="hcs-public-survey__dialog-header">
+                <h2 id="survey-detail-title">@L["SurveyDetails"]</h2>
+                <button type="button" class="btn-close" aria-label="@L["Close"]" @onclick="CloseDetail"></button>
+            </div>
+            <div class="hcs-public-survey__dialog-body">
+                @if (selectedSummary is not null)
+                {
+                    <dl class="row mb-4">
+                        <dt class="col-sm-4">@L["FullName"]</dt><dd class="col-sm-8">@(selectedSummary.FullName ?? "—")</dd>
+                        <dt class="col-sm-4">@L["PhoneNumber"]</dt><dd class="col-sm-8">@(selectedSummary.PhoneNumber ?? "—")</dd>
+                        <dt class="col-sm-4">@L["PatientCode"]</dt><dd class="col-sm-8">@(selectedSummary.PatientCode ?? "—")</dd>
+                        <dt class="col-sm-4">@L["Note"]</dt><dd class="col-sm-8">@(selectedSummary.Note ?? "—")</dd>
+                        <dt class="col-sm-4">@L["SurveyTime"]</dt><dd class="col-sm-8">@selectedSummary.SurveyTime.ToString("dd/MM/yyyy HH:mm")</dd>
+                    </dl>
+                }
+                @if (isDetailLoading)
+                {
+                    <div class="hcs-loading py-4"><i class="fa fa-spinner fa-spin"></i><span>@L["Catalog:Loading"]</span></div>
+                }
+                else if (details.Count == 0)
+                {
+                    <div class="hcs-empty py-4"><p>@L["NoSurveyData"]</p></div>
+                }
+                else
+                {
+                    <div class="table-responsive"><table class="table align-middle">
+                        <thead><tr><th>@L["Menu:SurveyCriterias"]</th><th>@L["Feature:Score"]</th><th>@L["Feature:Comment"]</th></tr></thead>
+                        <tbody>
+                            @foreach (var item in details)
+                            {
+                                <tr><td>@item.SurveyCriteriaName</td><td>@($"{WorkUi.ScoreToStars(item.Score)}★")</td><td>@(item.Comment ?? "—")</td></tr>
+                            }
+                        </tbody>
+                    </table></div>
+                }
+            </div>
+            <div class="hcs-public-survey__dialog-footer"><button type="button" class="btn btn-secondary" @onclick="CloseDetail">@L["Close"]</button></div>
+        </div>
+    </div>
+}
+
+@code {
+    private const int PageSize = 20;
+    private readonly List<SurveyLocationDto> locations = [];
+    private SurveyResultStatisticsDto? statistics;
+    private PagedWorkResponse<SurveyResultSessionSummaryDto> summaries = new(0, []);
+    private readonly List<SurveyResultSessionDetailDto> details = [];
+    private SurveyResultSessionSummaryDto? selectedSummary;
+    private string selectedLocationId = string.Empty;
+    private string activeTab = "chart";
+    private int page;
+    private bool isLoading = true;
+    private bool isDetailLoading;
+    private bool showDetail;
+
+    private Guid? SelectedLocation => Guid.TryParse(selectedLocationId, out var id) ? id : null;
+    private bool HasNextPage => (page + 1) * PageSize < summaries.TotalCount;
+    private IReadOnlyList<CatalogSelect2Item> LocationItems => locations
+        .Select(item => new CatalogSelect2Item(item.Id.ToString("D"), item.Name, item.Code))
+        .ToList();
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            locations.AddRange(await Work.GetLocationsAsync());
+            await LoadAsync();
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex);
+            isLoading = false;
+        }
+    }
+
+    private async Task OnLocationChanged(string? value)
+    {
+        selectedLocationId = value ?? string.Empty;
+        page = 0;
+        await LoadAsync();
+    }
+
+    private Task<CatalogSelect2SearchResponse> SearchLocationsAsync(string term, int page)
+    {
+        var query = CatalogSelect2Text.NormalizeSearch(term);
+        var results = locations
+            .Where(item => string.IsNullOrEmpty(query)
+                || CatalogSelect2Text.NormalizeSearch(item.Name).Contains(query, StringComparison.Ordinal)
+                || CatalogSelect2Text.NormalizeSearch(item.Code).Contains(query, StringComparison.Ordinal))
+            .Select(item => new CatalogSelect2Item(item.Id.ToString("D"), item.Name, item.Code))
+            .ToList();
+
+        return Task.FromResult(new CatalogSelect2SearchResponse(results, false));
+    }
+
+    private async Task ResetAsync()
+    {
+        selectedLocationId = string.Empty;
+        page = 0;
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true;
+        try
+        {
+            statistics = await Work.GetSurveyStatisticsAsync(SelectedLocation);
+            summaries = await Work.GetSurveyResultSummariesAsync(SelectedLocation, page * PageSize, PageSize);
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex);
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task PreviousPageAsync()
+    {
+        if (page == 0) return;
+        page--;
+        await LoadAsync();
+    }
+
+    private async Task NextPageAsync()
+    {
+        if (!HasNextPage) return;
+        page++;
+        await LoadAsync();
+    }
+
+    private async Task OpenDetailAsync(SurveyResultSessionSummaryDto item)
+    {
+        selectedSummary = item;
+        details.Clear();
+        showDetail = true;
+        isDetailLoading = true;
+        try
+        {
+            details.AddRange(await Work.GetSurveyResultDetailsAsync(item.SurveySessionId, SelectedLocation));
+        }
+        catch (Exception ex)
+        {
+            await NotifyErrorAsync(ex);
+        }
+        finally
+        {
+            isDetailLoading = false;
+        }
+    }
+
+    private void CloseDetail() => showDetail = false;
+}

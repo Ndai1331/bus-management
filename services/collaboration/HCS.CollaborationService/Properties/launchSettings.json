@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "HCS.CollaborationService": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "https://localhost:44415;http://localhost:44416",
+      "environmentVariables": { "ASPNETCORE_ENVIRONMENT": "Development" }
+    }
+  }
+}

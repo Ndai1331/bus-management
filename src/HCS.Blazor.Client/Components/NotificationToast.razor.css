@@ -1,0 +1,252 @@
+.hcs-notification-toast-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    max-width: min(22rem, calc(100vw - 1.5rem));
+    position: fixed;
+    right: 1rem;
+    top: 4.5rem;
+    width: 22rem;
+    z-index: 1080;
+}
+
+.hcs-notification-toast {
+    background: #fff;
+    border: 1px solid #e6edf2;
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(18, 38, 63, 0.14);
+    color: #1e3348;
+    overflow: hidden;
+    width: 100%;
+}
+
+.hcs-notification-toast__header {
+    align-items: center;
+    background: #f4f7fb;
+    border-bottom: 1px solid #e6edf2;
+    color: #1e3348;
+    display: flex;
+    font-size: 0.9rem;
+    font-weight: 700;
+    gap: 0.5rem;
+    padding: 0.7rem 0.85rem;
+}
+
+.hcs-notification-toast__header i {
+    color: #3d5cff;
+}
+
+.hcs-notification-toast__header strong {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.hcs-notification-toast__header small {
+    color: #64748b;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.hcs-notification-toast__close {
+    align-items: center;
+    background: transparent;
+    border: 0;
+    border-radius: 0.4rem;
+    color: #64748b;
+    cursor: pointer;
+    display: inline-flex;
+    flex: 0 0 auto;
+    height: 1.75rem;
+    justify-content: center;
+    width: 1.75rem;
+}
+
+.hcs-notification-toast__close:hover,
+.hcs-notification-toast__close:focus-visible {
+    background: #e8eef5;
+    color: #1e3348;
+}
+
+.hcs-notification-toast__body {
+    color: #334155;
+    font-size: 0.85rem;
+    padding: 0.85rem 0.95rem 1rem;
+}
+
+.hcs-notification-toast__body p {
+    margin: 0 0 0.75rem;
+    overflow-wrap: anywhere;
+}
+
+.hcs-notification-panel {
+    background: #fff;
+    border: 1px solid #eef1f7;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(18, 38, 63, 0.12);
+    position: fixed;
+    right: 4.5rem;
+    top: 4.25rem;
+    width: 20rem;
+    z-index: 1075;
+}
+
+.hcs-notification-panel__header {
+    align-items: center;
+    border-bottom: 1px solid #eef1f7;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+}
+
+.hcs-notification-panel__header-actions {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 0.5rem;
+}
+
+.hcs-notification-panel__view-all {
+    color: #3d5cff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.hcs-notification-panel__view-all:hover,
+.hcs-notification-panel__view-all:focus-visible {
+    color: #2b45d6;
+    text-decoration: underline;
+}
+
+.hcs-notification-panel__empty {
+    color: #64748b;
+    margin: 0;
+    padding: 1.25rem 1rem;
+}
+
+.hcs-notification-panel__list {
+    list-style: none;
+    margin: 0;
+    max-height: 20rem;
+    overflow: auto;
+    padding: 0;
+}
+
+.hcs-notification-panel__list a {
+    align-items: start;
+    border-bottom: 1px solid #f1f5f9;
+    color: inherit;
+    column-gap: 0.55rem;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    padding: 0.75rem 1rem;
+    text-decoration: none;
+    transition: background-color var(--hcs-motion-duration-quick) var(--hcs-motion-ease-standard);
+}
+
+.hcs-notification-panel__list a.is-unread {
+    background: #fff8fb;
+}
+
+.hcs-notification-panel__list a:hover,
+.hcs-notification-panel__list a:focus-visible {
+    background: #f8fafc;
+}
+
+.hcs-notification-panel__list a.is-unread:hover,
+.hcs-notification-panel__list a.is-unread:focus-visible {
+    background: #fff1f6;
+}
+
+.hcs-notification-panel__dot {
+    background: var(--hcs-color-primary);
+    border-radius: 50%;
+    height: 7px;
+    margin-top: 0.35rem;
+    width: 7px;
+}
+
+.hcs-notification-panel__dot.is-empty {
+    background: transparent;
+}
+
+.hcs-notification-panel__content {
+    min-width: 0;
+}
+
+.hcs-notification-panel__title,
+.hcs-notification-panel__detail {
+    display: block;
+    overflow-wrap: anywhere;
+}
+
+.hcs-notification-panel__title {
+    color: var(--hcs-color-ink);
+    font-size: 0.95rem;
+    font-weight: 650;
+    line-height: 1.35;
+}
+
+.hcs-notification-panel__list a.is-unread .hcs-notification-panel__title {
+    color: var(--hcs-color-primary);
+}
+
+.hcs-notification-panel__detail {
+    color: #718694;
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.hcs-notification-panel__footer {
+    border-top: 1px solid #eef1f7;
+    padding: 0.5rem 0.75rem;
+}
+
+.hcs-notification-panel__mark-all {
+    background: transparent;
+    border: 0;
+    border-radius: 0.5rem;
+    color: #3d5cff;
+    cursor: pointer;
+    display: block;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.55rem 0.5rem;
+    text-align: center;
+    width: 100%;
+}
+
+.hcs-notification-panel__mark-all:hover,
+.hcs-notification-panel__mark-all:focus-visible {
+    background: #f4f7fb;
+    color: #2b45d6;
+}
+
+.hcs-notification-toast, .hcs-notification-panel { border-color: var(--hcs-color-border, #d8e1e8); border-radius: var(--hcs-radius-md, 8px); box-shadow: var(--hcs-shadow-md, 0 10px 24px rgba(19, 47, 70, .1)); }
+.hcs-notification-toast__header { background: var(--hcs-color-surface-muted, #f1f5f8); border-color: var(--hcs-color-border, #d8e1e8); color: var(--hcs-color-ink, #1d2b3a); }
+.hcs-notification-toast__header i, .hcs-notification-panel__view-all, .hcs-notification-panel__mark-all { color: var(--hcs-color-primary, #0f6d78); }
+.hcs-notification-toast__body, .hcs-notification-panel__detail { color: var(--hcs-color-muted, #64748b); }
+.hcs-notification-panel__header, .hcs-notification-panel__footer { border-color: var(--hcs-color-border, #d8e1e8); }
+.hcs-notification-panel__list a:hover, .hcs-notification-panel__list a:focus-visible, .hcs-notification-panel__mark-all:hover, .hcs-notification-panel__mark-all:focus-visible { background: var(--hcs-color-primary-soft, #e7f4f4); }
+
+.hcs-notification-toast {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-standard, 200ms) var(--hcs-motion-ease-enter, cubic-bezier(.2, 0, 0, 1)) both;
+    transform-origin: top right;
+}
+
+.hcs-notification-panel {
+    animation: hcs-motion-surface-enter var(--hcs-motion-duration-quick, 140ms) var(--hcs-motion-ease-enter, cubic-bezier(.2, 0, 0, 1)) both;
+    transform-origin: top right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .hcs-notification-toast,
+    .hcs-notification-panel {
+        animation: none;
+    }
+}

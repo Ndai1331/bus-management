@@ -1,0 +1,113 @@
+{
+  "template": "app",
+  "imports": {
+    "Volo.Abp.LeptonXLiteTheme": {
+      "version": "5.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.Account": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.OpenIddict": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.Identity": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.SettingManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.PermissionManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.FeatureManagement": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    },
+    "Volo.Abp.BlobStoring.Database": {
+      "version": "10.6.0",
+      "isInstalled": true,
+      "creationTime": "08/03/2026 09:39:51 +00:00"
+    }
+  },
+  "folders": {
+    "items": {
+      "src": {},
+      "test": {}
+    }
+  },
+  "packages": {
+    "HCS.Application": {
+      "path": "src/HCS.Application/HCS.Application.abppkg",
+      "folder": "src"
+    },
+    "HCS.Application.Tests": {
+      "path": "test/HCS.Application.Tests/HCS.Application.Tests.abppkg",
+      "folder": "test"
+    },
+    "HCS.Domain.Shared": {
+      "path": "src/HCS.Domain.Shared/HCS.Domain.Shared.abppkg",
+      "folder": "src"
+    },
+    "HCS.Application.Contracts": {
+      "path": "src/HCS.Application.Contracts/HCS.Application.Contracts.abppkg",
+      "folder": "src"
+    },
+    "HCS.HttpApi": {
+      "path": "src/HCS.HttpApi/HCS.HttpApi.abppkg",
+      "folder": "src"
+    },
+    "HCS.HttpApi.Client": {
+      "path": "src/HCS.HttpApi.Client/HCS.HttpApi.Client.abppkg",
+      "folder": "src"
+    },
+    "HCS.EntityFrameworkCore.Tests": {
+      "path": "test/HCS.EntityFrameworkCore.Tests/HCS.EntityFrameworkCore.Tests.abppkg",
+      "folder": "test"
+    },
+    "HCS.EntityFrameworkCore": {
+      "path": "src/HCS.EntityFrameworkCore/HCS.EntityFrameworkCore.abppkg",
+      "folder": "src"
+    },
+    "HCS.TestBase": {
+      "path": "test/HCS.TestBase/HCS.TestBase.abppkg",
+      "folder": "test"
+    },
+    "HCS.Domain.Tests": {
+      "path": "test/HCS.Domain.Tests/HCS.Domain.Tests.abppkg",
+      "folder": "test"
+    },
+    "HCS.HttpApi.Client.ConsoleTestApp": {
+      "path": "test/HCS.HttpApi.Client.ConsoleTestApp/HCS.HttpApi.Client.ConsoleTestApp.abppkg",
+      "folder": "test"
+    },
+    "HCS.DbMigrator": {
+      "path": "src/HCS.DbMigrator/HCS.DbMigrator.abppkg",
+      "folder": "src"
+    },
+    "HCS.Blazor": {
+      "path": "src/HCS.Blazor/HCS.Blazor.abppkg",
+      "folder": "src"
+    },
+    "HCS.Blazor.Client": {
+      "path": "src/HCS.Blazor.Client/HCS.Blazor.Client.abppkg",
+      "folder": "src"
+    },
+    "HCS.Domain": {
+      "path": "src/HCS.Domain/HCS.Domain.abppkg",
+      "folder": "src"
+    }
+  }
+}

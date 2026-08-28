@@ -1,0 +1,216 @@
+@page
+@using System.Globalization
+@using System.Linq
+@using HCS.AuthServer
+@using HCS.AuthServer.Pages.Account
+@using HCS.Localization
+@using Localization.Resources.AbpUi
+@using Microsoft.AspNetCore.Mvc.Localization
+@using Volo.Abp.Account.Localization
+@using Volo.Abp.AspNetCore.Mvc.UI.Theming
+@using Volo.Abp.Identity
+@using Volo.Abp.Localization
+@model LoginModel
+@inject IHtmlLocalizer<AccountResource> L
+@inject IHtmlLocalizer<AbpUiResource> UiL
+@inject IHtmlLocalizer<HCSResource> HcsL
+@inject IThemeManager ThemeManager
+@inject ILanguageProvider LanguageProvider
+
+@{
+    ViewBag.Title = HcsL["Auth:LoginTitle"].Value;
+    Layout = ThemeManager.CurrentTheme.GetAccountLayout();
+    var languages = (await LanguageProvider.GetLanguagesAsync()).ToList();
+    var currentLanguage = languages.FirstOrDefault(x => x.CultureName == CultureInfo.CurrentUICulture.Name)
+        ?? languages.FirstOrDefault();
+    // Preserve OpenIddict/authorize ReturnUrl across culture switches.
+    var languageReturnUrl = string.IsNullOrWhiteSpace(Model.ReturnUrl)
+        ? $"{Request.Path}{Request.QueryString}"
+        : $"/Account/Login?ReturnUrl={Uri.EscapeDataString(Model.ReturnUrl)}" +
+          (string.IsNullOrWhiteSpace(Model.ReturnUrlHash)
+              ? string.Empty
+              : $"&ReturnUrlHash={Uri.EscapeDataString(Model.ReturnUrlHash)}");
+    string LanguageShortName(string cultureName) =>
+        cultureName.StartsWith("vi", StringComparison.OrdinalIgnoreCase)
+            ? HcsL["Auth:LanguageVietnameseShort"].Value
+            : HcsL["Auth:LanguageEnglishShort"].Value;
+}
+
+@section scripts
+{
+    <abp-script-bundle name="@typeof(LoginModel).FullName">
+        <abp-script src="/Pages/Account/Login.js" />
+    </abp-script-bundle>
+}
+
+@if (Model.ShowRequireMigrateSeedMessage)
+{
+    <div class="alert alert-danger">
+        <h4 class="alert-heading">@L["RequireMigrateSeedTitle"]</h4>
+        <p>@L["RequireMigrateSeedMessage"]</p>
+    </div>
+}
+
+<section class="hcs-auth-login-page" aria-labelledby="hcs-login-title">
+    <div class="card hcs-auth-login-card mt-3 shadow-sm rounded">
+        <div class="card-body p-5">
+            <div class="hcs-login-card-brand">
+                <div class="hcs-login-card-brand__logo">
+                    <img class="hcs-login-card-logo"
+                         src="/images/logo/logo.png"
+                         alt="@HcsL["AppName"] - @HcsL["Brand:Subtitle"]"
+                         width="72"
+                         height="72" />
+                </div>
+                <div class="hcs-login-card-brand__copy">
+                    <strong>@HcsL["AppName"] - @HcsL["Brand:Subtitle"]</strong>
+                    <span>@HcsL["Auth:AccountFallback"]</span>
+                </div>
+            </div>
+        @if (Model.VisibleAlerts.Any())
+        {
+            <div class="hcs-login-alerts" role="alert" aria-live="assertive">
+                @foreach (var alert in Model.VisibleAlerts)
+                {
+                    var alertClass = alert.Type.ToString().ToLowerInvariant();
+                    <div class="alert alert-@alertClass hcs-login-alert mb-3">
+                        @if (!string.IsNullOrWhiteSpace(alert.Title))
+                        {
+                            <div class="alert-heading">@alert.Title</div>
+                        }
+                        @alert.Text
+                    </div>
+                }
+            </div>
+        }
+
+        @if (languages.Count > 1 && currentLanguage != null)
+        {
+            <div class="mb-3 hcs-login-language">
+                <label class="form-label" for="hcs-login-language-toggle">@HcsL["Auth:SelectLanguage"]</label>
+                <div class="dropdown">
+                    <button id="hcs-login-language-toggle"
+                            class="btn btn-light dropdown-toggle w-100 text-start"
+                            type="button"
+                            data-bs-toggle="dropdown"
+                            aria-expanded="false">
+                        <i class="bi bi-translate" aria-hidden="true"></i>
+                        <span>@LanguageShortName(currentLanguage.CultureName)</span>
+                    </button>
+                    <ul class="dropdown-menu w-100" aria-labelledby="hcs-login-language-toggle">
+                        @foreach (var language in languages)
+                        {
+                            var selected = string.Equals(
+                                language.CultureName,
+                                currentLanguage.CultureName,
+                                StringComparison.OrdinalIgnoreCase);
+                            <li>
+                                <a class="dropdown-item @(selected ? "active" : null)"
+                                   href="/Abp/Languages/Switch?culture=@Uri.EscapeDataString(language.CultureName)&uiCulture=@Uri.EscapeDataString(language.UiCultureName)&returnUrl=@Uri.EscapeDataString(languageReturnUrl)">
+                                    @LanguageShortName(language.CultureName)
+                                </a>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            </div>
+        }
+
+        @if (Model.EnableLocalLogin)
+        {
+            <form method="post" class="mt-2 hcs-login-form">
+                <input type="hidden" asp-for="ReturnUrl" />
+                <input type="hidden" asp-for="ReturnUrlHash" />
+                <div asp-validation-summary="ModelOnly" class="text-danger hcs-login-validation-summary"></div>
+                <div class="mb-3">
+                    <label asp-for="LoginInput.UserNameOrEmailAddress" class="form-label"></label>
+                    <input asp-for="LoginInput.UserNameOrEmailAddress" class="form-control" autocomplete="username" spellcheck="false" />
+                    <span asp-validation-for="LoginInput.UserNameOrEmailAddress" class="text-danger"></span>
+                </div>
+
+                <div class="mb-3">
+                    <label asp-for="LoginInput.Password" class="form-label"></label>
+                    <div class="input-group">
+                        <input type="password"
+                               class="form-control"
+                               autocomplete="current-password"
+                               spellcheck="false"
+                               maxlength="@IdentityUserConsts.MaxPasswordLength"
+                               asp-for="LoginInput.Password" />
+                        <button class="btn btn-secondary"
+                                type="button"
+                                id="PasswordVisibilityButton"
+                                aria-label="@UiL["ShowPassword"]"
+                                data-show-label="@UiL["ShowPassword"]"
+                                data-hide-label="@UiL["HidePassword"]"
+                                aria-pressed="false">
+                            <i class="fa fa-eye-slash" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    <span asp-validation-for="LoginInput.Password" class="text-danger"></span>
+                </div>
+
+                <div class="form-check mb-3">
+                    <input asp-for="LoginInput.RememberMe" class="form-check-input" />
+                    <label asp-for="LoginInput.RememberMe" class="form-check-label"></label>
+                </div>
+
+                <div class="d-grid gap-2">
+                    <abp-button type="submit" button-type="Primary" name="Action" value="Login" class="btn-lg mt-1" data-loading-text="@HcsL["Auth:LoginProgress"]">
+                        @L["Login"]
+                    </abp-button>
+                    @if (Model.ShowCancelButton)
+                    {
+                        <abp-button type="submit"
+                                    button-type="Secondary"
+                                    formnovalidate="formnovalidate"
+                                    name="Action"
+                                    value="Cancel"
+                                    class="btn-lg mt-2">
+                            @L["Cancel"]
+                        </abp-button>
+                    }
+                </div>
+            </form>
+        }
+
+        @if (Model.VisibleExternalProviders.Any())
+        {
+            <div class="mt-3 hcs-login-external">
+                <h2 class="hcs-login-external__title">@L["OrLoginWith"]</h2>
+                <form asp-page="./Login"
+                      asp-page-handler="ExternalLogin"
+                      asp-route-returnUrl="@Model.ReturnUrl"
+                      asp-route-returnUrlHash="@Model.ReturnUrlHash"
+                      method="post">
+                    @foreach (var provider in Model.VisibleExternalProviders)
+                    {
+                        var displayName = string.Equals(
+                            provider.AuthenticationScheme,
+                            KeycloakOptions.Scheme,
+                            StringComparison.Ordinal)
+                            ? HcsL["Auth:LoginWithSso"].Value
+                            : provider.DisplayName;
+                        <button type="submit"
+                                class="btn btn-primary hcs-login-provider m-1"
+                                name="provider"
+                                value="@provider.AuthenticationScheme"
+                                data-loading-text="@HcsL["Auth:LoginProgress"]"
+                                title="@L["LogInUsingYourProviderAccount", displayName]">
+                            @displayName
+                        </button>
+                    }
+                </form>
+            </div>
+        }
+
+        @if (!Model.EnableLocalLogin && !Model.VisibleExternalProviders.Any())
+        {
+            <div class="alert alert-warning">
+                <strong>@L["InvalidLoginRequest"]</strong>
+                @L["ThereAreNoLoginSchemesConfiguredForThisClient"]
+            </div>
+        }
+        </div>
+    </div>
+</section>

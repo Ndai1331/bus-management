@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk.BlazorWebAssembly">
+
+  <Import Project="..\..\common.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <BlazorWebAssemblyLoadAllGlobalizationData>true</BlazorWebAssemblyLoadAllGlobalizationData>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Blazorise.Bootstrap5" Version="2.3.0" />
+    <PackageReference Include="Blazorise.Icons.FontAwesome" Version="2.3.0" />
+    <PackageReference Include="Blazorise.Components" Version="2.3.0" />
+    <PackageReference Include="Blazorise.PdfViewer" Version="2.3.0" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.DevServer" Version="10.0.9" />
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.Client" Version="10.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Autofac.WebAssembly" Version="10.6.0" />
+    <PackageReference Include="Volo.Abp.SettingManagement.Blazor.WebAssembly" Version="10.6.0" />
+    <PackageReference Include="Volo.Abp.FeatureManagement.Blazor.WebAssembly" Version="10.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.AspNetCore.Components.WebAssembly.LeptonXLiteTheme" Version="5.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Volo.Abp.Identity.Blazor.WebAssembly" Version="10.6.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\HCS.HttpApi.Client\HCS.HttpApi.Client.csproj" />
+    <ProjectReference Include="..\..\services\collaboration\HCS.CollaborationService.Contracts\HCS.CollaborationService.Contracts.csproj" />
+    <ProjectReference Include="..\..\services\bus-management\HCS.BusManagementService.Contracts\HCS.BusManagementService.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="HCS.WebGateway.Tests" />
+  </ItemGroup>
+
+</Project>
