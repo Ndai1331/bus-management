@@ -111,6 +111,26 @@ public sealed class RevenueController(BusManagementAppService service) : Control
     [HttpPost("tariffs")]
     [Authorize(Policy = BusPermissions.RevenueCreate)]
     public Task<TariffDto> CreateTariff(CreateTariffDto input, CancellationToken ct) => service.CreateTariffAsync(input, ct);
+    [HttpGet("parking/tariffs")]
+    [Authorize(Policy = BusPermissions.RevenueParking)]
+    public Task<PagedBusDto<ParkingTariffDto>> GetParkingTariffs(Guid? stationId, string? vehicleType, DateTime? effectiveOn,
+        int skip = 0, int take = 20, CancellationToken ct = default) => service.GetParkingTariffsAsync(stationId, vehicleType, effectiveOn, skip, take, ct);
+    [HttpPost("parking/tariffs")]
+    [Authorize(Policy = BusPermissions.RevenueParkingCreate)]
+    public Task<ParkingTariffDto> CreateParkingTariff(CreateParkingTariffDto input, CancellationToken ct) => service.CreateParkingTariffAsync(input, ct);
+    [HttpGet("parking/sessions")]
+    [Authorize(Policy = BusPermissions.RevenueParking)]
+    public Task<PagedBusDto<ParkingSessionDto>> GetParkingSessions(Guid? stationId, DateTime? from, DateTime? to, string? status,
+        string? vehiclePlateNumber, int skip = 0, int take = 20, CancellationToken ct = default) => service.GetParkingSessionsAsync(stationId, from, to, status, vehiclePlateNumber, skip, take, ct);
+    [HttpPost("parking/sessions")]
+    [Authorize(Policy = BusPermissions.RevenueParkingCreate)]
+    public Task<ParkingSessionDto> CreateParkingSession(CreateParkingSessionDto input, CancellationToken ct) => service.CreateParkingSessionAsync(input, ct);
+    [HttpPost("parking/sessions/{id:guid}/close")]
+    [Authorize(Policy = BusPermissions.RevenueParkingUpdate)]
+    public Task<ParkingSessionDto> CloseParkingSession(Guid id, CloseParkingSessionDto input, CancellationToken ct) => service.CloseParkingSessionAsync(id, input, ct);
+    [HttpPost("parking/sessions/{id:guid}/cancel")]
+    [Authorize(Policy = BusPermissions.RevenueParkingUpdate)]
+    public Task<ParkingSessionDto> CancelParkingSession(Guid id, CancelParkingSessionDto input, CancellationToken ct) => service.CancelParkingSessionAsync(id, input, ct);
 }
 
 [ApiController, Route("api/bus-management")]

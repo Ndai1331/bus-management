@@ -69,6 +69,9 @@ public class HCSPermissionDefinitionProvider : PermissionDefinitionProvider
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.FleetCompliance, L("Permission:BusManagement.FleetCompliance")));
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.Departures, L("Permission:BusManagement.Departures")));
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.Revenue, L("Permission:BusManagement.Revenue")));
+        var parking = bus.AddPermission(HCSPermissions.BusManagement.RevenueParking, L("Permission:BusManagement.Revenue.Parking"));
+        parking.AddChild(HCSPermissions.BusManagement.RevenueParkingCreate, L("Permission:Create"));
+        parking.AddChild(HCSPermissions.BusManagement.RevenueParkingUpdate, L("Permission:Update"));
         var expenses = bus.AddPermission(HCSPermissions.BusManagement.Expenses, L("Permission:BusManagement.Expenses"));
         AddCrud(expenses);
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.Premises, L("Permission:BusManagement.Premises")));

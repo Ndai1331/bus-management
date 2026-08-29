@@ -120,6 +120,7 @@ public static class HCSPermissions
         public const string FleetCompliance = Default + ".FleetCompliance";
         public const string Departures = Default + ".Departures";
         public const string Revenue = Default + ".Revenue";
+        public const string RevenueParking = Revenue + ".Parking";
         public const string Expenses = Default + ".Expenses";
         public const string Premises = Default + ".Premises";
         public const string Reconciliation = Default + ".Reconciliation";
@@ -138,6 +139,9 @@ public static class HCSPermissions
         public const string FleetComplianceUpdate = FleetCompliance + ".Update";
         public const string DeparturesCreate = Departures + ".Create";
         public const string RevenueCreate = Revenue + ".Create";
+        public const string RevenueUpdate = Revenue + ".Update";
+        public const string RevenueParkingCreate = RevenueParking + ".Create";
+        public const string RevenueParkingUpdate = RevenueParking + ".Update";
         public const string ExpensesCreate = Expenses + ".Create";
         public const string ExpensesApprove = Expenses + ".Approve";
         public const string PremisesCreate = Premises + ".Create";
@@ -148,10 +152,11 @@ public static class HCSPermissions
 
         public static readonly string[] All =
         [
-            Stations, MasterData, OperatorsContracts, FleetCompliance, Departures, Revenue,
+            Stations, MasterData, OperatorsContracts, FleetCompliance, Departures, Revenue, RevenueParking,
             Expenses, Premises, Reconciliation, ReconciliationCheck, ReconciliationClose,
             ReconciliationAdjust, ReconciliationAdjustApprove, Reports, StationAssignments, StationsCreate, StationsUpdate, MasterDataCreate,
-            OperatorsContractsCreate, FleetComplianceCreate, FleetComplianceUpdate, DeparturesCreate, RevenueCreate, ExpensesCreate,
+            OperatorsContractsCreate, FleetComplianceCreate, FleetComplianceUpdate, DeparturesCreate, RevenueCreate, RevenueUpdate,
+            RevenueParkingCreate, RevenueParkingUpdate, ExpensesCreate,
             ExpensesApprove, PremisesCreate, ReconciliationCreate, ReconciliationApprove, ReportsExport,
             StationAssignmentsCreate, DeparturesUpdate
         ];

@@ -11,6 +11,7 @@ public static class BusPermissions
     public const string FleetCompliance = Group + ".FleetCompliance";
     public const string Departures = Group + ".Departures";
     public const string Revenue = Group + ".Revenue";
+    public const string RevenueParking = Revenue + ".Parking";
     public const string Expenses = Group + ".Expenses";
     public const string Premises = Group + ".Premises";
     public const string Reconciliation = Group + ".Reconciliation";
@@ -29,6 +30,9 @@ public static class BusPermissions
     public const string FleetComplianceUpdate = FleetCompliance + ".Update";
     public const string DeparturesCreate = Departures + ".Create";
     public const string RevenueCreate = Revenue + ".Create";
+    public const string RevenueUpdate = Revenue + ".Update";
+    public const string RevenueParkingCreate = RevenueParking + ".Create";
+    public const string RevenueParkingUpdate = RevenueParking + ".Update";
     public const string ExpensesCreate = Expenses + ".Create";
     public const string ExpensesApprove = Expenses + ".Approve";
     public const string PremisesCreate = Premises + ".Create";
@@ -40,9 +44,10 @@ public static class BusPermissions
     public static readonly IReadOnlyList<string> All =
     [
         Stations, MasterData, OperatorsContracts, FleetCompliance, Departures,
-        Revenue, Expenses, Premises, Reconciliation, ReconciliationCheck,
+        Revenue, RevenueParking, Expenses, Premises, Reconciliation, ReconciliationCheck,
         ReconciliationClose, ReconciliationAdjust, ReconciliationAdjustApprove, Reports, StationAssignments, StationsCreate, StationsUpdate,
-        MasterDataCreate, OperatorsContractsCreate, FleetComplianceCreate, DeparturesCreate, RevenueCreate,
+        MasterDataCreate, OperatorsContractsCreate, FleetComplianceCreate, DeparturesCreate, RevenueCreate, RevenueUpdate,
+        RevenueParkingCreate, RevenueParkingUpdate,
         ExpensesCreate, ExpensesApprove, PremisesCreate, ReconciliationCreate, ReconciliationApprove,
         ReportsExport, StationAssignmentsCreate, DeparturesUpdate, FleetComplianceUpdate
     ];
@@ -62,6 +67,9 @@ public static class BusStatuses
     public const string Checked = "Checked";
     public const string Approved = "Approved";
     public const string Closed = "Closed";
+    public const string ParkingOpen = "Open";
+    public const string ParkingClosed = "Closed";
+    public const string ParkingCancelled = "Cancelled";
     public const string Issued = "Issued";
     public const string Voided = "Voided";
 }
@@ -123,6 +131,18 @@ public sealed record CreateTariffDto(Guid StationId, Guid? RouteId, string Vehic
     decimal Amount, DateTime EffectiveFrom, DateTime? EffectiveTo = null);
 public sealed record TariffDto(Guid Id, Guid StationId, Guid? RouteId, string VehicleType, string FeeType,
     decimal Amount, DateTime EffectiveFrom, DateTime? EffectiveTo);
+public sealed record CreateParkingTariffDto(Guid StationId, string VehicleType, int BillingUnitMinutes,
+    decimal RatePerUnit, decimal MinimumCharge, string? Description, DateTime EffectiveFrom, DateTime? EffectiveTo = null);
+public sealed record ParkingTariffDto(Guid Id, Guid StationId, string VehicleType, int BillingUnitMinutes,
+    decimal RatePerUnit, decimal MinimumCharge, string Description, DateTime EffectiveFrom, DateTime? EffectiveTo, bool IsActive);
+public sealed record CreateParkingSessionDto(Guid StationId, DateTime BusinessDate, string ShiftCode,
+    string VehiclePlateNumber, string VehicleType, DateTime ArrivalUtc, Guid? ParkingTariffId = null);
+public sealed record CloseParkingSessionDto(DateTime? ExitUtc = null);
+public sealed record CancelParkingSessionDto(string Reason);
+public sealed record ParkingSessionDto(Guid Id, Guid StationId, DateTime BusinessDate, string ShiftCode,
+    string VehiclePlateNumber, string VehicleType, DateTime ArrivalUtc, DateTime? ExitUtc, int? DurationMinutes,
+    int? BilledUnits, int BillingUnitMinutes, decimal RatePerUnit, decimal MinimumCharge, string TariffDescription,
+    decimal? ChargedAmount, string Status, Guid ParkingTariffId, Guid? ReceiptId, string? CancellationReason = null);
 public sealed record RevenueLineInput(string Description, decimal Quantity, decimal UnitAmount, Guid? TariffId = null);
 public sealed record CreateRevenueReceiptDto(Guid StationId, DateTime BusinessDate, string ShiftCode,
     string SourceType, Guid? DepartureId, Guid? OperatorId, string? IdempotencyKey,
@@ -133,7 +153,7 @@ public sealed record RevenueLineDto(Guid Id, string Description, decimal Quantit
 public sealed record RevenueReceiptDto(Guid Id, string ReceiptNumber, Guid StationId, DateTime BusinessDate,
     string ShiftCode, string SourceType, Guid? DepartureId, Guid? OperatorId, decimal TotalAmount, string Status,
     DateTime? IssuedAtUtc, IReadOnlyList<RevenueLineDto> Lines, string? SourceReference = null,
-    string? VehiclePlateNumber = null, Guid? PremisesUnitId = null);
+    string? VehiclePlateNumber = null, Guid? PremisesUnitId = null, Guid? ParkingSessionId = null);
 
 public sealed record CreateExpenseDto(Guid StationId, DateTime BusinessDate, string ShiftCode, string Category,
     decimal Amount, string Description, Guid? DocumentId = null);
@@ -217,6 +237,12 @@ public sealed record BusAdjustmentChangedEto(Guid EventId, DateTimeOffset Occurr
     Guid AdjustmentId, Guid StationId, decimal Amount, string Status) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
 {
     public const string EventName = "hcs.bus.adjustment.changed.v1";
+}
+public sealed record BusParkingSessionChangedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
+    Guid ParkingSessionId, Guid StationId, DateTime BusinessDate, string Status, decimal? ChargedAmount, Guid? ReceiptId,
+    int BillingUnitMinutes, string? CancellationReason) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
+{
+    public const string EventName = "hcs.bus.parking-session.changed.v1";
 }
 public sealed record BusReconciliationClosedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
     Guid DailyCloseId, Guid StationId, DateTime BusinessDate) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)

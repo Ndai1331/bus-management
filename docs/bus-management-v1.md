@@ -1,8 +1,8 @@
-# HCS Bus Management — vertical slice v1 và Phase 2–3
+# HCS Bus Management — vertical slice v1 và Phase 2–4A
 
-Đây là bản tách local từ working tree `HCS_web_free_license`. Repository mới chưa có remote GitHub; bến xe là bounded context độc lập và không join database với Work/Document.
+Đây là bản tách từ working tree `HCS_web_free_license`, hiện được quản lý tại repository [Ndai1331/bus-management](https://github.com/Ndai1331/bus-management); bến xe là bounded context độc lập và không join database với Work/Document.
 
-Trạng thái: Phase 2–3 đã có vertical slice trong working tree; nghiệm thu runtime end-to-end vẫn còn phụ thuộc PostgreSQL, Keycloak và Gateway/BFF.
+Trạng thái: Phase 2–4A đã có vertical slice và đã harden trong working tree; nghiệm thu runtime end-to-end vẫn còn phụ thuộc PostgreSQL, Gateway/BFF, Keycloak và browser.
 
 ## Runtime contract
 
@@ -10,7 +10,7 @@ Trạng thái: Phase 2–3 đã có vertical slice trong working tree; nghiệm 
 - URL local: `https://localhost:44416`
 - API prefix: `/api/bus-management`
 - Database/schema: `hcs_bus_management`
-- Browser chỉ gọi BFF/YARP; service nhận bearer token từ Gateway.
+- Browser chỉ gọi BFF/YARP; service nhận bearer token từ Gateway. PostgreSQL, Gateway/BFF, Keycloak và browser smoke test vẫn là runtime gate, chưa được coi là đạt chỉ từ build/test tĩnh.
 - Export cũng đi qua BFF bằng session cookie; không tạo URL service trực tiếp hoặc đưa bearer token ra browser.
 
 ## Luồng v1
@@ -40,6 +40,8 @@ Service tự chạy migration cho `BusManagement` khi khởi động. Khi chạy
 - `/api/bus-management/compliance/vehicle-documents`
 - `/api/bus-management/departures/*`
 - `/api/bus-management/revenue/receipts`
+- `/api/bus-management/revenue/parking/tariffs|sessions`
+- `/api/bus-management/revenue/parking/sessions/{id}/close|cancel`
 - `/api/bus-management/expenses`
 - `/api/bus-management/premises/leases`
 - `/api/bus-management/reconciliation/shifts/*`
@@ -71,6 +73,17 @@ API adjustment:
 - Route export yêu cầu `HCS.BusManagement.Reports.Export`; dashboard hiển thị breakdown theo từng station và hiện có link XLSX/PDF/trang in cho revenue khi user có quyền này. Các report type còn lại đã có route export server-side nhưng chưa có bảng UI riêng.
 - XLSX dùng Open XML; PDF/HTML được tạo tại service. HTML có nút `window.print()` và CSS in. PDF wrap Unicode và chia trang (46 dòng dữ liệu/trang); export giới hạn 366 ngày và 100.000 dòng để tránh giữ payload không kiểm soát trong process. Compliance report nhận `asOf` để khoảng thời gian export có ý nghĩa.
 
+## Phase 4A đã triển khai
+
+- `ParkingTariff` lưu bến, loại xe, đơn vị tính theo phút, đơn giá, mức tối thiểu và thời hạn hiệu lực; không cho cấu hình tariff cùng loại bị overlap.
+- `ParkingSession` chạy `Open → Closed|Cancelled`, chống hai phiên mở cùng biển số/bến/ngày bằng partial unique index và advisory business-day lock.
+- Khi xe vào, session snapshot toàn bộ tham số tariff. Khi đóng, hệ thống tính `ceil(thời lượng / đơn vị phút) × đơn giá`, áp mức tối thiểu, tạo đúng một phiếu thu `Parking` và phát outbox event. Đóng lặp lại trả session đã đóng, không phát sinh phiếu thứ hai.
+- Phiếu thu parking có liên kết one-to-one tới session và check constraint; FK một chiều là FK ghép `(ParkingSessionId, StationId)` từ receipt sang session, bảo đảm receipt không thể trỏ chéo bến và tránh vòng FK khi đóng phiên. Receipt parking thủ công không còn được tạo qua API generic.
+- Migration thực hiện legacy parking backfill: đánh dấu các receipt `Parking` lịch sử chưa có session bằng `IsLegacyParking`, không làm dừng startup migration. Bản ghi legacy chỉ để bảo toàn lịch sử; mọi receipt parking mới bắt buộc liên kết session.
+- `ArrivalUtc`/`ExitUtc` phải là UTC; arrival không được ở tương lai, exit không được ở tương lai hoặc trước arrival. `BusinessDate` được kiểm tra từ `ArrivalUtc` theo timezone của bến; tiền parking làm tròn theo VND (0 chữ số thập phân). Cấu hình tariff cùng bến/loại xe được serialize bằng PostgreSQL advisory lock.
+- Parking create/close/cancel và daily close chạy trong explicit transaction (hoặc savepoint khi đã có transaction), dùng cùng PostgreSQL advisory transaction lock theo `(station, business date)`. Close parking ghi session, receipt, receipt line, revenue/parking outbox và audit trong cùng boundary; daily close khóa, kiểm tra và ghi chốt nguyên tử.
+- DTO/event giữ snapshot cần cho downstream: `ParkingSessionDto` trả arrival/exit, duration, billed units, billing unit, rate, minimum charge, tariff description, charged amount, status và receipt; `RevenueReceiptDto` trả `ParkingSessionId`; `BusParkingSessionChangedEto` mang business date, status, charged amount, receipt id, billing unit và cancellation reason.
+
 ## Migration và validation evidence
 
 Migration chain hiện có trong bounded context:
@@ -80,13 +93,16 @@ Migration chain hiện có trong bounded context:
 - `20260828113032_FixBusRelationships`
 - `20260828121058_AddBusPhaseTwo`
 - `20260829040425_AddBusPhaseThreeScopeIntegrity`
+- `20260829133927_AddBusPhaseFourParking`
 
 Snapshot validation ngày 2026-08-29:
 
 ```text
-BusManagementService.Tests: 19 passed, 0 failed; build succeeded, 0 warnings, 0 errors
+Focused Bus Management tests: 27 passed, 0 failed
 AuthServer.Tests:           18 passed, 0 failed
 MigrationImporter.Tests:    11 passed, 0 failed
+Full solution tests:        383 passed, 0 failed
+Bus service build:          0 warnings, 0 errors
 has-pending-model-changes:  No changes have been made to the model since the last migration.
 ```
 
@@ -101,10 +117,10 @@ dotnet ef migrations has-pending-model-changes \
   --startup-project services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj --no-build
 ```
 
-Gateway `118/118` và EFCore `13/13` đã xanh trong lần cross-project verification ngày 2026-08-28; chưa có HTTP acceptance suite riêng cho Bus Management. `dotnet ef migrations list` hiện liệt kê đủ năm migration nhưng không xác định được migration nào đã apply vì PostgreSQL `127.0.0.1:5432` chưa chạy. EF tooling cũng cảnh báo `10.0.5` thấp hơn runtime `10.0.9`.
+Gateway `118/118` và EFCore `13/13` đã xanh trong lần cross-project verification ngày 2026-08-28; chưa có HTTP acceptance suite riêng cho Bus Management. `dotnet ef migrations list` hiện liệt kê đủ sáu migration nhưng không xác định được migration nào đã apply vì PostgreSQL `127.0.0.1:5432` chưa chạy. EF tooling cũng cảnh báo `10.0.5` thấp hơn runtime `10.0.9`.
 
-Runtime limitation hiện tại: chưa có bằng chứng live cho advisory lock, BFF/YARP route, Keycloak claim/role matrix hoặc browser export vì PostgreSQL/Keycloak/Gateway chưa được khởi động trong snapshot này. Cần chạy local infrastructure, seed role/permission, rồi smoke-test qua Gateway trước khi đánh dấu Phase 2–3 production-ready.
+Runtime limitation hiện tại: chưa có bằng chứng live cho advisory lock/explicit transaction, bãi đỗ, BFF/YARP route, Keycloak claim/role matrix hoặc browser export vì PostgreSQL/Gateway/Keycloak chưa được khởi động trong snapshot này. Cần chạy local infrastructure, seed role/permission, rồi smoke-test browser qua Gateway trước khi đánh dấu Phase 2–4A production-ready.
 
-## Còn ngoài phạm vi Phase 2–3
+## Còn ngoài phạm vi Phase 4A
 
-Session bãi đỗ/lượt xe chi tiết, notification/workflow tài liệu, kế toán tổng hợp/VAT/công nợ/ngân hàng, realtime vận hành và tích hợp read model Work/Document vẫn để phase tiếp theo. Hai hệ thống không join database; dùng outbox event làm điểm nối.
+Chi tiết bản đồ/vị trí bãi đỗ, reservation/barrier/camera/payment, notification/workflow tài liệu, kế toán tổng hợp/VAT/công nợ/ngân hàng, realtime vận hành và tích hợp read model Work/Document vẫn để phase tiếp theo. Hai hệ thống không join database; dùng outbox event làm điểm nối.

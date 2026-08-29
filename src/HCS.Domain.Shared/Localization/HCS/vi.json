@@ -128,6 +128,7 @@
     "Permission:BusManagement.FleetCompliance.Update": "Gia hạn/cập nhật hồ sơ phương tiện",
     "Permission:BusManagement.Departures": "Quản lý chuyến xuất bến",
     "Permission:BusManagement.Revenue": "Quản lý doanh thu",
+    "Permission:BusManagement.Revenue.Parking": "Doanh thu bãi đỗ",
     "Permission:BusManagement.Expenses": "Quản lý chi phí",
     "Permission:BusManagement.Premises": "Quản lý mặt bằng",
     "Permission:BusManagement.Reconciliation": "Đối soát thu chi",

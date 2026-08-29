@@ -86,7 +86,9 @@ public sealed class HCSRoleDataSeedContributor(
             permission.StartsWith("HCS.BusManagement.Reconciliation", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Reports", StringComparison.Ordinal)).ToArray();
         accountantPermissions = accountantPermissions
-            .Where(permission => !string.Equals(permission, "HCS.BusManagement.Reconciliation.AdjustApprove", StringComparison.Ordinal))
+            .Where(permission => !string.Equals(permission, "HCS.BusManagement.Reconciliation.AdjustApprove", StringComparison.Ordinal) &&
+                !string.Equals(permission, "HCS.BusManagement.Revenue.Parking.Create", StringComparison.Ordinal) &&
+                !string.Equals(permission, "HCS.BusManagement.Revenue.Parking.Update", StringComparison.Ordinal))
             .ToArray();
         var controlPermissions = busPermissions.Where(permission =>
             permission.StartsWith("HCS.BusManagement.Departures", StringComparison.Ordinal) ||

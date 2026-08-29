@@ -48,4 +48,16 @@ public sealed class OutboxTests
         Assert.Equal(BusSettlementChangedEto.EventName, message.EventName);
         Assert.Contains(settlementId.ToString(), message.Payload, StringComparison.OrdinalIgnoreCase);
     }
+
+    [Fact]
+    public void Parking_session_event_uses_canonical_versioned_name()
+    {
+        var sessionId = Guid.NewGuid();
+        var message = BusOutbox.Create(new BusParkingSessionChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, "corr",
+            sessionId, Guid.NewGuid(), DateTime.Today, BusStatuses.ParkingClosed, 75_000, Guid.NewGuid(), 60, null), "corr");
+
+        Assert.Equal(BusParkingSessionChangedEto.EventName, message.EventName);
+        Assert.Contains(sessionId.ToString(), message.Payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("billingUnitMinutes", message.Payload, StringComparison.OrdinalIgnoreCase);
+    }
 }

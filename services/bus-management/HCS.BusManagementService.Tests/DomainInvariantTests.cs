@@ -37,6 +37,13 @@ public sealed class DomainInvariantTests
     }
 
     [Fact]
+    public void Parking_receipt_requires_a_session_link()
+    {
+        Assert.Throws<BusinessException>(() => new RevenueReceipt(Guid.NewGuid(), "RC-PARKING", Guid.NewGuid(),
+            DateTime.Today, "AM", RevenueSources.Parking, null, null, Guid.NewGuid(), null));
+    }
+
+    [Fact]
     public void Settlement_enforces_maker_checker()
     {
         var maker = Guid.NewGuid();
@@ -134,5 +141,77 @@ public sealed class DomainInvariantTests
         settlement.Approve(Guid.NewGuid());
         settlement.Close();
         Assert.Throws<BusinessException>(() => settlement.RefreshTotals(1, 1));
+    }
+
+    [Fact]
+    public void Parking_session_calculates_billing_units_and_minimum_charge()
+    {
+        var arrival = new DateTime(2026, 8, 29, 1, 0, 0, DateTimeKind.Utc);
+        var session = new ParkingSession(Guid.NewGuid(), Guid.NewGuid(), arrival.Date, "AM ", "51a-123.45", "Bus",
+            arrival, Guid.NewGuid(), 60, 25_000, 40_000, "Phí bãi đỗ");
+
+        var quote = session.Quote(arrival.AddMinutes(61));
+
+        Assert.Equal(61, quote.DurationMinutes);
+        Assert.Equal(2, quote.BilledUnits);
+        Assert.Equal(50_000, quote.Amount);
+        Assert.Equal("51A-123.45", session.VehiclePlateNumber);
+        Assert.Equal("AM", session.ShiftCode);
+    }
+
+    [Fact]
+    public void Parking_session_applies_minimum_charge_when_units_are_below_minimum()
+    {
+        var arrival = new DateTime(2026, 8, 29, 1, 0, 0, DateTimeKind.Utc);
+        var session = new ParkingSession(Guid.NewGuid(), Guid.NewGuid(), arrival.Date, "AM", "51A-111.11", "Bus",
+            arrival, Guid.NewGuid(), 60, 10_000, 40_000, "Phí bãi đỗ");
+
+        var quote = session.Quote(arrival.AddMinutes(5));
+
+        Assert.Equal(1, quote.BilledUnits);
+        Assert.Equal(40_000, quote.Amount);
+    }
+
+    [Fact]
+    public void Parking_session_requires_utc_timestamps()
+    {
+        var arrival = new DateTime(2026, 8, 29, 1, 0, 0, DateTimeKind.Unspecified);
+
+        Assert.Throws<BusinessException>(() => new ParkingSession(Guid.NewGuid(), Guid.NewGuid(), arrival.Date, "AM", "51A-222.22", "Bus",
+            arrival, Guid.NewGuid(), 60, 10_000, 0, "Phí bãi đỗ"));
+    }
+
+    [Fact]
+    public void Parking_session_snapshot_is_immutable_after_close()
+    {
+        var session = new ParkingSession(Guid.NewGuid(), Guid.NewGuid(), DateTime.Today, "PM", "51B-999.99", "Truck",
+            DateTime.UtcNow.AddHours(-1), Guid.NewGuid(), 30, 10_000, 10_000, "Parking rate v1");
+
+        session.Close(session.ArrivalUtc.AddMinutes(31));
+
+        Assert.Equal(BusStatuses.ParkingClosed, session.Status);
+        Assert.Equal(20_000, session.ChargedAmount);
+        Assert.Throws<BusinessException>(() => session.Quote(DateTime.UtcNow.AddHours(2)));
+        Assert.Throws<BusinessException>(() => session.Cancel("late"));
+    }
+
+    [Fact]
+    public void Parking_session_rejects_a_future_exit_time()
+    {
+        var session = new ParkingSession(Guid.NewGuid(), Guid.NewGuid(), DateTime.Today, "PM", "51B-777.77", "Truck",
+            DateTime.UtcNow.AddMinutes(-1), Guid.NewGuid(), 30, 10_000, 10_000, "Parking rate");
+
+        Assert.Throws<BusinessException>(() => session.Quote(DateTime.UtcNow.AddMinutes(1)));
+    }
+
+    [Fact]
+    public void Cancelled_parking_session_cannot_be_closed()
+    {
+        var session = new ParkingSession(Guid.NewGuid(), Guid.NewGuid(), DateTime.Today, "PM", "51C-888.88", "Car",
+            DateTime.UtcNow, Guid.NewGuid(), 60, 15_000, 0, "Parking rate");
+        session.Cancel("Xe rời trước khi tính phí");
+
+        Assert.Equal(BusStatuses.ParkingCancelled, session.Status);
+        Assert.Throws<BusinessException>(() => session.Close(DateTime.UtcNow.AddMinutes(5)));
     }
 }

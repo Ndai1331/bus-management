@@ -302,16 +302,36 @@ public sealed class RevenueReceipt : FullAuditedAggregateRoot<Guid>
     private RevenueReceipt() { }
     public RevenueReceipt(Guid id, string receiptNumber, Guid stationId, DateTime businessDate, string shiftCode,
         string sourceType, Guid? departureId, Guid? operatorId, Guid? createdByUserId, string? idempotencyKey,
-        string? sourceReference = null, string? vehiclePlateNumber = null, Guid? premisesUnitId = null) : base(id)
+        string? sourceReference = null, string? vehiclePlateNumber = null, Guid? premisesUnitId = null) : this(id, receiptNumber,
+            stationId, businessDate, shiftCode, sourceType, departureId, operatorId,
+            createdByUserId, idempotencyKey, sourceReference, vehiclePlateNumber, premisesUnitId, null)
+    {
+    }
+
+    private RevenueReceipt(Guid id, string receiptNumber, Guid stationId, DateTime businessDate, string shiftCode,
+        string sourceType, Guid? departureId, Guid? operatorId, Guid? createdByUserId, string? idempotencyKey,
+        string? sourceReference, string? vehiclePlateNumber, Guid? premisesUnitId, Guid? parkingSessionId) : base(id)
     {
         ReceiptNumber = Check.NotNullOrWhiteSpace(receiptNumber, nameof(receiptNumber), BusConsts.CodeLength);
         if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
         StationId = stationId; BusinessDate = BusDates.BusinessDate(businessDate);
         ShiftCode = Check.NotNullOrWhiteSpace(shiftCode, nameof(shiftCode), BusConsts.CodeLength);
         SourceType = Check.NotNullOrWhiteSpace(sourceType, nameof(sourceType), BusConsts.TypeLength).Trim();
+        if ((SourceType == RevenueSources.Parking && !parkingSessionId.HasValue) ||
+            (SourceType != RevenueSources.Parking && parkingSessionId.HasValue))
+            throw new BusinessException("Bus:ParkingSessionLinkRequired");
         DepartureId = departureId; OperatorId = operatorId; CreatedByUserId = createdByUserId;
         IdempotencyKey = idempotencyKey?.Trim(); SourceReference = sourceReference?.Trim();
-        VehiclePlateNumber = vehiclePlateNumber?.Trim(); PremisesUnitId = premisesUnitId; Status = BusStatuses.Draft;
+        VehiclePlateNumber = vehiclePlateNumber?.Trim(); PremisesUnitId = premisesUnitId; ParkingSessionId = parkingSessionId; Status = BusStatuses.Draft;
+    }
+
+    public static RevenueReceipt CreateParking(Guid id, string receiptNumber, ParkingSession session, Guid? createdByUserId)
+    {
+        if (session.Status != BusStatuses.ParkingOpen)
+            throw new BusinessException("Bus:ParkingSessionImmutable");
+        return new RevenueReceipt(id, receiptNumber, session.StationId, session.BusinessDate, session.ShiftCode,
+            RevenueSources.Parking, null, null, createdByUserId, null, $"ParkingSession:{session.Id:N}",
+            session.VehiclePlateNumber, null, session.Id);
     }
     public string ReceiptNumber { get; private set; } = string.Empty;
     public Guid StationId { get; private set; }
@@ -325,6 +345,8 @@ public sealed class RevenueReceipt : FullAuditedAggregateRoot<Guid>
     public string? SourceReference { get; private set; }
     public string? VehiclePlateNumber { get; private set; }
     public Guid? PremisesUnitId { get; private set; }
+    public Guid? ParkingSessionId { get; private set; }
+    public bool IsLegacyParking { get; private set; }
     public decimal TotalAmount { get; private set; }
     public string Status { get; private set; } = BusStatuses.Draft;
     public DateTime? IssuedAtUtc { get; private set; }

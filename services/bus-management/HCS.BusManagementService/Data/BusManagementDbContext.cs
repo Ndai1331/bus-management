@@ -21,6 +21,8 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
     public DbSet<DepartureTrip> DepartureTrips => Set<DepartureTrip>();
     public DbSet<DepartureCheck> DepartureChecks => Set<DepartureCheck>();
     public DbSet<Tariff> Tariffs => Set<Tariff>();
+    public DbSet<ParkingTariff> ParkingTariffs => Set<ParkingTariff>();
+    public DbSet<ParkingSession> ParkingSessions => Set<ParkingSession>();
     public DbSet<RevenueReceipt> RevenueReceipts => Set<RevenueReceipt>();
     public DbSet<RevenueLine> RevenueLines => Set<RevenueLine>();
     public DbSet<ExpenseEntry> ExpenseEntries => Set<ExpenseEntry>();
@@ -136,11 +138,45 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
             b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<FixedRoute>().WithMany().HasForeignKey(x => x.RouteId).OnDelete(DeleteBehavior.Restrict);
         });
+        builder.Entity<ParkingTariff>(b =>
+        {
+            b.ToTable("ParkingTariffs"); b.ConfigureByConvention();
+            b.Property(x => x.VehicleType).HasMaxLength(BusConsts.TypeLength).IsRequired();
+            b.Property(x => x.Description).HasMaxLength(BusConsts.DescriptionLength).IsRequired();
+            b.Property(x => x.RatePerUnit).HasPrecision(18, 2);
+            b.Property(x => x.MinimumCharge).HasPrecision(18, 2);
+            b.Property(x => x.EffectiveFrom).HasColumnType("date"); b.Property(x => x.EffectiveTo).HasColumnType("date");
+            b.HasIndex(x => new { x.StationId, x.VehicleType, x.EffectiveFrom }).IsUnique();
+            b.HasIndex(x => new { x.StationId, x.VehicleType, x.EffectiveFrom, x.EffectiveTo, x.IsActive });
+            b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<ParkingSession>(b =>
+        {
+            b.ToTable("ParkingSessions"); b.ConfigureByConvention();
+            b.Property(x => x.BusinessDate).HasColumnType("date");
+            b.Property(x => x.ShiftCode).HasMaxLength(BusConsts.CodeLength).IsRequired();
+            b.Property(x => x.VehiclePlateNumber).HasMaxLength(BusConsts.CodeLength).IsRequired();
+            b.Property(x => x.VehicleType).HasMaxLength(BusConsts.TypeLength).IsRequired();
+            b.Property(x => x.ArrivalUtc).HasColumnType("timestamp with time zone");
+            b.Property(x => x.ExitUtc).HasColumnType("timestamp with time zone");
+            b.Property(x => x.RatePerUnit).HasPrecision(18, 2);
+            b.Property(x => x.MinimumCharge).HasPrecision(18, 2);
+            b.Property(x => x.TariffDescription).HasMaxLength(BusConsts.DescriptionLength).IsRequired();
+            b.Property(x => x.ChargedAmount).HasPrecision(18, 2);
+            b.Property(x => x.Status).HasMaxLength(BusConsts.StatusLength).IsRequired();
+            b.Property(x => x.CancellationReason).HasMaxLength(BusConsts.DescriptionLength);
+            b.HasIndex(x => new { x.StationId, x.BusinessDate, x.Status });
+            b.HasIndex(x => new { x.StationId, x.BusinessDate, x.VehiclePlateNumber })
+                .HasFilter("\"Status\" = 'Open'").IsUnique();
+            b.HasAlternateKey(x => new { x.Id, x.StationId });
+            b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ParkingTariff>().WithMany().HasForeignKey(x => x.ParkingTariffId).OnDelete(DeleteBehavior.Restrict);
+        });
         builder.Entity<RevenueReceipt>(b =>
         {
             b.ToTable("RevenueReceipts", table => table.HasCheckConstraint(
                 "CK_RevenueReceipt_SourceType",
-                "\"SourceType\" IN ('FixedRoute', 'VisitingVehicle', 'PublicBus', 'Parking', 'Premises', 'Other') AND (\"SourceType\" <> 'Premises' OR \"PremisesUnitId\" IS NOT NULL)"));
+                "\"SourceType\" IN ('FixedRoute', 'VisitingVehicle', 'PublicBus', 'Parking', 'Premises', 'Other') AND (\"SourceType\" <> 'Premises' OR \"PremisesUnitId\" IS NOT NULL) AND ((\"SourceType\" = 'Parking' AND ((\"ParkingSessionId\" IS NOT NULL AND \"IsLegacyParking\" = FALSE) OR (\"ParkingSessionId\" IS NULL AND \"IsLegacyParking\" = TRUE))) OR (\"SourceType\" <> 'Parking' AND \"ParkingSessionId\" IS NULL AND \"IsLegacyParking\" = FALSE))"));
             b.ConfigureByConvention();
             b.Property(x => x.ReceiptNumber).HasMaxLength(BusConsts.CodeLength).IsRequired();
             b.Property(x => x.ShiftCode).HasMaxLength(BusConsts.CodeLength).IsRequired();
@@ -148,6 +184,8 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
             b.Property(x => x.IdempotencyKey).HasMaxLength(128);
             b.Property(x => x.SourceReference).HasMaxLength(256);
             b.Property(x => x.VehiclePlateNumber).HasMaxLength(BusConsts.CodeLength);
+            b.Property(x => x.IsLegacyParking).IsRequired().HasDefaultValue(false);
+            b.HasIndex(x => x.ParkingSessionId).IsUnique().HasFilter("\"ParkingSessionId\" IS NOT NULL");
             b.Property(x => x.TotalAmount).HasPrecision(18, 2);
             b.Property(x => x.BusinessDate).HasColumnType("date"); b.Property(x => x.Status).HasMaxLength(BusConsts.StatusLength).IsRequired();
             b.HasIndex(x => x.ReceiptNumber).IsUnique();
@@ -158,6 +196,8 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
             b.HasOne<DepartureTrip>().WithMany().HasForeignKey(x => x.DepartureId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<TransportOperator>().WithMany().HasForeignKey(x => x.OperatorId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<PremisesUnit>().WithMany().HasForeignKey(x => new { x.PremisesUnitId, x.StationId })
+                .HasPrincipalKey(x => new { x.Id, x.StationId }).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ParkingSession>().WithMany().HasForeignKey(x => new { x.ParkingSessionId, x.StationId })
                 .HasPrincipalKey(x => new { x.Id, x.StationId }).OnDelete(DeleteBehavior.Restrict);
         });
         builder.Entity<RevenueLine>(b =>

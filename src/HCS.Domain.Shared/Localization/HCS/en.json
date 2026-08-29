@@ -128,6 +128,7 @@
     "Permission:BusManagement.FleetCompliance.Update": "Renew/update vehicle documents",
     "Permission:BusManagement.Departures": "Manage departures",
     "Permission:BusManagement.Revenue": "Manage revenue",
+    "Permission:BusManagement.Revenue.Parking": "Parking revenue",
     "Permission:BusManagement.Expenses": "Manage expenses",
     "Permission:BusManagement.Premises": "Manage premises",
     "Permission:BusManagement.Reconciliation": "Reconcile revenue and expenses",

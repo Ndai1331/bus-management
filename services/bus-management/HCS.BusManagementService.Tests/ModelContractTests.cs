@@ -43,6 +43,8 @@ public sealed class ModelContractTests
         var route = db.Model.FindEntityType(typeof(FixedRoute))!;
         var vehicle = db.Model.FindEntityType(typeof(Vehicle))!;
         var driver = db.Model.FindEntityType(typeof(Driver))!;
+        var parkingTariff = db.Model.FindEntityType(typeof(ParkingTariff))!;
+        var parkingSession = db.Model.FindEntityType(typeof(ParkingSession))!;
 
         Assert.Contains(assignment.GetIndexes(), index => index.IsUnique &&
             index.Properties.Select(property => property.Name).SequenceEqual([nameof(UserStationAssignment.UserId), nameof(UserStationAssignment.StationId)]));
@@ -67,5 +69,19 @@ public sealed class ModelContractTests
         Assert.Contains(receipt.GetForeignKeys(), foreignKey => foreignKey.Properties.Select(property => property.Name)
             .SequenceEqual([nameof(RevenueReceipt.PremisesUnitId), nameof(RevenueReceipt.StationId)]) &&
             foreignKey.PrincipalEntityType.ClrType == typeof(PremisesUnit));
+        Assert.Contains(parkingTariff.GetIndexes(), index => index.IsUnique &&
+            index.Properties.Select(property => property.Name).SequenceEqual([
+                nameof(ParkingTariff.StationId), nameof(ParkingTariff.VehicleType), nameof(ParkingTariff.EffectiveFrom)]));
+        Assert.Contains(parkingSession.GetIndexes(), index => index.IsUnique && index.GetFilter() == "\"Status\" = 'Open'" &&
+            index.Properties.Select(property => property.Name).SequenceEqual([
+                nameof(ParkingSession.StationId), nameof(ParkingSession.BusinessDate), nameof(ParkingSession.VehiclePlateNumber)]));
+        Assert.Contains(receipt.GetProperties(), property => property.Name == nameof(RevenueReceipt.ParkingSessionId));
+        Assert.Contains(receipt.GetProperties(), property => property.Name == nameof(RevenueReceipt.IsLegacyParking));
+        Assert.Contains(receipt.GetForeignKeys(), foreignKey => foreignKey.Properties.Select(property => property.Name)
+            .SequenceEqual([nameof(RevenueReceipt.ParkingSessionId), nameof(RevenueReceipt.StationId)]) &&
+            foreignKey.PrincipalEntityType.ClrType == typeof(ParkingSession));
+        Assert.Contains(designReceipt.GetCheckConstraints(), constraint => constraint.Name == "CK_RevenueReceipt_SourceType" &&
+            constraint.Sql!.Contains("ParkingSessionId", StringComparison.Ordinal) &&
+            constraint.Sql.Contains("IsLegacyParking", StringComparison.Ordinal));
     }
 }
