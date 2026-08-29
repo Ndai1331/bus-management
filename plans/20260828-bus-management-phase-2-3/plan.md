@@ -11,7 +11,7 @@ created: 2026-08-28
 
 # Bus Management Phase 0–3
 
-Status: **in-progress — implementation complete, release gates open**  
+Status: **in-progress — implementation complete, release gates open**
 Progress: **90% (18/20 tracked items complete)**
 
 ## Phase status
