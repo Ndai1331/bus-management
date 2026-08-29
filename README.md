@@ -66,7 +66,11 @@ The renamed layered projects are the Community foundation. Migration phases spli
 
 The licensed source at `../HCS_web_with_license` is read-only migration input and must never become a project or package dependency.
 
-Local HTTPS ports are AuthServer `44401`, Gateway/BFF `44402`, Blazor `44403`, Platform `44411`, Organization `44412`, Document `44413`, Work Management `44414`, and Collaboration `44415`.
+Local HTTPS ports are AuthServer `44401`, Gateway/BFF `44402`, Blazor `44403`, Platform `44411`, Organization `44412`, Document `44413`, Work Management `44414`, Collaboration `44415`, and Bus Management `44416`.
+
+Bus Management is a separate bounded context with database/schema `hcs_bus_management` and API prefix `/api/bus-management`. The browser uses the Gateway/BFF route; it must not call `https://localhost:44416` directly. The vertical slice and the Phase 2–3 implementation notes are in [`docs/bus-management-v1.md`](./docs/bus-management-v1.md).
+
+Phase 2–3 currently includes server-side station scope, source-specific revenue validation, immutable issued/closed records, settlement/day-close advisory locking, closed-day adjustments with maker-checker approval, compliance expiry counts, and server-side XLSX/PDF/HTML exports for revenue, departures, reconciliation, and compliance. Export requires `HCS.BusManagement.Reports.Export`; the Blazor dashboard currently exposes revenue export links, while the other export types remain API routes. Validation evidence and runtime limitations are recorded in [`docs/bus-management-v1.md`](./docs/bus-management-v1.md#migration-và-validation-evidence). PostgreSQL must be running to verify applied migration state and live lock behavior; browser role/scope and BFF smoke coverage is still outstanding.
 
 ## Docker Compose: runtime mặc định
 

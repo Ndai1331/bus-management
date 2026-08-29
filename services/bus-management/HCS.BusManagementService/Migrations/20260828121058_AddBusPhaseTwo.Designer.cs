@@ -3,6 +3,7 @@ using System;
 using HCS.BusManagementService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace HCS.BusManagementService.Migrations
 {
     [DbContext(typeof(BusManagementDbContext))]
-    partial class BusManagementDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260828121058_AddBusPhaseTwo")]
+    partial class AddBusPhaseTwo
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -556,15 +559,10 @@ namespace HCS.BusManagementService.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<Guid?>("StationId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("LicenseNumber")
                         .IsUnique();
-
-                    b.HasIndex("StationId");
 
                     b.ToTable("Drivers", "hcs_bus_management");
                 });
@@ -724,17 +722,12 @@ namespace HCS.BusManagementService.Migrations
                     b.Property<Guid>("OperatorId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("StationId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
 
                     b.HasIndex("OperatorId");
-
-                    b.HasIndex("StationId");
 
                     b.ToTable("FixedRoutes", "hcs_bus_management");
                 });
@@ -1063,14 +1056,9 @@ namespace HCS.BusManagementService.Migrations
                     b.HasIndex("ReceiptNumber")
                         .IsUnique();
 
-                    b.HasIndex("PremisesUnitId", "StationId");
-
                     b.HasIndex("StationId", "BusinessDate", "ShiftCode");
 
-                    b.ToTable("RevenueReceipts", "hcs_bus_management", t =>
-                        {
-                            t.HasCheckConstraint("CK_RevenueReceipt_SourceType", "\"SourceType\" IN ('FixedRoute', 'VisitingVehicle', 'PublicBus', 'Parking', 'Premises', 'Other') AND (\"SourceType\" <> 'Premises' OR \"PremisesUnitId\" IS NOT NULL)");
-                        });
+                    b.ToTable("RevenueReceipts", "hcs_bus_management");
                 });
 
             modelBuilder.Entity("HCS.BusManagementService.Domain.ShiftSettlement", b =>
@@ -1313,15 +1301,10 @@ namespace HCS.BusManagementService.Migrations
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
 
-                    b.Property<Guid?>("StationId")
-                        .HasColumnType("uuid");
-
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique();
-
-                    b.HasIndex("StationId");
 
                     b.ToTable("TransportOperators", "hcs_bus_management");
                 });
@@ -1425,9 +1408,6 @@ namespace HCS.BusManagementService.Migrations
                         .HasMaxLength(64)
                         .HasColumnType("character varying(64)");
 
-                    b.Property<Guid?>("StationId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("VehicleType")
                         .IsRequired()
                         .HasMaxLength(64)
@@ -1439,8 +1419,6 @@ namespace HCS.BusManagementService.Migrations
 
                     b.HasIndex("PlateNumber")
                         .IsUnique();
-
-                    b.HasIndex("StationId");
 
                     b.ToTable("Vehicles", "hcs_bus_management");
                 });
@@ -1657,14 +1635,6 @@ namespace HCS.BusManagementService.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("HCS.BusManagementService.Domain.Driver", b =>
-                {
-                    b.HasOne("HCS.BusManagementService.Domain.BusStation", null)
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
             modelBuilder.Entity("HCS.BusManagementService.Domain.ExpenseEntry", b =>
                 {
                     b.HasOne("HCS.BusManagementService.Domain.BusStation", null)
@@ -1681,11 +1651,6 @@ namespace HCS.BusManagementService.Migrations
                         .HasForeignKey("OperatorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("HCS.BusManagementService.Domain.BusStation", null)
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HCS.BusManagementService.Domain.LeaseContract", b =>
@@ -1743,12 +1708,6 @@ namespace HCS.BusManagementService.Migrations
                         .HasForeignKey("StationId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("HCS.BusManagementService.Domain.PremisesUnit", null)
-                        .WithMany()
-                        .HasForeignKey("PremisesUnitId", "StationId")
-                        .HasPrincipalKey("Id", "StationId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HCS.BusManagementService.Domain.ShiftSettlement", b =>
@@ -1774,14 +1733,6 @@ namespace HCS.BusManagementService.Migrations
                         .IsRequired();
                 });
 
-            modelBuilder.Entity("HCS.BusManagementService.Domain.TransportOperator", b =>
-                {
-                    b.HasOne("HCS.BusManagementService.Domain.BusStation", null)
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict);
-                });
-
             modelBuilder.Entity("HCS.BusManagementService.Domain.UserStationAssignment", b =>
                 {
                     b.HasOne("HCS.BusManagementService.Domain.BusStation", null)
@@ -1798,11 +1749,6 @@ namespace HCS.BusManagementService.Migrations
                         .HasForeignKey("OperatorId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.HasOne("HCS.BusManagementService.Domain.BusStation", null)
-                        .WithMany()
-                        .HasForeignKey("StationId")
-                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("HCS.BusManagementService.Domain.VehicleLegalDocument", b =>

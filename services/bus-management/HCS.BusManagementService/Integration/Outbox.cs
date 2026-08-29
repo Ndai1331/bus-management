@@ -46,8 +46,12 @@ public static class BusOutbox
         ? BusDepartureChangedEto.EventName
         : typeof(T) == typeof(BusRevenueRecordedEto)
             ? BusRevenueRecordedEto.EventName
-            : typeof(T) == typeof(BusExpenseChangedEto)
-                ? BusExpenseChangedEto.EventName
+                : typeof(T) == typeof(BusExpenseChangedEto)
+                    ? BusExpenseChangedEto.EventName
+                : typeof(T) == typeof(BusSettlementChangedEto)
+                    ? BusSettlementChangedEto.EventName
+                : typeof(T) == typeof(BusAdjustmentChangedEto)
+                    ? BusAdjustmentChangedEto.EventName
                 : typeof(T) == typeof(BusReconciliationClosedEto)
                     ? BusReconciliationClosedEto.EventName
                     : typeof(T).FullName!;
@@ -77,6 +81,10 @@ public sealed class OutboxDispatcher(BusManagementDbContext db, IDistributedEven
                     await eventBus.PublishAsync(JsonSerializer.Deserialize<BusRevenueRecordedEto>(message.Payload)!, onUnitOfWorkComplete: false);
                 else if (message.EventName == BusExpenseChangedEto.EventName)
                     await eventBus.PublishAsync(JsonSerializer.Deserialize<BusExpenseChangedEto>(message.Payload)!, onUnitOfWorkComplete: false);
+                else if (message.EventName == BusSettlementChangedEto.EventName)
+                    await eventBus.PublishAsync(JsonSerializer.Deserialize<BusSettlementChangedEto>(message.Payload)!, onUnitOfWorkComplete: false);
+                else if (message.EventName == BusAdjustmentChangedEto.EventName)
+                    await eventBus.PublishAsync(JsonSerializer.Deserialize<BusAdjustmentChangedEto>(message.Payload)!, onUnitOfWorkComplete: false);
                 else if (message.EventName == BusReconciliationClosedEto.EventName)
                     await eventBus.PublishAsync(JsonSerializer.Deserialize<BusReconciliationClosedEto>(message.Payload)!, onUnitOfWorkComplete: false);
                 else { message.MarkFailed($"Unknown event type: {message.EventName}"); continue; }

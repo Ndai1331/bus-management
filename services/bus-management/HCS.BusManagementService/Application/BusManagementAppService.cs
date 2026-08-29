@@ -1,4 +1,6 @@
 using System.Security.Claims;
+using System.Security.Cryptography;
+using System.Text;
 using HCS.BusManagementService.Contracts;
 using HCS.BusManagementService.Data;
 using HCS.BusManagementService.Domain;
@@ -24,13 +26,16 @@ public sealed class BusAccessScope(BusManagementDbContext db, ICurrentUser curre
         return (await db.UserStationAssignments.AsNoTracking()
             .Where(x => x.UserId == UserId && x.IsActive &&
                 (!x.ValidFrom.HasValue || x.ValidFrom.Value <= DateTime.UtcNow.Date) &&
-                (!x.ValidTo.HasValue || x.ValidTo.Value >= DateTime.UtcNow.Date))
+                (!x.ValidTo.HasValue || x.ValidTo.Value >= DateTime.UtcNow.Date) &&
+                db.BusStations.Any(station => station.Id == x.StationId && station.IsActive))
             .Select(x => x.StationId).ToListAsync(cancellationToken)).ToHashSet();
     }
 
     public async Task EnsureStationAsync(Guid stationId, CancellationToken cancellationToken = default)
     {
         if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
+        if (!await db.BusStations.AsNoTracking().AnyAsync(x => x.Id == stationId && x.IsActive, cancellationToken))
+            throw new BusinessException("Bus:StationNotFound");
         var stationIds = await GetStationIdsAsync(cancellationToken);
         if (stationIds is not null && !stationIds.Contains(stationId))
             throw new AbpAuthorizationException("The station is outside the current user's assignment.");
@@ -95,49 +100,73 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
 
     public async Task<PagedBusDto<OperatorDto>> GetOperatorsAsync(int skip, int take, CancellationToken ct)
     {
-        var query = db.TransportOperators.AsNoTracking().OrderBy(x => x.Code);
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        var query = db.TransportOperators.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => x.StationId.HasValue && stationIds.Contains(x.StationId.Value));
+        query = query.OrderBy(x => x.Code);
         var total = await query.LongCountAsync(ct); var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100))
-            .Select(x => new OperatorDto(x.Id, x.Code, x.Name, x.IsActive)).ToListAsync(ct); return new(total, items);
+            .Select(x => new OperatorDto(x.Id, x.Code, x.Name, x.IsActive, x.StationId)).ToListAsync(ct); return new(total, items);
     }
 
     public async Task<OperatorDto> CreateOperatorAsync(CreateOperatorDto input, CancellationToken ct)
     {
-        var entity = new TransportOperator(Guid.NewGuid(), input.Code, input.Name); db.TransportOperators.Add(entity); await db.SaveChangesAsync(ct); return new(entity.Id, entity.Code, entity.Name, entity.IsActive);
+        var stationId = await ResolveMasterDataStationAsync(input.StationId, ct);
+        var entity = new TransportOperator(Guid.NewGuid(), input.Code, input.Name, stationId); db.TransportOperators.Add(entity); await db.SaveChangesAsync(ct);
+        return new(entity.Id, entity.Code, entity.Name, entity.IsActive, entity.StationId);
     }
 
     public async Task<PagedBusDto<RouteDto>> GetRoutesAsync(int skip, int take, CancellationToken ct)
     {
-        var query = db.FixedRoutes.AsNoTracking().OrderBy(x => x.Code); var total = await query.LongCountAsync(ct);
-        var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).Select(x => new RouteDto(x.Id, x.Code, x.Name, x.OperatorId, x.IsActive)).ToListAsync(ct); return new(total, items);
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        var query = db.FixedRoutes.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => x.StationId.HasValue && stationIds.Contains(x.StationId.Value));
+        query = query.OrderBy(x => x.Code); var total = await query.LongCountAsync(ct);
+        var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).Select(x => new RouteDto(x.Id, x.Code, x.Name, x.OperatorId, x.IsActive, x.StationId)).ToListAsync(ct); return new(total, items);
     }
 
     public async Task<RouteDto> CreateRouteAsync(CreateRouteDto input, CancellationToken ct)
     {
-        if (!await db.TransportOperators.AnyAsync(x => x.Id == input.OperatorId && x.IsActive, ct)) throw new BusinessException("Bus:OperatorNotFound");
-        var entity = new FixedRoute(Guid.NewGuid(), input.Code, input.Name, input.OperatorId); db.FixedRoutes.Add(entity); await db.SaveChangesAsync(ct); return new(entity.Id, entity.Code, entity.Name, entity.OperatorId, entity.IsActive);
+        var operatorEntity = await db.TransportOperators.SingleOrDefaultAsync(x => x.Id == input.OperatorId && x.IsActive, ct)
+            ?? throw new BusinessException("Bus:OperatorNotFound");
+        var stationId = await ResolveMasterDataStationAsync(input.StationId ?? operatorEntity.StationId, ct);
+        EnsureMasterDataStationMatches(operatorEntity.StationId, stationId);
+        var entity = new FixedRoute(Guid.NewGuid(), input.Code, input.Name, input.OperatorId, stationId); db.FixedRoutes.Add(entity); await db.SaveChangesAsync(ct);
+        return new(entity.Id, entity.Code, entity.Name, entity.OperatorId, entity.IsActive, entity.StationId);
     }
 
     public async Task<PagedBusDto<VehicleDto>> GetVehiclesAsync(int skip, int take, CancellationToken ct)
     {
-        var query = db.Vehicles.AsNoTracking().OrderBy(x => x.PlateNumber); var total = await query.LongCountAsync(ct);
-        var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).Select(x => new VehicleDto(x.Id, x.PlateNumber, x.VehicleType, x.OperatorId, x.IsActive)).ToListAsync(ct); return new(total, items);
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        var query = db.Vehicles.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => x.StationId.HasValue && stationIds.Contains(x.StationId.Value));
+        query = query.OrderBy(x => x.PlateNumber); var total = await query.LongCountAsync(ct);
+        var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).Select(x => new VehicleDto(x.Id, x.PlateNumber, x.VehicleType, x.OperatorId, x.IsActive, x.StationId)).ToListAsync(ct); return new(total, items);
     }
 
     public async Task<VehicleDto> CreateVehicleAsync(CreateVehicleDto input, CancellationToken ct)
     {
-        if (!await db.TransportOperators.AnyAsync(x => x.Id == input.OperatorId && x.IsActive, ct)) throw new BusinessException("Bus:OperatorNotFound");
-        var entity = new Vehicle(Guid.NewGuid(), input.PlateNumber, input.VehicleType, input.OperatorId); db.Vehicles.Add(entity); await db.SaveChangesAsync(ct); return new(entity.Id, entity.PlateNumber, entity.VehicleType, entity.OperatorId, entity.IsActive);
+        var operatorEntity = await db.TransportOperators.SingleOrDefaultAsync(x => x.Id == input.OperatorId && x.IsActive, ct)
+            ?? throw new BusinessException("Bus:OperatorNotFound");
+        var stationId = await ResolveMasterDataStationAsync(input.StationId ?? operatorEntity.StationId, ct);
+        EnsureMasterDataStationMatches(operatorEntity.StationId, stationId);
+        var entity = new Vehicle(Guid.NewGuid(), input.PlateNumber, input.VehicleType, input.OperatorId, stationId); db.Vehicles.Add(entity); await db.SaveChangesAsync(ct);
+        return new(entity.Id, entity.PlateNumber, entity.VehicleType, entity.OperatorId, entity.IsActive, entity.StationId);
     }
 
     public async Task<PagedBusDto<DriverDto>> GetDriversAsync(int skip, int take, CancellationToken ct)
     {
-        var query = db.Drivers.AsNoTracking().OrderBy(x => x.FullName); var total = await query.LongCountAsync(ct);
-        var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).Select(x => new DriverDto(x.Id, x.FullName, x.LicenseNumber, x.IsActive)).ToListAsync(ct); return new(total, items);
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        var query = db.Drivers.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => x.StationId.HasValue && stationIds.Contains(x.StationId.Value));
+        query = query.OrderBy(x => x.FullName); var total = await query.LongCountAsync(ct);
+        var items = await query.Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).Select(x => new DriverDto(x.Id, x.FullName, x.LicenseNumber, x.IsActive, x.StationId)).ToListAsync(ct); return new(total, items);
     }
 
     public async Task<DriverDto> CreateDriverAsync(CreateDriverDto input, CancellationToken ct)
     {
-        var entity = new Driver(Guid.NewGuid(), input.FullName, input.LicenseNumber); db.Drivers.Add(entity); await db.SaveChangesAsync(ct); return new(entity.Id, entity.FullName, entity.LicenseNumber, entity.IsActive);
+        var stationId = await ResolveMasterDataStationAsync(input.StationId, ct);
+        var entity = new Driver(Guid.NewGuid(), input.FullName, input.LicenseNumber, stationId); db.Drivers.Add(entity); await db.SaveChangesAsync(ct);
+        return new(entity.Id, entity.FullName, entity.LicenseNumber, entity.IsActive, entity.StationId);
     }
 
     public async Task<PagedBusDto<CarrierContractDto>> GetCarrierContractsAsync(Guid? stationId, DateTime? onDate, int skip, int take, CancellationToken ct)
@@ -156,7 +185,9 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     public async Task<CarrierContractDto> CreateCarrierContractAsync(CreateCarrierContractDto input, CancellationToken ct)
     {
         await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
-        if (!await db.TransportOperators.AnyAsync(x => x.Id == input.OperatorId && x.IsActive, ct)) throw new BusinessException("Bus:OperatorNotFound");
+        var operatorEntity = await db.TransportOperators.SingleOrDefaultAsync(x => x.Id == input.OperatorId && x.IsActive, ct)
+            ?? throw new BusinessException("Bus:OperatorNotFound");
+        EnsureMasterDataStationMatches(operatorEntity.StationId, input.StationId);
         var contract = new CarrierContract(Guid.NewGuid(), input.StationId, input.OperatorId, input.ContractNumber,
             input.StartDate, input.EndDate, input.DocumentId);
         db.CarrierContracts.Add(contract); await db.SaveChangesAsync(ct); return ToDto(contract);
@@ -169,8 +200,9 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var query = db.VehicleLegalDocuments.AsNoTracking();
         if (stationIds is not null)
         {
-            var scopedVehicles = db.DepartureTrips.Where(x => stationIds.Contains(x.StationId)).Select(x => x.VehicleId);
-            query = query.Where(x => scopedVehicles.Contains(x.VehicleId));
+            query = query.Where(x => (x.StationId.HasValue && stationIds.Contains(x.StationId.Value)) ||
+                (!x.StationId.HasValue && db.DepartureTrips.Where(t => t.VehicleId == x.VehicleId).Select(t => t.StationId).Distinct().Count() == 1 &&
+                    db.DepartureTrips.Any(t => stationIds.Contains(t.StationId) && t.VehicleId == x.VehicleId)));
         }
         if (vehicleId.HasValue) query = query.Where(x => x.VehicleId == vehicleId);
         if (expiringBefore.HasValue) query = query.Where(x => x.ExpiresOn <= expiringBefore.Value.Date);
@@ -181,10 +213,28 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
 
     public async Task<VehicleLegalDocumentDto> CreateVehicleLegalDocumentAsync(CreateVehicleLegalDocumentDto input, CancellationToken ct)
     {
-        scope.EnsureGlobal();
-        if (!await db.Vehicles.AnyAsync(x => x.Id == input.VehicleId && x.IsActive, ct)) throw new BusinessException("Bus:VehicleNotFound");
-        var document = new VehicleLegalDocument(Guid.NewGuid(), input.VehicleId, input.DocumentType, input.ExpiresOn, input.DocumentId);
+        var vehicle = await db.Vehicles.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.VehicleId && x.IsActive, ct)
+            ?? throw new BusinessException("Bus:VehicleNotFound");
+        var stationId = await ResolveVehicleStationAsync(vehicle.Id, input.StationId, ct);
+        EnsureMasterDataStationMatches(vehicle.StationId, stationId);
+        await scope.EnsureStationAsync(stationId, ct);
+        await RequireStationAsync(stationId, ct);
+        if (await db.VehicleLegalDocuments.AnyAsync(x => x.VehicleId == vehicle.Id && x.DocumentType == input.DocumentType, ct))
+            throw new BusinessException("Bus:VehicleDocumentExists");
+        var document = new VehicleLegalDocument(Guid.NewGuid(), vehicle.Id, input.DocumentType, input.ExpiresOn, input.DocumentId, stationId);
         db.VehicleLegalDocuments.Add(document); await db.SaveChangesAsync(ct); return ToDto(document);
+    }
+
+    public async Task<VehicleLegalDocumentDto> UpdateVehicleLegalDocumentAsync(Guid id, UpdateVehicleLegalDocumentDto input, CancellationToken ct)
+    {
+        var document = await db.VehicleLegalDocuments.SingleOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new BusinessException("Bus:VehicleDocumentNotFound");
+        var stationId = await ResolveVehicleStationAsync(document.VehicleId, document.StationId, ct);
+        await scope.EnsureStationAsync(stationId, ct);
+        document.Renew(input.ExpiresOn, input.DocumentId, input.IsActive);
+        if (!document.StationId.HasValue) document.AssignStation(stationId);
+        await db.SaveChangesAsync(ct);
+        return ToDto(document);
     }
 
     public async Task<DepartureDto> CreateDepartureAsync(CreateDepartureDto input, CancellationToken ct)
@@ -192,14 +242,18 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         await scope.EnsureStationAsync(input.StationId, ct);
         await RequireStationAsync(input.StationId, ct);
         await EnsureOpenDayAsync(input.StationId, input.BusinessDate, ct);
-        if (!await db.TransportOperators.AnyAsync(x => x.Id == input.OperatorId && x.IsActive, ct)) throw new BusinessException("Bus:OperatorNotFound");
-        if (!await db.FixedRoutes.AnyAsync(x => x.Id == input.RouteId && x.OperatorId == input.OperatorId && x.IsActive, ct)) throw new BusinessException("Bus:RouteNotFound");
-        var vehicle = await db.Vehicles.SingleOrDefaultAsync(x => x.Id == input.VehicleId && x.OperatorId == input.OperatorId && x.IsActive, ct) ?? throw new BusinessException("Bus:VehicleNotFound");
-        var driver = await db.Drivers.SingleOrDefaultAsync(x => x.Id == input.DriverId && x.IsActive, ct) ?? throw new BusinessException("Bus:DriverNotFound");
+        if (!await db.TransportOperators.AnyAsync(x => x.Id == input.OperatorId && x.IsActive &&
+            (x.StationId == input.StationId || (scope.IsGlobal && !x.StationId.HasValue)), ct)) throw new BusinessException("Bus:OperatorNotFound");
+        if (!await db.FixedRoutes.AnyAsync(x => x.Id == input.RouteId && x.OperatorId == input.OperatorId && x.IsActive &&
+            (x.StationId == input.StationId || (scope.IsGlobal && !x.StationId.HasValue)), ct)) throw new BusinessException("Bus:RouteNotFound");
+        var vehicle = await db.Vehicles.SingleOrDefaultAsync(x => x.Id == input.VehicleId && x.OperatorId == input.OperatorId && x.IsActive &&
+            (x.StationId == input.StationId || (scope.IsGlobal && !x.StationId.HasValue)), ct) ?? throw new BusinessException("Bus:VehicleNotFound");
+        var driver = await db.Drivers.SingleOrDefaultAsync(x => x.Id == input.DriverId && x.IsActive &&
+            (x.StationId == input.StationId || (scope.IsGlobal && !x.StationId.HasValue)), ct) ?? throw new BusinessException("Bus:DriverNotFound");
         var businessDate = input.BusinessDate.Date;
-        var inspectionValid = input.InspectionValid && await HasVehicleDocumentAsync(input.VehicleId, ["Inspection", "DangKiem"], businessDate, ct);
-        var routeBadgeValid = input.RouteBadgeValid && await HasVehicleDocumentAsync(input.VehicleId, ["RouteBadge", "PhuHieu"], businessDate, ct);
-        var insuranceValid = input.InsuranceValid && await HasVehicleDocumentAsync(input.VehicleId, ["Insurance", "BaoHiem"], businessDate, ct);
+        var inspectionValid = input.InspectionValid && await HasVehicleDocumentAsync(input.VehicleId, ["Inspection", "DangKiem"], businessDate, input.StationId, ct);
+        var routeBadgeValid = input.RouteBadgeValid && await HasVehicleDocumentAsync(input.VehicleId, ["RouteBadge", "PhuHieu"], businessDate, input.StationId, ct);
+        var insuranceValid = input.InsuranceValid && await HasVehicleDocumentAsync(input.VehicleId, ["Insurance", "BaoHiem"], businessDate, input.StationId, ct);
         var driverLicenseValid = input.DriverLicenseValid && !string.IsNullOrWhiteSpace(driver.LicenseNumber);
         var contractValid = input.ContractValid && await db.CarrierContracts.AnyAsync(x => x.StationId == input.StationId && x.OperatorId == input.OperatorId &&
             x.IsActive && x.StartDate <= businessDate && x.EndDate >= businessDate, ct);
@@ -242,6 +296,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     {
         var trip = await db.DepartureTrips.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:DepartureNotFound");
         await scope.EnsureStationAsync(trip.StationId, ct);
+        await EnsureOpenDayAsync(trip.StationId, trip.BusinessDate, ct);
         if (trip.Status is not (BusStatuses.Registered or BusStatuses.Blocked)) throw new BusinessException("Bus:DepartureChecksLocked");
         var allowed = new HashSet<string>(["Inspection", "RouteBadge", "Insurance", "DriverLicense", "TransportOrder", "Contract", "Fee", "Control"], StringComparer.Ordinal);
         if (input.Checks is null || input.Checks.Any(x => string.IsNullOrWhiteSpace(x.CheckType))) throw new BusinessException("Bus:DepartureChecksInvalid");
@@ -264,6 +319,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     {
         var trip = await db.DepartureTrips.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:DepartureNotFound");
         await scope.EnsureStationAsync(trip.StationId, ct);
+        await EnsureOpenDayAsync(trip.StationId, trip.BusinessDate, ct);
         switch (action.Trim().ToLowerInvariant())
         {
             case "ready":
@@ -286,6 +342,9 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     public async Task<TariffDto> CreateTariffAsync(CreateTariffDto input, CancellationToken ct)
     {
         await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
+        if (input.RouteId.HasValue && !await db.FixedRoutes.AnyAsync(x => x.Id == input.RouteId && x.IsActive &&
+            (x.StationId == input.StationId || (scope.IsGlobal && !x.StationId.HasValue)), ct))
+            throw new BusinessException("Bus:RouteNotFound");
         var tariff = new Tariff(Guid.NewGuid(), input.StationId, input.RouteId, input.VehicleType, input.FeeType, input.Amount, input.EffectiveFrom, input.EffectiveTo);
         db.Tariffs.Add(tariff); await db.SaveChangesAsync(ct); return ToDto(tariff);
     }
@@ -304,6 +363,9 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
                 return await GetReceiptAsync(previous.Id, ct);
             }
         }
+        await EnsureOpenDayAsync(input.StationId, input.BusinessDate, ct);
+        await EnsureShiftAcceptsSourceMutationAsync(input.StationId, input.BusinessDate, input.ShiftCode, ct);
+        await ValidateRevenueSourceAsync(input, ct);
         DepartureTrip? departure = null;
         if (input.DepartureId.HasValue)
         {
@@ -311,7 +373,8 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
                 ?? throw new BusinessException("Bus:DepartureNotFound");
         }
         var receipt = new RevenueReceipt(Guid.NewGuid(), MakeReceiptNumber(input.BusinessDate), input.StationId, input.BusinessDate,
-            input.ShiftCode, input.SourceType, input.DepartureId, input.OperatorId, UserId, idempotencyKey);
+            input.ShiftCode, input.SourceType, input.DepartureId, input.OperatorId, UserId, idempotencyKey,
+            input.SourceReference, input.VehiclePlateNumber, input.PremisesUnitId);
         foreach (var line in input.Lines)
         {
             if (line.TariffId.HasValue)
@@ -369,6 +432,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     {
         await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
         await EnsureOpenDayAsync(input.StationId, input.BusinessDate, ct);
+        await EnsureShiftAcceptsSourceMutationAsync(input.StationId, input.BusinessDate, input.ShiftCode, ct);
         var expense = new ExpenseEntry(Guid.NewGuid(), input.StationId, input.BusinessDate, input.ShiftCode, input.Category, input.Amount, input.Description, input.DocumentId, UserId);
         db.ExpenseEntries.Add(expense);
         db.OutboxMessages.Add(BusOutbox.Create(new BusExpenseChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
@@ -397,7 +461,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     public async Task<ExpenseDto> SubmitExpenseAsync(Guid id, CancellationToken ct)
     {
         var expense = await db.ExpenseEntries.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:ExpenseNotFound");
-        await scope.EnsureStationAsync(expense.StationId, ct); expense.Submit();
+        await scope.EnsureStationAsync(expense.StationId, ct); await EnsureOpenDayAsync(expense.StationId, expense.BusinessDate, ct); expense.Submit();
         db.OutboxMessages.Add(BusOutbox.Create(new BusExpenseChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
             expense.Id, expense.StationId, expense.Amount, expense.Status), Guid.NewGuid().ToString("N")));
         AddMutationAudit("Expense.Submit", expense.Id, nameof(ExpenseEntry), expense.StationId);
@@ -407,7 +471,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     public async Task<ExpenseDto> ApproveExpenseAsync(Guid id, CancellationToken ct)
     {
         var expense = await db.ExpenseEntries.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:ExpenseNotFound");
-        await scope.EnsureStationAsync(expense.StationId, ct); expense.Approve(UserId);
+        await scope.EnsureStationAsync(expense.StationId, ct); await EnsureOpenDayAsync(expense.StationId, expense.BusinessDate, ct); expense.Approve(UserId);
         db.OutboxMessages.Add(BusOutbox.Create(new BusExpenseChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
             expense.Id, expense.StationId, expense.Amount, expense.Status), Guid.NewGuid().ToString("N")));
         AddMutationAudit("Expense.Approve", expense.Id, nameof(ExpenseEntry), expense.StationId);
@@ -435,7 +499,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
 
     public async Task<LeaseContractDto> CreateLeaseAsync(CreateLeaseContractDto input, CancellationToken ct)
     {
-        await scope.EnsureStationAsync(input.StationId, ct);
+        await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
         if (!await db.PremisesUnits.AnyAsync(x => x.Id == input.PremisesUnitId && x.StationId == input.StationId, ct)) throw new BusinessException("Bus:PremisesNotFound");
         var lease = new LeaseContract(Guid.NewGuid(), input.StationId, input.PremisesUnitId, input.TenantName, input.StartDate, input.EndDate, input.RentAmount, input.RentPeriod); db.LeaseContracts.Add(lease); await db.SaveChangesAsync(ct); return ToDto(lease);
     }
@@ -459,19 +523,22 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     public async Task<SettlementDto> CreateShiftSettlementAsync(CreateShiftSettlementDto input, CancellationToken ct)
     {
         await scope.EnsureStationAsync(input.StationId, ct);
+        await RequireStationAsync(input.StationId, ct);
         var date = BusDates.BusinessDate(input.BusinessDate);
         await EnsureOpenDayAsync(input.StationId, date, ct);
         var revenue = await db.RevenueReceipts.Where(x => x.StationId == input.StationId && x.BusinessDate == date && x.ShiftCode == input.ShiftCode && x.Status == BusStatuses.Issued).SumAsync(x => (decimal?)x.TotalAmount, ct) ?? 0;
         var expense = await db.ExpenseEntries.Where(x => x.StationId == input.StationId && x.BusinessDate == date && x.ShiftCode == input.ShiftCode && x.Status == BusStatuses.Approved).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
         var settlement = new ShiftSettlement(Guid.NewGuid(), input.StationId, date, input.ShiftCode, revenue, expense, UserId);
-        db.ShiftSettlements.Add(settlement); AddMutationAudit("ShiftSettlement.Create", settlement.Id, nameof(ShiftSettlement), settlement.StationId);
+        db.ShiftSettlements.Add(settlement); AddSettlementOutbox(settlement); AddMutationAudit("ShiftSettlement.Create", settlement.Id, nameof(ShiftSettlement), settlement.StationId);
         await db.SaveChangesAsync(ct); return ToDto(settlement);
     }
 
     public async Task<SettlementDto> TransitionSettlementAsync(Guid id, string action, CancellationToken ct)
     {
         var settlement = await db.ShiftSettlements.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:SettlementNotFound");
-        await scope.EnsureStationAsync(settlement.StationId, ct); var user = UserId;
+        await scope.EnsureStationAsync(settlement.StationId, ct); await EnsureOpenDayAsync(settlement.StationId, settlement.BusinessDate, ct); var user = UserId;
+        var totals = await GetShiftTotalsAsync(settlement.StationId, settlement.BusinessDate, settlement.ShiftCode, ct);
+        settlement.RefreshTotals(totals.Revenue, totals.Expense);
         switch (action.Trim().ToLowerInvariant())
         {
             case "submit": settlement.Submit(user); break;
@@ -480,17 +547,26 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
             case "close": settlement.Close(); break;
             default: throw new BusinessException("Bus:UnsupportedSettlementAction");
         }
+        AddSettlementOutbox(settlement);
         AddMutationAudit($"ShiftSettlement.{action.Trim().ToUpperInvariant()}", settlement.Id, nameof(ShiftSettlement), settlement.StationId);
         await db.SaveChangesAsync(ct); return ToDto(settlement);
     }
 
     public async Task<DailyCloseDto> CloseDailyAsync(CloseDailyDto input, CancellationToken ct)
     {
-        await scope.EnsureStationAsync(input.StationId, ct); var date = BusDates.BusinessDate(input.BusinessDate);
+        await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct); var date = BusDates.BusinessDate(input.BusinessDate);
+        await LockBusinessDayAsync(input.StationId, date, ct);
         if (await db.ExpenseEntries.AnyAsync(x => x.StationId == input.StationId && x.BusinessDate == date && x.Status != BusStatuses.Approved, ct))
             throw new BusinessException("Bus:ExpensesNotApproved");
         var shifts = await db.ShiftSettlements.Where(x => x.StationId == input.StationId && x.BusinessDate == date).ToListAsync(ct);
         if (shifts.Count == 0 || shifts.Any(x => x.Status != BusStatuses.Approved && x.Status != BusStatuses.Closed)) throw new BusinessException("Bus:ShiftsNotApproved");
+        var settledShiftCodes = shifts.Where(x => x.Status is BusStatuses.Approved or BusStatuses.Closed)
+            .Select(x => x.ShiftCode).ToArray();
+        if (await db.RevenueReceipts.AnyAsync(x => x.StationId == input.StationId && x.BusinessDate == date &&
+            x.Status == BusStatuses.Issued && !settledShiftCodes.Contains(x.ShiftCode), ct) ||
+            await db.ExpenseEntries.AnyAsync(x => x.StationId == input.StationId && x.BusinessDate == date &&
+                x.Status == BusStatuses.Approved && !settledShiftCodes.Contains(x.ShiftCode), ct))
+            throw new BusinessException("Bus:ShiftsNotApproved");
         var close = await db.DailyCloses.SingleOrDefaultAsync(x => x.StationId == input.StationId && x.BusinessDate == date, ct);
         if (close is null)
         {
@@ -505,44 +581,147 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
             close.ShiftCount, close.Status, close.ClosedByUserId, close.ClosedAtUtc);
     }
 
+    public async Task<AdjustmentDto> CreateAdjustmentAsync(CreateAdjustmentDto input, CancellationToken ct)
+    {
+        var userId = UserId ?? throw new AbpAuthorizationException("Authenticated user required.");
+        await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
+        if ((input.ReceiptId.HasValue) == (input.ExpenseId.HasValue)) throw new BusinessException("Bus:AdjustmentTargetInvalid");
+
+        Guid targetStationId;
+        DateTime targetDate;
+        if (input.ReceiptId.HasValue)
+        {
+            var receipt = await db.RevenueReceipts.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.ReceiptId.Value, ct)
+                ?? throw new BusinessException("Bus:ReceiptNotFound");
+            if (receipt.Status != BusStatuses.Issued) throw new BusinessException("Bus:AdjustmentReceiptInvalid");
+            targetStationId = receipt.StationId; targetDate = receipt.BusinessDate;
+        }
+        else
+        {
+            var expense = await db.ExpenseEntries.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.ExpenseId!.Value, ct)
+                ?? throw new BusinessException("Bus:ExpenseNotFound");
+            if (expense.Status != BusStatuses.Approved) throw new BusinessException("Bus:AdjustmentExpenseInvalid");
+            targetStationId = expense.StationId; targetDate = expense.BusinessDate;
+        }
+
+        if (targetStationId != input.StationId) throw new BusinessException("Bus:AdjustmentStationMismatch");
+        await EnsureClosedDayAsync(targetStationId, targetDate, ct);
+        var adjustment = new AdjustmentEntry(Guid.NewGuid(), input.StationId, input.ReceiptId, input.ExpenseId, input.Amount, input.Reason, userId);
+        db.AdjustmentEntries.Add(adjustment);
+        AddAdjustmentOutbox(adjustment);
+        AddMutationAudit("Adjustment.Create", adjustment.Id, nameof(AdjustmentEntry), adjustment.StationId);
+        await db.SaveChangesAsync(ct);
+        return ToDto(adjustment);
+    }
+
+    public async Task<PagedBusDto<AdjustmentDto>> GetAdjustmentsAsync(Guid? stationId, string? status, DateTime? from,
+        DateTime? to, int skip, int take, CancellationToken ct)
+    {
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
+        var query = db.AdjustmentEntries.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
+        if (stationId.HasValue) query = query.Where(x => x.StationId == stationId);
+        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(x => x.Status == status);
+        if (from.HasValue) query = query.Where(x => x.CreationTime >= from.Value.Date);
+        if (to.HasValue) query = query.Where(x => x.CreationTime < to.Value.Date.AddDays(1));
+        var total = await query.LongCountAsync(ct);
+        var items = await query.OrderByDescending(x => x.CreationTime).Skip(Math.Max(skip, 0))
+            .Take(Math.Clamp(take, 1, 100)).ToListAsync(ct);
+        return new(total, items.Select(ToDto).ToList());
+    }
+
+    public async Task<AdjustmentDto> ApproveAdjustmentAsync(Guid id, CancellationToken ct)
+    {
+        var adjustment = await db.AdjustmentEntries.SingleOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new BusinessException("Bus:AdjustmentNotFound");
+        await scope.EnsureStationAsync(adjustment.StationId, ct);
+        var targetDate = adjustment.ReceiptId.HasValue
+            ? await db.RevenueReceipts.Where(x => x.Id == adjustment.ReceiptId.Value).Select(x => (DateTime?)x.BusinessDate).SingleOrDefaultAsync(ct)
+            : await db.ExpenseEntries.Where(x => x.Id == adjustment.ExpenseId!.Value).Select(x => (DateTime?)x.BusinessDate).SingleOrDefaultAsync(ct);
+        if (!targetDate.HasValue) throw new BusinessException("Bus:AdjustmentTargetNotFound");
+        await EnsureClosedDayAsync(adjustment.StationId, targetDate.Value, ct);
+        adjustment.Approve(UserId ?? throw new AbpAuthorizationException("Authenticated user required."), DateTime.UtcNow);
+        AddAdjustmentOutbox(adjustment);
+        AddMutationAudit("Adjustment.Approve", adjustment.Id, nameof(AdjustmentEntry), adjustment.StationId);
+        await db.SaveChangesAsync(ct);
+        return ToDto(adjustment);
+    }
+
     public async Task<DashboardSummaryDto> GetDashboardAsync(DateTime from, DateTime to, Guid? stationId, CancellationToken ct)
     {
-        var stationIds = await scope.GetStationIdsAsync(ct); var start = BusDates.BusinessDate(from); var end = BusDates.BusinessDate(to);
-        var receipts = db.RevenueReceipts.AsNoTracking().Where(x => x.BusinessDate >= start && x.BusinessDate <= end && x.Status == BusStatuses.Issued);
-        var expenses = db.ExpenseEntries.AsNoTracking().Where(x => x.BusinessDate >= start && x.BusinessDate <= end && x.Status == BusStatuses.Approved);
-        var trips = db.DepartureTrips.AsNoTracking().Where(x => x.BusinessDate >= start && x.BusinessDate <= end);
-        var shifts = db.ShiftSettlements.AsNoTracking().Where(x => x.BusinessDate >= start && x.BusinessDate <= end && x.Status != BusStatuses.Closed);
-        var docs = db.VehicleLegalDocuments.AsNoTracking().Where(x => x.IsActive && x.ExpiresOn <= DateTime.UtcNow.Date.AddDays(30));
-        if (stationIds is not null)
-        {
-            receipts = receipts.Where(x => stationIds.Contains(x.StationId));
-            expenses = expenses.Where(x => stationIds.Contains(x.StationId));
-            trips = trips.Where(x => stationIds.Contains(x.StationId));
-            shifts = shifts.Where(x => stationIds.Contains(x.StationId));
-            var scopedVehicleIds = db.DepartureTrips.Where(x => stationIds.Contains(x.StationId)).Select(x => x.VehicleId);
-            docs = docs.Where(x => scopedVehicleIds.Contains(x.VehicleId));
-        }
-        if (stationId.HasValue)
-        {
-            await scope.EnsureStationAsync(stationId.Value, ct);
-            receipts = receipts.Where(x => x.StationId == stationId); expenses = expenses.Where(x => x.StationId == stationId);
-            trips = trips.Where(x => x.StationId == stationId); shifts = shifts.Where(x => x.StationId == stationId);
-        }
-        IQueryable<DepartureTrip> dashboardTrips = db.DepartureTrips.AsNoTracking();
-        if (stationIds is not null) dashboardTrips = dashboardTrips.Where(x => stationIds.Contains(x.StationId));
-        if (stationId.HasValue) dashboardTrips = dashboardTrips.Where(x => x.StationId == stationId);
-        var dashboardVehicleIds = dashboardTrips.Select(x => x.VehicleId);
-        docs = docs.Where(x => dashboardVehicleIds.Contains(x.VehicleId));
-        return new(from, to, await receipts.SumAsync(x => (decimal?)x.TotalAmount, ct) ?? 0, await expenses.SumAsync(x => (decimal?)x.Amount, ct) ?? 0,
-            await trips.CountAsync(ct), await receipts.CountAsync(ct), await shifts.CountAsync(ct), await docs.CountAsync(ct), DateTime.UtcNow);
+        if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
+        var permitted = await scope.GetStationIdsAsync(ct);
+        var dashboardStationIds = stationId.HasValue
+            ? [stationId.Value]
+            : permitted is not null
+                ? permitted.ToArray()
+                : await db.BusStations.AsNoTracking().Where(x => x.IsActive).Select(x => x.Id).ToArrayAsync(ct);
+        var start = BusDates.BusinessDate(from); var end = BusDates.BusinessDate(to);
+        var receipts = db.RevenueReceipts.AsNoTracking().Where(x => dashboardStationIds.Contains(x.StationId) &&
+            x.BusinessDate >= start && x.BusinessDate <= end && x.Status == BusStatuses.Issued);
+        var expenses = db.ExpenseEntries.AsNoTracking().Where(x => dashboardStationIds.Contains(x.StationId) &&
+            x.BusinessDate >= start && x.BusinessDate <= end && x.Status == BusStatuses.Approved);
+        var trips = db.DepartureTrips.AsNoTracking().Where(x => dashboardStationIds.Contains(x.StationId) &&
+            x.BusinessDate >= start && x.BusinessDate <= end);
+        var shifts = db.ShiftSettlements.AsNoTracking().Where(x => dashboardStationIds.Contains(x.StationId) &&
+            x.BusinessDate >= start && x.BusinessDate <= end && x.Status != BusStatuses.Closed);
+        var receiptAdjustments = from adjustment in db.AdjustmentEntries.AsNoTracking()
+                                 join receipt in db.RevenueReceipts.AsNoTracking() on adjustment.ReceiptId equals receipt.Id
+                                 where adjustment.Status == BusStatuses.Approved && dashboardStationIds.Contains(adjustment.StationId) &&
+                                     receipt.BusinessDate >= start && receipt.BusinessDate <= end
+                                 select adjustment;
+        var expenseAdjustments = from adjustment in db.AdjustmentEntries.AsNoTracking()
+                                 join expense in db.ExpenseEntries.AsNoTracking() on adjustment.ExpenseId equals expense.Id
+                                 where adjustment.Status == BusStatuses.Approved && dashboardStationIds.Contains(adjustment.StationId) &&
+                                     expense.BusinessDate >= start && expense.BusinessDate <= end
+                                 select adjustment;
+
+        var receiptBase = await receipts.GroupBy(x => x.StationId).Select(g => new { g.Key, Amount = g.Sum(x => x.TotalAmount), Count = g.Count() }).ToDictionaryAsync(x => x.Key, ct);
+        var expenseBase = await expenses.GroupBy(x => x.StationId).Select(g => new { g.Key, Amount = g.Sum(x => x.Amount) }).ToDictionaryAsync(x => x.Key, ct);
+        var receiptAdjustment = await receiptAdjustments.GroupBy(x => x.StationId).Select(g => new { g.Key, Amount = g.Sum(x => x.Amount) }).ToDictionaryAsync(x => x.Key, ct);
+        var expenseAdjustment = await expenseAdjustments.GroupBy(x => x.StationId).Select(g => new { g.Key, Amount = g.Sum(x => x.Amount) }).ToDictionaryAsync(x => x.Key, ct);
+        var tripCounts = await trips.GroupBy(x => x.StationId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, ct);
+        var openShiftCounts = await shifts.GroupBy(x => x.StationId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, ct);
+        var stationRows = dashboardStationIds.OrderBy(x => x).Select(id => new StationDashboardRowDto(id,
+            receiptBase.GetValueOrDefault(id)?.Amount ?? 0, expenseBase.GetValueOrDefault(id)?.Amount ?? 0,
+            tripCounts.GetValueOrDefault(id)?.Count ?? 0, receiptBase.GetValueOrDefault(id)?.Count ?? 0,
+            openShiftCounts.GetValueOrDefault(id)?.Count ?? 0, receiptAdjustment.GetValueOrDefault(id)?.Amount ?? 0,
+            expenseAdjustment.GetValueOrDefault(id)?.Amount ?? 0)).ToList();
+
+        var threshold = DateTime.UtcNow.Date.AddDays(30);
+        var docs = db.VehicleLegalDocuments.AsNoTracking().Where(x => x.IsActive && x.ExpiresOn <= threshold &&
+            ((x.StationId.HasValue && dashboardStationIds.Contains(x.StationId.Value)) ||
+             (!x.StationId.HasValue && db.DepartureTrips.Where(t => t.VehicleId == x.VehicleId).Select(t => t.StationId).Distinct().Count() == 1 &&
+                 db.DepartureTrips.Any(t => dashboardStationIds.Contains(t.StationId) && t.VehicleId == x.VehicleId))));
+        var contracts = db.CarrierContracts.AsNoTracking().Where(x => dashboardStationIds.Contains(x.StationId) && x.IsActive && x.EndDate <= threshold);
+        var leases = db.LeaseContracts.AsNoTracking().Where(x => dashboardStationIds.Contains(x.StationId) && x.Status != BusStatuses.Closed && x.EndDate <= threshold);
+        return new(from, to, receiptBase.Values.Sum(x => x.Amount), expenseBase.Values.Sum(x => x.Amount),
+            tripCounts.Values.Sum(x => x.Count), receiptBase.Values.Sum(x => x.Count), openShiftCounts.Values.Sum(x => x.Count),
+            await docs.CountAsync(ct), DateTime.UtcNow, receiptAdjustment.Values.Sum(x => x.Amount), expenseAdjustment.Values.Sum(x => x.Amount),
+            await contracts.CountAsync(ct), await leases.CountAsync(ct), stationRows);
     }
 
     public async Task<IReadOnlyList<RevenueReportRowDto>> GetRevenueReportAsync(DateTime from, DateTime to, Guid? stationId, CancellationToken ct)
     {
-        var stationIds = await scope.GetStationIdsAsync(ct); var query = db.RevenueReceipts.AsNoTracking().Where(x => x.BusinessDate >= from.Date && x.BusinessDate <= to.Date && x.Status == BusStatuses.Issued);
+        var startDate = from.Date; var endDate = to.Date;
+        var stationIds = await scope.GetStationIdsAsync(ct); var query = db.RevenueReceipts.AsNoTracking().Where(x => x.BusinessDate >= startDate && x.BusinessDate <= endDate && x.Status == BusStatuses.Issued);
         if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
         if (stationId.HasValue) { await scope.EnsureStationAsync(stationId.Value, ct); query = query.Where(x => x.StationId == stationId); }
-        return await query.GroupBy(x => new { x.StationId, x.SourceType }).Select(g => new RevenueReportRowDto(g.Key.StationId, g.Key.SourceType, g.Sum(x => x.TotalAmount), g.Count())).OrderBy(x => x.StationId).ThenBy(x => x.SourceType).ToListAsync(ct);
+        var baseRows = await query.GroupBy(x => new { x.StationId, x.SourceType })
+            .Select(g => new RevenueReportRowDto(g.Key.StationId, g.Key.SourceType, g.Sum(x => x.TotalAmount), g.Count()))
+            .ToListAsync(ct);
+        var adjustments = from adjustment in db.AdjustmentEntries.AsNoTracking()
+                          join receipt in db.RevenueReceipts.AsNoTracking() on adjustment.ReceiptId equals receipt.Id
+                          where adjustment.Status == BusStatuses.Approved && receipt.BusinessDate >= startDate && receipt.BusinessDate <= endDate
+                          select new { adjustment.StationId, receipt.SourceType, adjustment.Amount };
+        if (stationIds is not null) adjustments = adjustments.Where(x => stationIds.Contains(x.StationId));
+        if (stationId.HasValue) adjustments = adjustments.Where(x => x.StationId == stationId);
+        var adjustmentRows = await adjustments.GroupBy(x => new { x.StationId, x.SourceType })
+            .Select(g => new { g.Key.StationId, g.Key.SourceType, Amount = g.Sum(x => x.Amount) }).ToListAsync(ct);
+        var adjustmentMap = adjustmentRows.ToDictionary(x => (x.StationId, x.SourceType), x => x.Amount);
+        return baseRows.Select(x => x with { AdjustmentAmount = adjustmentMap.GetValueOrDefault((x.StationId, x.SourceType)) })
+            .OrderBy(x => x.StationId).ThenBy(x => x.SourceType).ToList();
     }
 
     public async Task<IReadOnlyList<DepartureReportRowDto>> GetDepartureReportAsync(DateTime from, DateTime to, Guid? stationId, CancellationToken ct)
@@ -559,30 +738,73 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
 
     public async Task<IReadOnlyList<ReconciliationReportRowDto>> GetReconciliationReportAsync(DateTime from, DateTime to, Guid? stationId, CancellationToken ct)
     {
+        var startDate = from.Date; var endDate = to.Date;
         var stationIds = await scope.GetStationIdsAsync(ct);
         if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
-        var query = db.ShiftSettlements.AsNoTracking().Where(x => x.BusinessDate >= from.Date && x.BusinessDate <= to.Date);
+        var query = db.ShiftSettlements.AsNoTracking().Where(x => x.BusinessDate >= startDate && x.BusinessDate <= endDate);
         if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
         if (stationId.HasValue) query = query.Where(x => x.StationId == stationId);
-        return await query.OrderBy(x => x.BusinessDate).ThenBy(x => x.StationId).ThenBy(x => x.ShiftCode)
+        var rows = await query.OrderBy(x => x.BusinessDate).ThenBy(x => x.StationId).ThenBy(x => x.ShiftCode)
             .Select(x => new ReconciliationReportRowDto(x.StationId, x.BusinessDate, x.ShiftCode, x.Status, x.TotalRevenue, x.TotalExpense))
             .ToListAsync(ct);
+        var revenueAdjustments = from adjustment in db.AdjustmentEntries.AsNoTracking()
+                                 join receipt in db.RevenueReceipts.AsNoTracking() on adjustment.ReceiptId equals receipt.Id
+                                 where adjustment.Status == BusStatuses.Approved && receipt.BusinessDate >= startDate && receipt.BusinessDate <= endDate
+                                 group adjustment by new { adjustment.StationId, receipt.BusinessDate, receipt.ShiftCode } into grouped
+                                 select new { grouped.Key.StationId, grouped.Key.BusinessDate, grouped.Key.ShiftCode, Amount = grouped.Sum(x => x.Amount) };
+        var expenseAdjustments = from adjustment in db.AdjustmentEntries.AsNoTracking()
+                                 join expense in db.ExpenseEntries.AsNoTracking() on adjustment.ExpenseId equals expense.Id
+                                 where adjustment.Status == BusStatuses.Approved && expense.BusinessDate >= startDate && expense.BusinessDate <= endDate
+                                 group adjustment by new { adjustment.StationId, expense.BusinessDate, expense.ShiftCode } into grouped
+                                 select new { grouped.Key.StationId, grouped.Key.BusinessDate, grouped.Key.ShiftCode, Amount = grouped.Sum(x => x.Amount) };
+        if (stationIds is not null)
+        {
+            revenueAdjustments = revenueAdjustments.Where(x => stationIds.Contains(x.StationId));
+            expenseAdjustments = expenseAdjustments.Where(x => stationIds.Contains(x.StationId));
+        }
+        if (stationId.HasValue)
+        {
+            revenueAdjustments = revenueAdjustments.Where(x => x.StationId == stationId);
+            expenseAdjustments = expenseAdjustments.Where(x => x.StationId == stationId);
+        }
+        var revenueMap = await revenueAdjustments.ToDictionaryAsync(x => (x.StationId, x.BusinessDate, x.ShiftCode), x => x.Amount, ct);
+        var expenseMap = await expenseAdjustments.ToDictionaryAsync(x => (x.StationId, x.BusinessDate, x.ShiftCode), x => x.Amount, ct);
+        return rows.Select(x => x with
+        {
+            RevenueAdjustmentAmount = revenueMap.GetValueOrDefault((x.StationId, x.BusinessDate, x.ShiftCode)),
+            ExpenseAdjustmentAmount = expenseMap.GetValueOrDefault((x.StationId, x.BusinessDate, x.ShiftCode))
+        }).ToList();
     }
 
-    public async Task<IReadOnlyList<ComplianceReportRowDto>> GetComplianceReportAsync(Guid? stationId, CancellationToken ct)
+    public async Task<IReadOnlyList<ComplianceReportRowDto>> GetComplianceReportAsync(Guid? stationId, DateTime? asOf, CancellationToken ct)
     {
         var stationIds = await scope.GetStationIdsAsync(ct);
         if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
-        var threshold = DateTime.UtcNow.Date.AddDays(30);
-        var query = from document in db.VehicleLegalDocuments.AsNoTracking()
-                    join departure in db.DepartureTrips.AsNoTracking() on document.VehicleId equals departure.VehicleId
-                    where document.IsActive && document.ExpiresOn <= threshold
-                    select new { departure.StationId, document.Id };
-        if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
-        if (stationId.HasValue) query = query.Where(x => x.StationId == stationId);
-        return await query.Distinct().GroupBy(x => x.StationId)
-            .Select(g => new ComplianceReportRowDto(g.Key, g.Count()))
-            .OrderBy(x => x.StationId).ToListAsync(ct);
+        var reportStationIds = stationId.HasValue
+            ? [stationId.Value]
+            : stationIds is not null
+                ? stationIds.ToArray()
+                : await db.BusStations.AsNoTracking().Where(x => x.IsActive).Select(x => x.Id).ToArrayAsync(ct);
+        var threshold = (asOf?.Date ?? DateTime.UtcNow.Date).AddDays(30);
+        var assignedDocuments = db.VehicleLegalDocuments.AsNoTracking()
+            .Where(x => x.IsActive && x.ExpiresOn <= threshold && x.StationId.HasValue && reportStationIds.Contains(x.StationId.Value))
+            .Select(x => new { StationId = x.StationId!.Value, x.Id });
+        var legacyDocuments = from document in db.VehicleLegalDocuments.AsNoTracking()
+                              join departure in db.DepartureTrips.AsNoTracking() on document.VehicleId equals departure.VehicleId
+                              where document.IsActive && document.ExpiresOn <= threshold && !document.StationId.HasValue &&
+                                  db.DepartureTrips.Where(t => t.VehicleId == document.VehicleId).Select(t => t.StationId).Distinct().Count() == 1 &&
+                                  reportStationIds.Contains(departure.StationId)
+                              select new { departure.StationId, document.Id };
+        var documentCounts = await assignedDocuments.Concat(legacyDocuments).Distinct()
+            .GroupBy(x => x.StationId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var contractCounts = await db.CarrierContracts.AsNoTracking()
+            .Where(x => x.IsActive && x.EndDate <= threshold && reportStationIds.Contains(x.StationId))
+            .GroupBy(x => x.StationId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        var leaseCounts = await db.LeaseContracts.AsNoTracking()
+            .Where(x => x.EndDate <= threshold && x.Status != BusStatuses.Closed && reportStationIds.Contains(x.StationId))
+            .GroupBy(x => x.StationId).Select(g => new { g.Key, Count = g.Count() }).ToDictionaryAsync(x => x.Key, x => x.Count, ct);
+        return reportStationIds.OrderBy(x => x).Select(id => new ComplianceReportRowDto(id,
+            documentCounts.GetValueOrDefault(id), contractCounts.GetValueOrDefault(id), leaseCounts.GetValueOrDefault(id))).ToList();
     }
 
     private async Task<DepartureDto> GetDepartureAsync(Guid id, CancellationToken ct)
@@ -594,11 +816,139 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var receipt = await db.RevenueReceipts.AsNoTracking().SingleAsync(x => x.Id == id, ct); var lines = await db.RevenueLines.AsNoTracking().Where(x => x.ReceiptId == id).ToListAsync(ct); return ToDto(receipt, lines);
     }
     private async Task RequireStationAsync(Guid stationId, CancellationToken ct) { if (!await db.BusStations.AnyAsync(x => x.Id == stationId && x.IsActive, ct)) throw new BusinessException("Bus:StationNotFound"); }
+    private async Task<Guid> ResolveVehicleStationAsync(Guid vehicleId, Guid? requestedStationId, CancellationToken ct)
+    {
+        if (requestedStationId.HasValue)
+        {
+            await scope.EnsureStationAsync(requestedStationId.Value, ct);
+            return requestedStationId.Value;
+        }
+
+        var stations = await db.DepartureTrips.AsNoTracking().Where(x => x.VehicleId == vehicleId)
+            .Select(x => x.StationId).Distinct().Take(2).ToListAsync(ct);
+        if (stations.Count != 1) throw new BusinessException("Bus:VehicleStationRequired");
+        return stations[0];
+    }
+
+    private async Task<Guid?> ResolveMasterDataStationAsync(Guid? requestedStationId, CancellationToken ct)
+    {
+        if (requestedStationId.HasValue)
+        {
+            await scope.EnsureStationAsync(requestedStationId.Value, ct);
+            await RequireStationAsync(requestedStationId.Value, ct);
+            return requestedStationId.Value;
+        }
+        if (!scope.IsGlobal) throw new BusinessException("Bus:StationRequiredForScopedMasterData");
+        return null;
+    }
+
+    private static void EnsureMasterDataStationMatches(Guid? ownerStationId, Guid? requestedStationId)
+    {
+        if (ownerStationId.HasValue && ownerStationId != requestedStationId)
+            throw new BusinessException("Bus:MasterDataStationMismatch");
+    }
+
+    private async Task ValidateRevenueSourceAsync(CreateRevenueReceiptDto input, CancellationToken ct)
+    {
+        var source = input.SourceType?.Trim();
+        if (string.IsNullOrWhiteSpace(source) || !RevenueSources.Supported.Contains(source))
+            throw new BusinessException("Bus:RevenueSourceInvalid");
+
+        if (input.OperatorId.HasValue)
+        {
+            var operatorEntity = await db.TransportOperators.AsNoTracking()
+                .SingleOrDefaultAsync(x => x.Id == input.OperatorId && x.IsActive, ct)
+                ?? throw new BusinessException("Bus:OperatorNotFound");
+            if (operatorEntity.StationId.HasValue && operatorEntity.StationId != input.StationId)
+                throw new BusinessException("Bus:MasterDataStationMismatch");
+        }
+
+        if (source == RevenueSources.FixedRoute)
+        {
+            if (!input.DepartureId.HasValue) throw new BusinessException("Bus:DepartureRequiredForFixedRoute");
+            var departure = await db.DepartureTrips.AsNoTracking().SingleOrDefaultAsync(x => x.Id == input.DepartureId.Value, ct)
+                ?? throw new BusinessException("Bus:DepartureNotFound");
+            if (departure.StationId != input.StationId || departure.BusinessDate != BusDates.BusinessDate(input.BusinessDate) ||
+                !string.Equals(departure.ShiftCode, input.ShiftCode, StringComparison.Ordinal))
+                throw new BusinessException("Bus:RevenueDepartureMismatch");
+            if (departure.Status is BusStatuses.Cancelled or BusStatuses.NoService)
+                throw new BusinessException("Bus:RevenueDepartureUnavailable");
+            if (input.OperatorId.HasValue && input.OperatorId != departure.OperatorId)
+                throw new BusinessException("Bus:RevenueOperatorMismatch");
+            return;
+        }
+
+        if (input.DepartureId.HasValue) throw new BusinessException("Bus:DepartureOnlyForFixedRoute");
+        switch (source)
+        {
+            case RevenueSources.VisitingVehicle when string.IsNullOrWhiteSpace(input.VehiclePlateNumber):
+                throw new BusinessException("Bus:VehiclePlateRequired");
+            case RevenueSources.PublicBus when !input.OperatorId.HasValue:
+                throw new BusinessException("Bus:OperatorRequiredForPublicBus");
+            case RevenueSources.Parking when string.IsNullOrWhiteSpace(input.SourceReference) && string.IsNullOrWhiteSpace(input.VehiclePlateNumber):
+                throw new BusinessException("Bus:ParkingReferenceRequired");
+            case RevenueSources.Premises:
+                if (!input.PremisesUnitId.HasValue) throw new BusinessException("Bus:PremisesRequired");
+                if (!await db.PremisesUnits.AnyAsync(x => x.Id == input.PremisesUnitId && x.StationId == input.StationId && x.IsActive, ct))
+                    throw new BusinessException("Bus:PremisesNotFound");
+                break;
+        }
+    }
+
     private async Task EnsureOpenDayAsync(Guid stationId, DateTime businessDate, CancellationToken ct)
     {
         var date = BusDates.BusinessDate(businessDate);
+        await LockBusinessDayAsync(stationId, date, ct);
         if (await db.DailyCloses.AnyAsync(x => x.StationId == stationId && x.BusinessDate == date && x.Status == BusStatuses.Closed, ct))
             throw new BusinessException("Bus:DailyAlreadyClosed");
+    }
+
+    private async Task EnsureClosedDayAsync(Guid stationId, DateTime businessDate, CancellationToken ct)
+    {
+        var date = BusDates.BusinessDate(businessDate);
+        await LockBusinessDayAsync(stationId, date, ct);
+        if (!await db.DailyCloses.AnyAsync(x => x.StationId == stationId && x.BusinessDate == date && x.Status == BusStatuses.Closed, ct))
+            throw new BusinessException("Bus:AdjustmentRequiresClosedDay");
+    }
+
+    private async Task EnsureShiftAcceptsSourceMutationAsync(Guid stationId, DateTime businessDate, string shiftCode, CancellationToken ct)
+    {
+        var date = BusDates.BusinessDate(businessDate);
+        if (await db.ShiftSettlements.AnyAsync(x => x.StationId == stationId && x.BusinessDate == date &&
+            x.ShiftCode == shiftCode && x.Status != BusStatuses.Draft, ct))
+            throw new BusinessException("Bus:SettlementAlreadySubmitted");
+    }
+
+    private async Task<(decimal Revenue, decimal Expense)> GetShiftTotalsAsync(Guid stationId, DateTime businessDate,
+        string shiftCode, CancellationToken ct)
+    {
+        var date = BusDates.BusinessDate(businessDate);
+        var revenue = await db.RevenueReceipts.Where(x => x.StationId == stationId && x.BusinessDate == date &&
+            x.ShiftCode == shiftCode && x.Status == BusStatuses.Issued).SumAsync(x => (decimal?)x.TotalAmount, ct) ?? 0;
+        var expense = await db.ExpenseEntries.Where(x => x.StationId == stationId && x.BusinessDate == date &&
+            x.ShiftCode == shiftCode && x.Status == BusStatuses.Approved).SumAsync(x => (decimal?)x.Amount, ct) ?? 0;
+        return (decimal.Round(revenue, 2), decimal.Round(expense, 2));
+    }
+
+    private async Task LockBusinessDayAsync(Guid stationId, DateTime businessDate, CancellationToken ct)
+    {
+        if (!db.Database.IsRelational()) return;
+        var keyBytes = SHA256.HashData(Encoding.UTF8.GetBytes($"{stationId:N}:{BusDates.BusinessDate(businessDate):yyyy-MM-dd}"));
+        var lockKey = BitConverter.ToInt32(keyBytes, 0);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
+    }
+
+    private void AddSettlementOutbox(ShiftSettlement settlement)
+    {
+        db.OutboxMessages.Add(BusOutbox.Create(new BusSettlementChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
+            settlement.Id, settlement.StationId, settlement.BusinessDate, settlement.ShiftCode, settlement.Status,
+            settlement.TotalRevenue, settlement.TotalExpense), Guid.NewGuid().ToString("N")));
+    }
+
+    private void AddAdjustmentOutbox(AdjustmentEntry adjustment)
+    {
+        db.OutboxMessages.Add(BusOutbox.Create(new BusAdjustmentChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
+            adjustment.Id, adjustment.StationId, adjustment.Amount, adjustment.Status), Guid.NewGuid().ToString("N")));
     }
 
     private async Task<bool> HasCurrentReadinessAsync(DepartureTrip trip, CancellationToken ct)
@@ -609,23 +959,30 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var driver = await db.Drivers.AsNoTracking().SingleOrDefaultAsync(x => x.Id == trip.DriverId && x.IsActive, ct);
         if (vehicle is null || driver is null || string.IsNullOrWhiteSpace(driver.LicenseNumber)) return false;
         var date = trip.BusinessDate.Date;
-        return await HasVehicleDocumentAsync(trip.VehicleId, ["Inspection", "DangKiem"], date, ct)
-            && await HasVehicleDocumentAsync(trip.VehicleId, ["RouteBadge", "PhuHieu"], date, ct)
-            && await HasVehicleDocumentAsync(trip.VehicleId, ["Insurance", "BaoHiem"], date, ct)
+        return await HasVehicleDocumentAsync(trip.VehicleId, ["Inspection", "DangKiem"], date, trip.StationId, ct)
+            && await HasVehicleDocumentAsync(trip.VehicleId, ["RouteBadge", "PhuHieu"], date, trip.StationId, ct)
+            && await HasVehicleDocumentAsync(trip.VehicleId, ["Insurance", "BaoHiem"], date, trip.StationId, ct)
             && await db.CarrierContracts.AsNoTracking().AnyAsync(x => x.StationId == trip.StationId && x.OperatorId == trip.OperatorId &&
                 x.IsActive && x.StartDate <= date && x.EndDate >= date, ct)
             && await db.Tariffs.AsNoTracking().AnyAsync(x => x.StationId == trip.StationId && (x.RouteId == null || x.RouteId == trip.RouteId) &&
                 x.VehicleType == vehicle.VehicleType && x.IsActive && x.EffectiveFrom <= date && (!x.EffectiveTo.HasValue || x.EffectiveTo.Value >= date), ct);
     }
-    private async Task<bool> HasVehicleDocumentAsync(Guid vehicleId, string[] documentTypes, DateTime date, CancellationToken ct) =>
-        await db.VehicleLegalDocuments.AnyAsync(x => x.VehicleId == vehicleId && x.IsActive && documentTypes.Contains(x.DocumentType) && x.ExpiresOn >= date, ct);
+    private async Task<bool> HasVehicleDocumentAsync(Guid vehicleId, string[] documentTypes, DateTime date, Guid stationId, CancellationToken ct) =>
+        await db.VehicleLegalDocuments.AnyAsync(x => x.VehicleId == vehicleId && x.IsActive &&
+            (x.StationId == stationId || (!x.StationId.HasValue &&
+                db.DepartureTrips.Where(t => t.VehicleId == x.VehicleId).Select(t => t.StationId).Distinct().Count() == 1 &&
+                db.DepartureTrips.Any(t => t.VehicleId == x.VehicleId && t.StationId == stationId))) &&
+            documentTypes.Contains(x.DocumentType) && x.ExpiresOn >= date, ct);
 
     private async Task EnsureReceiptIdempotencyMatchesAsync(RevenueReceipt existing, CreateRevenueReceiptDto input, CancellationToken ct)
     {
         if (existing.StationId != input.StationId || existing.BusinessDate != BusDates.BusinessDate(input.BusinessDate) ||
             !string.Equals(existing.ShiftCode, input.ShiftCode, StringComparison.Ordinal) ||
-            !string.Equals(existing.SourceType, input.SourceType, StringComparison.Ordinal) || existing.DepartureId != input.DepartureId ||
-            existing.OperatorId != input.OperatorId)
+            !string.Equals(existing.SourceType, input.SourceType?.Trim(), StringComparison.Ordinal) || existing.DepartureId != input.DepartureId ||
+            existing.OperatorId != input.OperatorId ||
+            !string.Equals(existing.SourceReference, input.SourceReference?.Trim(), StringComparison.Ordinal) ||
+            !string.Equals(existing.VehiclePlateNumber, input.VehiclePlateNumber?.Trim(), StringComparison.Ordinal) ||
+            existing.PremisesUnitId != input.PremisesUnitId)
             throw new BusinessException("Bus:IdempotencyKeyConflict");
 
         var existingLines = await db.RevenueLines.AsNoTracking().Where(x => x.ReceiptId == existing.Id)
@@ -643,12 +1000,13 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     private static StationAssignmentDto ToDto(UserStationAssignment x) => new(x.Id, x.UserId, x.StationId, x.IsPrimary, x.IsActive, x.ValidFrom, x.ValidTo);
     private static DepartureDto ToDto(DepartureTrip x, IEnumerable<DepartureCheck> checks) => new(x.Id, x.StationId, x.OperatorId, x.RouteId, x.VehicleId, x.DriverId, x.BusinessDate, x.ShiftCode, x.ScheduledDepartureUtc, x.ActualDepartureUtc, x.PassengerCount, x.Status, checks.Select(c => new DepartureCheckDto(c.Id, c.CheckType, c.IsPassed, c.Note)).ToList());
     private static TariffDto ToDto(Tariff x) => new(x.Id, x.StationId, x.RouteId, x.VehicleType, x.FeeType, x.Amount, x.EffectiveFrom, x.EffectiveTo);
-    private static RevenueReceiptDto ToDto(RevenueReceipt x, IEnumerable<RevenueLine> lines) => new(x.Id, x.ReceiptNumber, x.StationId, x.BusinessDate, x.ShiftCode, x.SourceType, x.DepartureId, x.OperatorId, x.TotalAmount, x.Status, x.IssuedAtUtc, lines.Select(l => new RevenueLineDto(l.Id, l.Description, l.Quantity, l.UnitAmount, l.LineTotal, l.TariffId)).ToList());
+    private static RevenueReceiptDto ToDto(RevenueReceipt x, IEnumerable<RevenueLine> lines) => new(x.Id, x.ReceiptNumber, x.StationId, x.BusinessDate, x.ShiftCode, x.SourceType, x.DepartureId, x.OperatorId, x.TotalAmount, x.Status, x.IssuedAtUtc, lines.Select(l => new RevenueLineDto(l.Id, l.Description, l.Quantity, l.UnitAmount, l.LineTotal, l.TariffId)).ToList(), x.SourceReference, x.VehiclePlateNumber, x.PremisesUnitId);
     private static ExpenseDto ToDto(ExpenseEntry x) => new(x.Id, x.StationId, x.BusinessDate, x.ShiftCode, x.Category, x.Amount, x.Description, x.DocumentId, x.Status);
     private static PremisesUnitDto ToDto(PremisesUnit x) => new(x.Id, x.StationId, x.Code, x.Name, x.AreaSquareMeters, x.Location, x.IsActive);
     private static LeaseContractDto ToDto(LeaseContract x) => new(x.Id, x.StationId, x.PremisesUnitId, x.TenantName, x.StartDate, x.EndDate, x.RentAmount, x.RentPeriod, x.Status);
     private static CarrierContractDto ToDto(CarrierContract x) => new(x.Id, x.StationId, x.OperatorId, x.ContractNumber, x.StartDate, x.EndDate, x.DocumentId, x.IsActive);
-    private static VehicleLegalDocumentDto ToDto(VehicleLegalDocument x) => new(x.Id, x.VehicleId, x.DocumentType, x.ExpiresOn, x.DocumentId, x.IsActive);
+    private static VehicleLegalDocumentDto ToDto(VehicleLegalDocument x) => new(x.Id, x.VehicleId, x.StationId, x.DocumentType, x.ExpiresOn, x.DocumentId, x.IsActive);
+    private static AdjustmentDto ToDto(AdjustmentEntry x) => new(x.Id, x.StationId, x.ReceiptId, x.ExpenseId, x.Amount, x.Reason, x.Status, x.CreatedByUserId, x.ApprovedByUserId, x.ApprovedAtUtc);
     private static SettlementDto ToDto(ShiftSettlement x) => new(x.Id, x.StationId, x.BusinessDate, x.ShiftCode, x.TotalRevenue, x.TotalExpense, x.Status, x.SubmittedByUserId, x.CheckedByUserId, x.ApprovedByUserId);
 
     private void AddMutationAudit(string action, Guid entityId, string entityType, Guid stationId)

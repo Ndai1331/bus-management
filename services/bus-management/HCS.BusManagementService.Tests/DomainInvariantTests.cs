@@ -77,4 +77,62 @@ public sealed class DomainInvariantTests
         expense.Approve(Guid.NewGuid());
         Assert.Equal(BusStatuses.Approved, expense.Status);
     }
+
+    [Fact]
+    public void Adjustment_requires_exactly_one_target()
+    {
+        var maker = Guid.NewGuid();
+        Assert.Throws<BusinessException>(() => new AdjustmentEntry(Guid.NewGuid(), Guid.NewGuid(), null, null, 10, "Correction", maker));
+        Assert.Throws<BusinessException>(() => new AdjustmentEntry(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), 10, "Correction", maker));
+        Assert.Throws<BusinessException>(() => new AdjustmentEntry(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, 0, "Correction", maker));
+    }
+
+    [Fact]
+    public void Adjustment_requires_separate_approver_and_records_audit_fields()
+    {
+        var maker = Guid.NewGuid();
+        var adjustment = new AdjustmentEntry(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), null, -25, "Receipt correction", maker);
+        Assert.Throws<BusinessException>(() => adjustment.Approve(maker, DateTime.UtcNow));
+        var approver = Guid.NewGuid();
+        var approvedAt = DateTime.UtcNow;
+        adjustment.Approve(approver, approvedAt);
+        Assert.Equal(BusStatuses.Approved, adjustment.Status);
+        Assert.Equal(approver, adjustment.ApprovedByUserId);
+        Assert.Equal(approvedAt, adjustment.ApprovedAtUtc);
+    }
+
+    [Fact]
+    public void Revenue_sources_are_explicitly_allow_listed()
+    {
+        Assert.All(new[]
+        {
+            RevenueSources.FixedRoute, RevenueSources.VisitingVehicle, RevenueSources.PublicBus,
+            RevenueSources.Parking, RevenueSources.Premises, RevenueSources.Other
+        }, source => Assert.Contains(source, RevenueSources.Supported));
+        Assert.DoesNotContain("Unknown", RevenueSources.Supported);
+    }
+
+    [Fact]
+    public void Vehicle_document_can_be_renewed_or_deactivated()
+    {
+        var document = new VehicleLegalDocument(Guid.NewGuid(), Guid.NewGuid(), "Inspection", DateTime.Today.AddDays(1));
+        document.Renew(DateTime.Today.AddDays(90), Guid.NewGuid(), true);
+        Assert.True(document.IsValidOn(DateTime.Today.AddDays(30)));
+        document.Renew(DateTime.Today.AddDays(-1), null, false);
+        Assert.False(document.IsActive);
+    }
+
+    [Fact]
+    public void Settlement_refreshes_source_totals_before_close()
+    {
+        var settlement = new ShiftSettlement(Guid.NewGuid(), Guid.NewGuid(), DateTime.Today, "AM", 100, 10, Guid.NewGuid());
+        settlement.RefreshTotals(250, 35);
+        Assert.Equal(250, settlement.TotalRevenue);
+        Assert.Equal(35, settlement.TotalExpense);
+        settlement.Submit(Guid.NewGuid());
+        settlement.Check(Guid.NewGuid());
+        settlement.Approve(Guid.NewGuid());
+        settlement.Close();
+        Assert.Throws<BusinessException>(() => settlement.RefreshTotals(1, 1));
+    }
 }

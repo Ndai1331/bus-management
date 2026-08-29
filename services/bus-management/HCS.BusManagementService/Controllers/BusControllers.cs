@@ -67,6 +67,9 @@ public sealed class ComplianceController(BusManagementAppService service) : Cont
     [HttpPost("vehicle-documents")]
     [Authorize(Policy = BusPermissions.FleetComplianceCreate)]
     public Task<VehicleLegalDocumentDto> CreateVehicleDocument(CreateVehicleLegalDocumentDto input, CancellationToken ct) => service.CreateVehicleLegalDocumentAsync(input, ct);
+    [HttpPut("vehicle-documents/{id:guid}")]
+    [Authorize(Policy = BusPermissions.FleetComplianceUpdate)]
+    public Task<VehicleLegalDocumentDto> UpdateVehicleDocument(Guid id, UpdateVehicleLegalDocumentDto input, CancellationToken ct) => service.UpdateVehicleLegalDocumentAsync(id, input, ct);
 }
 
 [ApiController, Authorize(Policy = BusPermissions.Departures), Route("api/bus-management/departures")]
@@ -156,10 +159,20 @@ public sealed class FinanceController(BusManagementAppService service) : Control
     [HttpPost("reconciliation/daily/close")]
     [Authorize(Policy = BusPermissions.ReconciliationClose)]
     public Task<DailyCloseDto> CloseDaily(CloseDailyDto input, CancellationToken ct) => service.CloseDailyAsync(input, ct);
+    [HttpGet("reconciliation/adjustments")]
+    [Authorize(Policy = BusPermissions.Reconciliation)]
+    public Task<PagedBusDto<AdjustmentDto>> GetAdjustments(Guid? stationId, string? status, DateTime? from, DateTime? to,
+        int skip = 0, int take = 20, CancellationToken ct = default) => service.GetAdjustmentsAsync(stationId, status, from, to, skip, take, ct);
+    [HttpPost("reconciliation/adjustments")]
+    [Authorize(Policy = BusPermissions.ReconciliationAdjust)]
+    public Task<AdjustmentDto> CreateAdjustment(CreateAdjustmentDto input, CancellationToken ct) => service.CreateAdjustmentAsync(input, ct);
+    [HttpPost("reconciliation/adjustments/{id:guid}/approve")]
+    [Authorize(Policy = BusPermissions.ReconciliationAdjustApprove)]
+    public Task<AdjustmentDto> ApproveAdjustment(Guid id, CancellationToken ct) => service.ApproveAdjustmentAsync(id, ct);
 }
 
 [ApiController, Authorize(Policy = BusPermissions.Reports), Route("api/bus-management")]
-public sealed class ReportsController(BusManagementAppService service) : ControllerBase
+public sealed class ReportsController(BusManagementAppService service, BusReportExportService exportService) : ControllerBase
 {
     [HttpGet("dashboard")]
     public Task<DashboardSummaryDto> Dashboard(DateTime? from, DateTime? to, Guid? stationId, CancellationToken ct = default)
@@ -194,5 +207,24 @@ public sealed class ReportsController(BusManagementAppService service) : Control
     }
 
     [HttpGet("reports/compliance")]
-    public Task<IReadOnlyList<ComplianceReportRowDto>> Compliance(Guid? stationId, CancellationToken ct = default) => service.GetComplianceReportAsync(stationId, ct);
+    public Task<IReadOnlyList<ComplianceReportRowDto>> Compliance(Guid? stationId, DateTime? asOf = null, CancellationToken ct = default) => service.GetComplianceReportAsync(stationId, asOf, ct);
+
+    [HttpGet("exports/{reportType}")]
+    [Authorize(Policy = BusPermissions.ReportsExport)]
+    public async Task<IActionResult> Export(string reportType, string format = "xlsx", DateTime? from = null, DateTime? to = null,
+        Guid? stationId = null, CancellationToken ct = default)
+    {
+        var end = to?.Date ?? DateTime.UtcNow.Date;
+        var start = from?.Date ?? new DateTime(end.Year, end.Month, 1);
+        if (start > end) return BadRequest("from must be before or equal to to.");
+        try
+        {
+            var result = await exportService.ExportAsync(reportType, format, start, end, stationId, ct);
+            return File(result.Content, result.ContentType, result.FileName);
+        }
+        catch (ArgumentException exception)
+        {
+            return BadRequest(exception.Message);
+        }
+    }
 }

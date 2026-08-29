@@ -30,8 +30,8 @@
     else if (dashboard is not null)
     {
         <div class="row g-3 mb-4">
-            @Metric("Doanh thu", $"{dashboard.TotalRevenue:N0} đ", "fa-money-bill-wave")
-            @Metric("Chi phí", $"{dashboard.TotalExpense:N0} đ", "fa-receipt")
+            @Metric("Doanh thu thuần", $"{dashboard.NetRevenue:N0} đ", "fa-money-bill-wave")
+            @Metric("Chi phí thuần", $"{dashboard.NetExpense:N0} đ", "fa-receipt")
             @Metric("Chuyến xe", dashboard.DepartureCount.ToString("N0"), "fa-bus")
             @Metric("Ca chưa chốt", dashboard.UnreconciledShiftCount.ToString("N0"), "fa-clipboard-check")
         </div>
@@ -40,7 +40,18 @@
             <div class="col-12 col-xl-8">
                 <div class="card h-100">
                     <div class="card-body">
-                        <h2 class="h5">Doanh thu theo nguồn</h2>
+                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                            <h2 class="h5 mb-0">Doanh thu theo nguồn</h2>
+                            <AuthorizeView Policy="HCS.BusManagement.Reports.Export">
+                                <Authorized>
+                                    <div class="btn-group btn-group-sm" role="group" aria-label="Xuất báo cáo doanh thu">
+                                        <a class="btn btn-outline-secondary" href="@ExportUrl("revenue", "xlsx")">XLSX</a>
+                                        <a class="btn btn-outline-secondary" href="@ExportUrl("revenue", "pdf")">PDF</a>
+                                        <a class="btn btn-outline-secondary" target="_blank" rel="noopener" href="@ExportUrl("revenue", "html")">In</a>
+                                    </div>
+                                </Authorized>
+                            </AuthorizeView>
+                        </div>
                         @if (revenueRows.Count == 0)
                         {
                             <p class="text-muted mb-0">Chưa có số liệu trong kỳ.</p>
@@ -49,11 +60,11 @@
                         {
                             <div class="table-responsive">
                                 <table class="table table-sm align-middle mb-0">
-                                    <thead><tr><th>Nguồn thu</th><th class="text-end">Số phiếu</th><th class="text-end">Tổng tiền</th></tr></thead>
+                                    <thead><tr><th>Nguồn thu</th><th class="text-end">Số phiếu</th><th class="text-end">Điều chỉnh</th><th class="text-end">Thuần</th></tr></thead>
                                     <tbody>
                                     @foreach (var row in revenueRows)
                                     {
-                                        <tr><td>@row.SourceType</td><td class="text-end">@row.ReceiptCount</td><td class="text-end">@row.TotalAmount.ToString("N0") đ</td></tr>
+                                        <tr><td>@row.SourceType</td><td class="text-end">@row.ReceiptCount</td><td class="text-end">@row.AdjustmentAmount.ToString("N0") đ</td><td class="text-end">@row.NetAmount.ToString("N0") đ</td></tr>
                                     }
                                     </tbody>
                                 </table>
@@ -66,12 +77,34 @@
                 <div class="card h-100">
                     <div class="card-body">
                         <h2 class="h5">Cảnh báo vận hành</h2>
-                        <p class="mb-2"><i class="fa fa-file-circle-exclamation text-warning me-2"></i>Hồ sơ sắp hết hạn: <strong>@dashboard.ExpiringDocumentCount</strong></p>
+                        <p class="mb-2"><i class="fa fa-file-circle-exclamation text-warning me-2"></i>Hồ sơ xe sắp hết hạn: <strong>@dashboard.ExpiringDocumentCount</strong></p>
+                        <p class="mb-2"><i class="fa fa-file-signature text-warning me-2"></i>Hợp đồng nhà xe sắp hết hạn: <strong>@dashboard.ExpiringContractCount</strong></p>
+                        <p class="mb-2"><i class="fa fa-building text-warning me-2"></i>Hợp đồng mặt bằng sắp hết hạn: <strong>@dashboard.ExpiringLeaseCount</strong></p>
                         <p class="mb-0"><i class="fa fa-clock text-secondary me-2"></i>Cập nhật: @dashboard.AsOfUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</p>
                     </div>
                 </div>
             </div>
         </div>
+
+        @if (dashboard.StationRows is { Count: > 0 })
+        {
+            <div class="card mt-3">
+                <div class="card-body">
+                    <h2 class="h5">Tổng hợp theo bến</h2>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead><tr><th>Bến</th><th class="text-end">Doanh thu thuần</th><th class="text-end">Chi phí thuần</th><th class="text-end">Chuyến</th><th class="text-end">Ca chưa chốt</th></tr></thead>
+                            <tbody>
+                            @foreach (var row in dashboard.StationRows)
+                            {
+                                <tr><td class="font-monospace">@row.StationId.ToString("D")</td><td class="text-end">@row.NetRevenue.ToString("N0") đ</td><td class="text-end">@row.NetExpense.ToString("N0") đ</td><td class="text-end">@row.DepartureCount</td><td class="text-end">@row.UnreconciledShiftCount</td></tr>
+                            }
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        }
     }
 </section>
 
@@ -96,6 +129,15 @@
         catch (Exception exception) { error = exception.Message; }
         finally { isLoading = false; }
     }
+
+    private string ExportUrl(string reportType, string format)
+    {
+        var encodedFrom = Uri.EscapeDataString(from.ToString("O"));
+        var encodedTo = Uri.EscapeDataString(to.ToString("O"));
+        return $"/api/bus-management/exports/{reportType}?format={format}&from={encodedFrom}&to={encodedTo}";
+    }
+    private DateTime from => dashboard?.From ?? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
+    private DateTime to => dashboard?.To ?? DateTime.Now.Date;
 
 }
 

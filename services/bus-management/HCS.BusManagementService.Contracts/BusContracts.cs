@@ -17,6 +17,7 @@ public static class BusPermissions
     public const string ReconciliationCheck = Reconciliation + ".Check";
     public const string ReconciliationClose = Reconciliation + ".Close";
     public const string ReconciliationAdjust = Reconciliation + ".Adjust";
+    public const string ReconciliationAdjustApprove = Reconciliation + ".AdjustApprove";
     public const string Reports = Group + ".Reports";
     public const string StationAssignments = Group + ".StationAssignments";
     public const string StationsCreate = Stations + ".Create";
@@ -25,6 +26,7 @@ public static class BusPermissions
     public const string MasterDataCreate = MasterData + ".Create";
     public const string OperatorsContractsCreate = OperatorsContracts + ".Create";
     public const string FleetComplianceCreate = FleetCompliance + ".Create";
+    public const string FleetComplianceUpdate = FleetCompliance + ".Update";
     public const string DeparturesCreate = Departures + ".Create";
     public const string RevenueCreate = Revenue + ".Create";
     public const string ExpensesCreate = Expenses + ".Create";
@@ -39,10 +41,10 @@ public static class BusPermissions
     [
         Stations, MasterData, OperatorsContracts, FleetCompliance, Departures,
         Revenue, Expenses, Premises, Reconciliation, ReconciliationCheck,
-        ReconciliationClose, ReconciliationAdjust, Reports, StationAssignments, StationsCreate, StationsUpdate,
+        ReconciliationClose, ReconciliationAdjust, ReconciliationAdjustApprove, Reports, StationAssignments, StationsCreate, StationsUpdate,
         MasterDataCreate, OperatorsContractsCreate, FleetComplianceCreate, DeparturesCreate, RevenueCreate,
         ExpensesCreate, ExpensesApprove, PremisesCreate, ReconciliationCreate, ReconciliationApprove,
-        ReportsExport, StationAssignmentsCreate, DeparturesUpdate
+        ReportsExport, StationAssignmentsCreate, DeparturesUpdate, FleetComplianceUpdate
     ];
 }
 
@@ -72,6 +74,11 @@ public static class RevenueSources
     public const string Parking = "Parking";
     public const string Premises = "Premises";
     public const string Other = "Other";
+
+    public static readonly IReadOnlySet<string> Supported = new HashSet<string>(StringComparer.Ordinal)
+    {
+        FixedRoute, VisitingVehicle, PublicBus, Parking, Premises, Other
+    };
 }
 
 public sealed record PagedBusDto<T>(long TotalCount, IReadOnlyList<T> Items);
@@ -83,16 +90,18 @@ public sealed record StationAssignmentDto(Guid Id, Guid UserId, Guid StationId, 
 public sealed record AssignStationDto(Guid UserId, Guid StationId, bool IsPrimary = false,
     DateTime? ValidFrom = null, DateTime? ValidTo = null);
 
-public sealed record OperatorDto(Guid Id, string Code, string Name, bool IsActive);
-public sealed record CreateOperatorDto(string Code, string Name);
-public sealed record RouteDto(Guid Id, string Code, string Name, Guid OperatorId, bool IsActive);
-public sealed record CreateRouteDto(string Code, string Name, Guid OperatorId);
-public sealed record VehicleDto(Guid Id, string PlateNumber, string VehicleType, Guid OperatorId, bool IsActive);
-public sealed record CreateVehicleDto(string PlateNumber, string VehicleType, Guid OperatorId);
-public sealed record DriverDto(Guid Id, string FullName, string LicenseNumber, bool IsActive);
-public sealed record CreateDriverDto(string FullName, string LicenseNumber);
-public sealed record CreateVehicleLegalDocumentDto(Guid VehicleId, string DocumentType, DateTime ExpiresOn, Guid? DocumentId = null);
-public sealed record VehicleLegalDocumentDto(Guid Id, Guid VehicleId, string DocumentType, DateTime ExpiresOn, Guid? DocumentId, bool IsActive);
+public sealed record OperatorDto(Guid Id, string Code, string Name, bool IsActive, Guid? StationId = null);
+public sealed record CreateOperatorDto(string Code, string Name, Guid? StationId = null);
+public sealed record RouteDto(Guid Id, string Code, string Name, Guid OperatorId, bool IsActive, Guid? StationId = null);
+public sealed record CreateRouteDto(string Code, string Name, Guid OperatorId, Guid? StationId = null);
+public sealed record VehicleDto(Guid Id, string PlateNumber, string VehicleType, Guid OperatorId, bool IsActive, Guid? StationId = null);
+public sealed record CreateVehicleDto(string PlateNumber, string VehicleType, Guid OperatorId, Guid? StationId = null);
+public sealed record DriverDto(Guid Id, string FullName, string LicenseNumber, bool IsActive, Guid? StationId = null);
+public sealed record CreateDriverDto(string FullName, string LicenseNumber, Guid? StationId = null);
+public sealed record CreateVehicleLegalDocumentDto(Guid VehicleId, string DocumentType, DateTime ExpiresOn, Guid? DocumentId = null,
+    Guid? StationId = null);
+public sealed record UpdateVehicleLegalDocumentDto(DateTime ExpiresOn, Guid? DocumentId, bool IsActive = true);
+public sealed record VehicleLegalDocumentDto(Guid Id, Guid VehicleId, Guid? StationId, string DocumentType, DateTime ExpiresOn, Guid? DocumentId, bool IsActive);
 public sealed record CreateCarrierContractDto(Guid StationId, Guid OperatorId, string ContractNumber,
     DateTime StartDate, DateTime EndDate, Guid? DocumentId = null);
 public sealed record CarrierContractDto(Guid Id, Guid StationId, Guid OperatorId, string ContractNumber,
@@ -117,12 +126,14 @@ public sealed record TariffDto(Guid Id, Guid StationId, Guid? RouteId, string Ve
 public sealed record RevenueLineInput(string Description, decimal Quantity, decimal UnitAmount, Guid? TariffId = null);
 public sealed record CreateRevenueReceiptDto(Guid StationId, DateTime BusinessDate, string ShiftCode,
     string SourceType, Guid? DepartureId, Guid? OperatorId, string? IdempotencyKey,
-    IReadOnlyList<RevenueLineInput> Lines);
+    IReadOnlyList<RevenueLineInput> Lines, string? SourceReference = null, string? VehiclePlateNumber = null,
+    Guid? PremisesUnitId = null);
 public sealed record RevenueLineDto(Guid Id, string Description, decimal Quantity, decimal UnitAmount, decimal LineTotal,
     Guid? TariffId);
 public sealed record RevenueReceiptDto(Guid Id, string ReceiptNumber, Guid StationId, DateTime BusinessDate,
     string ShiftCode, string SourceType, Guid? DepartureId, Guid? OperatorId, decimal TotalAmount, string Status,
-    DateTime? IssuedAtUtc, IReadOnlyList<RevenueLineDto> Lines);
+    DateTime? IssuedAtUtc, IReadOnlyList<RevenueLineDto> Lines, string? SourceReference = null,
+    string? VehiclePlateNumber = null, Guid? PremisesUnitId = null);
 
 public sealed record CreateExpenseDto(Guid StationId, DateTime BusinessDate, string ShiftCode, string Category,
     decimal Amount, string Description, Guid? DocumentId = null);
@@ -147,12 +158,39 @@ public sealed record DailyCloseDto(Guid Id, Guid StationId, DateTime BusinessDat
     decimal TotalExpense, int ShiftCount, string Status, Guid? ClosedByUserId, DateTime? ClosedAtUtc);
 public sealed record DashboardSummaryDto(DateTime From, DateTime To, decimal TotalRevenue, decimal TotalExpense,
     int DepartureCount, int ReceiptCount, int UnreconciledShiftCount, int ExpiringDocumentCount,
-    DateTime AsOfUtc);
-public sealed record RevenueReportRowDto(Guid StationId, string SourceType, decimal TotalAmount, int ReceiptCount);
+    DateTime AsOfUtc, decimal RevenueAdjustmentAmount = 0, decimal ExpenseAdjustmentAmount = 0,
+    int ExpiringContractCount = 0, int ExpiringLeaseCount = 0,
+    IReadOnlyList<StationDashboardRowDto>? StationRows = null)
+{
+    public decimal RevenueBaseAmount => TotalRevenue;
+    public decimal ExpenseBaseAmount => TotalExpense;
+    public decimal NetRevenue => TotalRevenue + RevenueAdjustmentAmount;
+    public decimal NetExpense => TotalExpense + ExpenseAdjustmentAmount;
+};
+public sealed record StationDashboardRowDto(Guid StationId, decimal TotalRevenue, decimal TotalExpense,
+    int DepartureCount, int ReceiptCount, int UnreconciledShiftCount, decimal RevenueAdjustmentAmount = 0,
+    decimal ExpenseAdjustmentAmount = 0)
+{
+    public decimal NetRevenue => TotalRevenue + RevenueAdjustmentAmount;
+    public decimal NetExpense => TotalExpense + ExpenseAdjustmentAmount;
+};
+public sealed record RevenueReportRowDto(Guid StationId, string SourceType, decimal TotalAmount, int ReceiptCount,
+    decimal AdjustmentAmount = 0)
+{
+    public decimal NetAmount => TotalAmount + AdjustmentAmount;
+};
 public sealed record DepartureReportRowDto(Guid StationId, DateTime BusinessDate, string Status, int TripCount, int PassengerCount);
 public sealed record ReconciliationReportRowDto(Guid StationId, DateTime BusinessDate, string ShiftCode, string Status,
-    decimal TotalRevenue, decimal TotalExpense);
-public sealed record ComplianceReportRowDto(Guid StationId, int ExpiringDocumentCount);
+    decimal TotalRevenue, decimal TotalExpense, decimal RevenueAdjustmentAmount = 0, decimal ExpenseAdjustmentAmount = 0)
+{
+    public decimal NetRevenue => TotalRevenue + RevenueAdjustmentAmount;
+    public decimal NetExpense => TotalExpense + ExpenseAdjustmentAmount;
+};
+public sealed record ComplianceReportRowDto(Guid StationId, int ExpiringDocumentCount,
+    int ExpiringContractCount = 0, int ExpiringLeaseCount = 0);
+public sealed record CreateAdjustmentDto(Guid StationId, Guid? ReceiptId, Guid? ExpenseId, decimal Amount, string Reason);
+public sealed record AdjustmentDto(Guid Id, Guid StationId, Guid? ReceiptId, Guid? ExpenseId, decimal Amount,
+    string Reason, string Status, Guid CreatedByUserId, Guid? ApprovedByUserId, DateTime? ApprovedAtUtc);
 
 public sealed record BusDepartureChangedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
     Guid DepartureId, Guid StationId, string Status) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
@@ -168,6 +206,17 @@ public sealed record BusExpenseChangedEto(Guid EventId, DateTimeOffset OccurredA
     Guid ExpenseId, Guid StationId, decimal Amount, string Status) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
 {
     public const string EventName = "hcs.bus.expense.changed.v1";
+}
+public sealed record BusSettlementChangedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
+    Guid SettlementId, Guid StationId, DateTime BusinessDate, string ShiftCode, string Status,
+    decimal TotalRevenue, decimal TotalExpense) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
+{
+    public const string EventName = "hcs.bus.settlement.changed.v1";
+}
+public sealed record BusAdjustmentChangedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
+    Guid AdjustmentId, Guid StationId, decimal Amount, string Status) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
+{
+    public const string EventName = "hcs.bus.adjustment.changed.v1";
 }
 public sealed record BusReconciliationClosedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
     Guid DailyCloseId, Guid StationId, DateTime BusinessDate) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)

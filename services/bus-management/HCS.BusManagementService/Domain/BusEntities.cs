@@ -85,79 +85,102 @@ public sealed class UserStationAssignment : Entity<Guid>
 public sealed class TransportOperator : FullAuditedAggregateRoot<Guid>
 {
     private TransportOperator() { }
-    public TransportOperator(Guid id, string code, string name) : base(id)
+    public TransportOperator(Guid id, string code, string name, Guid? stationId = null) : base(id)
     {
+        if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
         Code = Check.NotNullOrWhiteSpace(code, nameof(code), BusConsts.CodeLength);
         Name = Check.NotNullOrWhiteSpace(name, nameof(name), BusConsts.NameLength);
+        StationId = stationId;
         IsActive = true;
     }
     public string Code { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
+    public Guid? StationId { get; private set; }
     public bool IsActive { get; private set; }
 }
 
 public sealed class FixedRoute : FullAuditedAggregateRoot<Guid>
 {
     private FixedRoute() { }
-    public FixedRoute(Guid id, string code, string name, Guid operatorId) : base(id)
+    public FixedRoute(Guid id, string code, string name, Guid operatorId, Guid? stationId = null) : base(id)
     {
         if (operatorId == Guid.Empty) throw new BusinessException("Bus:OperatorRequired");
+        if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
         Code = Check.NotNullOrWhiteSpace(code, nameof(code), BusConsts.CodeLength);
         Name = Check.NotNullOrWhiteSpace(name, nameof(name), BusConsts.NameLength);
-        OperatorId = operatorId; IsActive = true;
+        OperatorId = operatorId; StationId = stationId; IsActive = true;
     }
     public string Code { get; private set; } = string.Empty;
     public string Name { get; private set; } = string.Empty;
     public Guid OperatorId { get; private set; }
+    public Guid? StationId { get; private set; }
     public bool IsActive { get; private set; }
 }
 
 public sealed class Vehicle : FullAuditedAggregateRoot<Guid>
 {
     private Vehicle() { }
-    public Vehicle(Guid id, string plateNumber, string vehicleType, Guid operatorId) : base(id)
+    public Vehicle(Guid id, string plateNumber, string vehicleType, Guid operatorId, Guid? stationId = null) : base(id)
     {
         if (operatorId == Guid.Empty) throw new BusinessException("Bus:OperatorRequired");
+        if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
         PlateNumber = Check.NotNullOrWhiteSpace(plateNumber, nameof(plateNumber), BusConsts.CodeLength);
         VehicleType = Check.NotNullOrWhiteSpace(vehicleType, nameof(vehicleType), BusConsts.TypeLength);
-        OperatorId = operatorId; IsActive = true;
+        OperatorId = operatorId; StationId = stationId; IsActive = true;
     }
     public string PlateNumber { get; private set; } = string.Empty;
     public string VehicleType { get; private set; } = string.Empty;
     public Guid OperatorId { get; private set; }
+    public Guid? StationId { get; private set; }
     public bool IsActive { get; private set; }
 }
 
 public sealed class Driver : FullAuditedAggregateRoot<Guid>
 {
     private Driver() { }
-    public Driver(Guid id, string fullName, string licenseNumber) : base(id)
+    public Driver(Guid id, string fullName, string licenseNumber, Guid? stationId = null) : base(id)
     {
+        if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
         FullName = Check.NotNullOrWhiteSpace(fullName, nameof(fullName), BusConsts.NameLength);
         LicenseNumber = Check.NotNullOrWhiteSpace(licenseNumber, nameof(licenseNumber), BusConsts.CodeLength);
-        IsActive = true;
+        StationId = stationId; IsActive = true;
     }
     public string FullName { get; private set; } = string.Empty;
     public string LicenseNumber { get; private set; } = string.Empty;
+    public Guid? StationId { get; private set; }
     public bool IsActive { get; private set; }
 }
 
 public sealed class VehicleLegalDocument : FullAuditedAggregateRoot<Guid>
 {
     private VehicleLegalDocument() { }
-    public VehicleLegalDocument(Guid id, Guid vehicleId, string documentType, DateTime expiresOn, Guid? documentId = null) : base(id)
+    public VehicleLegalDocument(Guid id, Guid vehicleId, string documentType, DateTime expiresOn, Guid? documentId = null,
+        Guid? stationId = null) : base(id)
     {
         if (vehicleId == Guid.Empty) throw new BusinessException("Bus:VehicleRequired");
         VehicleId = vehicleId;
+        StationId = stationId;
         DocumentType = Check.NotNullOrWhiteSpace(documentType, nameof(documentType), BusConsts.TypeLength);
         ExpiresOn = expiresOn.Date; DocumentId = documentId; IsActive = true;
     }
     public Guid VehicleId { get; private set; }
+    public Guid? StationId { get; private set; }
     public string DocumentType { get; private set; } = string.Empty;
     public DateTime ExpiresOn { get; private set; }
     public Guid? DocumentId { get; private set; }
     public bool IsActive { get; private set; }
     public bool IsValidOn(DateTime date) => IsActive && ExpiresOn.Date >= date.Date;
+    public void Renew(DateTime expiresOn, Guid? documentId, bool isActive)
+    {
+        if (isActive && expiresOn.Date < DateTime.UtcNow.Date) throw new BusinessException("Bus:DocumentExpiryInvalid");
+        ExpiresOn = expiresOn.Date; DocumentId = documentId; IsActive = isActive;
+        ConcurrencyStamp = Guid.NewGuid().ToString("N");
+    }
+    public void AssignStation(Guid stationId)
+    {
+        if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
+        StationId = stationId; ConcurrencyStamp = Guid.NewGuid().ToString("N");
+    }
 }
 
 public sealed class CarrierContract : FullAuditedAggregateRoot<Guid>
@@ -278,15 +301,17 @@ public sealed class RevenueReceipt : FullAuditedAggregateRoot<Guid>
     private readonly List<RevenueLine> _lines = [];
     private RevenueReceipt() { }
     public RevenueReceipt(Guid id, string receiptNumber, Guid stationId, DateTime businessDate, string shiftCode,
-        string sourceType, Guid? departureId, Guid? operatorId, Guid? createdByUserId, string? idempotencyKey) : base(id)
+        string sourceType, Guid? departureId, Guid? operatorId, Guid? createdByUserId, string? idempotencyKey,
+        string? sourceReference = null, string? vehiclePlateNumber = null, Guid? premisesUnitId = null) : base(id)
     {
         ReceiptNumber = Check.NotNullOrWhiteSpace(receiptNumber, nameof(receiptNumber), BusConsts.CodeLength);
         if (stationId == Guid.Empty) throw new BusinessException("Bus:StationRequired");
         StationId = stationId; BusinessDate = BusDates.BusinessDate(businessDate);
         ShiftCode = Check.NotNullOrWhiteSpace(shiftCode, nameof(shiftCode), BusConsts.CodeLength);
-        SourceType = Check.NotNullOrWhiteSpace(sourceType, nameof(sourceType), BusConsts.TypeLength);
+        SourceType = Check.NotNullOrWhiteSpace(sourceType, nameof(sourceType), BusConsts.TypeLength).Trim();
         DepartureId = departureId; OperatorId = operatorId; CreatedByUserId = createdByUserId;
-        IdempotencyKey = idempotencyKey?.Trim(); Status = BusStatuses.Draft;
+        IdempotencyKey = idempotencyKey?.Trim(); SourceReference = sourceReference?.Trim();
+        VehiclePlateNumber = vehiclePlateNumber?.Trim(); PremisesUnitId = premisesUnitId; Status = BusStatuses.Draft;
     }
     public string ReceiptNumber { get; private set; } = string.Empty;
     public Guid StationId { get; private set; }
@@ -297,6 +322,9 @@ public sealed class RevenueReceipt : FullAuditedAggregateRoot<Guid>
     public Guid? OperatorId { get; private set; }
     public Guid? CreatedByUserId { get; private set; }
     public string? IdempotencyKey { get; private set; }
+    public string? SourceReference { get; private set; }
+    public string? VehiclePlateNumber { get; private set; }
+    public Guid? PremisesUnitId { get; private set; }
     public decimal TotalAmount { get; private set; }
     public string Status { get; private set; } = BusStatuses.Draft;
     public DateTime? IssuedAtUtc { get; private set; }
@@ -438,6 +466,12 @@ public sealed class ShiftSettlement : FullAuditedAggregateRoot<Guid>
     public void Check(Guid? userId) { Require(BusStatuses.Submitted); EnsureDifferent(userId, CreatedByUserId); Status = BusStatuses.Checked; CheckedByUserId = userId; Touch(); }
     public void Approve(Guid? userId) { Require(BusStatuses.Checked); EnsureDifferent(userId, CreatedByUserId, SubmittedByUserId, CheckedByUserId); Status = BusStatuses.Approved; ApprovedByUserId = userId; Touch(); }
     public void Close() { Require(BusStatuses.Approved); Status = BusStatuses.Closed; Touch(); }
+    public void RefreshTotals(decimal totalRevenue, decimal totalExpense)
+    {
+        if (Status == BusStatuses.Closed) throw new BusinessException("Bus:SettlementImmutable");
+        if (totalRevenue < 0 || totalExpense < 0) throw new BusinessException("Bus:SettlementInvalid");
+        TotalRevenue = decimal.Round(totalRevenue, 2); TotalExpense = decimal.Round(totalExpense, 2); Touch();
+    }
     private void Touch() => ConcurrencyStamp = Guid.NewGuid().ToString("N");
     private void Require(string expected) { if (Status != expected) throw new BusinessException("Bus:InvalidSettlementTransition"); }
     private static void EnsureDifferent(Guid? current, params Guid?[] previous) { if (current.HasValue && previous.Any(x => x == current)) throw new BusinessException("Bus:MakerCheckerViolation"); }
@@ -469,7 +503,8 @@ public sealed class AdjustmentEntry : FullAuditedAggregateRoot<Guid>
     private AdjustmentEntry() { }
     public AdjustmentEntry(Guid id, Guid stationId, Guid? receiptId, Guid? expenseId, decimal amount, string reason, Guid createdByUserId) : base(id)
     {
-        if (stationId == Guid.Empty || (receiptId is null && expenseId is null) || amount == 0) throw new BusinessException("Bus:AdjustmentInvalid");
+        if (stationId == Guid.Empty || (receiptId is null) == (expenseId is null) || amount == 0 || createdByUserId == Guid.Empty)
+            throw new BusinessException("Bus:AdjustmentInvalid");
         StationId = stationId; ReceiptId = receiptId; ExpenseId = expenseId; Amount = decimal.Round(amount, 2);
         Reason = Check.NotNullOrWhiteSpace(reason, nameof(reason), BusConsts.DescriptionLength); CreatedByUserId = createdByUserId; Status = BusStatuses.Submitted;
     }
@@ -480,6 +515,14 @@ public sealed class AdjustmentEntry : FullAuditedAggregateRoot<Guid>
     public string Reason { get; private set; } = string.Empty;
     public Guid CreatedByUserId { get; private set; }
     public string Status { get; private set; } = string.Empty;
-    public void Approve() { if (Status != BusStatuses.Submitted) throw new BusinessException("Bus:InvalidAdjustmentTransition"); Status = BusStatuses.Approved; Touch(); }
+    public Guid? ApprovedByUserId { get; private set; }
+    public DateTime? ApprovedAtUtc { get; private set; }
+    public void Approve(Guid approverUserId, DateTime approvedAtUtc)
+    {
+        if (Status != BusStatuses.Submitted) throw new BusinessException("Bus:InvalidAdjustmentTransition");
+        if (approverUserId == Guid.Empty || approverUserId == CreatedByUserId)
+            throw new BusinessException("Bus:MakerCheckerViolation");
+        Status = BusStatuses.Approved; ApprovedByUserId = approverUserId; ApprovedAtUtc = BusDates.Utc(approvedAtUtc); Touch();
+    }
     private void Touch() => ConcurrencyStamp = Guid.NewGuid().ToString("N");
 }

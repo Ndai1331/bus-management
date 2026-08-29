@@ -15,6 +15,7 @@ using Volo.Abp.EventBus.RabbitMq;
 using Volo.Abp.Modularity;
 using Volo.Abp.OpenIddict;
 using Volo.Abp.Swashbuckle;
+using Volo.Abp.Uow;
 
 namespace HCS.BusManagementService;
 
@@ -64,6 +65,11 @@ public sealed class HcsBusManagementServiceModule : AbpModule
         Configure<AbpAntiForgeryOptions>(BearerApiAntiforgery.DisableCookieValidation);
         context.Services.AddDbContext<BusManagementDbContext>(options =>
             options.UseNpgsql(configuration.GetConnectionString(BusManagementDbContext.ConnectionStringName)));
+        // Business-day advisory locks must remain held through validation and SaveChanges.
+        // Enable the ABP transaction for every service request so the lock is never released
+        // between the guard query and the financial mutation/close.
+        Configure<AbpUnitOfWorkDefaultOptions>(options =>
+            options.TransactionBehavior = UnitOfWorkTransactionBehavior.Enabled);
         context.Services.AddScoped<BusAccessScope>();
         context.Services.AddScoped<BusManagementAppService>();
         context.Services.AddScoped<OutboxDispatcher>();

@@ -126,6 +126,7 @@ public static class HCSPermissions
         public const string ReconciliationCheck = Reconciliation + ".Check";
         public const string ReconciliationClose = Reconciliation + ".Close";
         public const string ReconciliationAdjust = Reconciliation + ".Adjust";
+        public const string ReconciliationAdjustApprove = Reconciliation + ".AdjustApprove";
         public const string Reports = Default + ".Reports";
         public const string StationAssignments = Default + ".StationAssignments";
         public const string StationsCreate = Stations + ".Create";
@@ -134,6 +135,7 @@ public static class HCSPermissions
         public const string MasterDataCreate = MasterData + ".Create";
         public const string OperatorsContractsCreate = OperatorsContracts + ".Create";
         public const string FleetComplianceCreate = FleetCompliance + ".Create";
+        public const string FleetComplianceUpdate = FleetCompliance + ".Update";
         public const string DeparturesCreate = Departures + ".Create";
         public const string RevenueCreate = Revenue + ".Create";
         public const string ExpensesCreate = Expenses + ".Create";
@@ -148,8 +150,8 @@ public static class HCSPermissions
         [
             Stations, MasterData, OperatorsContracts, FleetCompliance, Departures, Revenue,
             Expenses, Premises, Reconciliation, ReconciliationCheck, ReconciliationClose,
-            ReconciliationAdjust, Reports, StationAssignments, StationsCreate, StationsUpdate, MasterDataCreate,
-            OperatorsContractsCreate, FleetComplianceCreate, DeparturesCreate, RevenueCreate, ExpensesCreate,
+            ReconciliationAdjust, ReconciliationAdjustApprove, Reports, StationAssignments, StationsCreate, StationsUpdate, MasterDataCreate,
+            OperatorsContractsCreate, FleetComplianceCreate, FleetComplianceUpdate, DeparturesCreate, RevenueCreate, ExpensesCreate,
             ExpensesApprove, PremisesCreate, ReconciliationCreate, ReconciliationApprove, ReportsExport,
             StationAssignmentsCreate, DeparturesUpdate
         ];

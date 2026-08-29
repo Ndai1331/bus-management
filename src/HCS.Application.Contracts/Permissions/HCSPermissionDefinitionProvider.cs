@@ -77,6 +77,7 @@ public class HCSPermissionDefinitionProvider : PermissionDefinitionProvider
         reconciliation.AddChild(HCSPermissions.BusManagement.ReconciliationCheck, L("Permission:BusManagement.Reconciliation.Check"));
         reconciliation.AddChild(HCSPermissions.BusManagement.ReconciliationClose, L("Permission:BusManagement.Reconciliation.Close"));
         reconciliation.AddChild(HCSPermissions.BusManagement.ReconciliationAdjust, L("Permission:BusManagement.Reconciliation.Adjust"));
+        reconciliation.AddChild(HCSPermissions.BusManagement.ReconciliationAdjustApprove, L("Permission:BusManagement.Reconciliation.AdjustApprove"));
         reconciliation.AddChild(HCSPermissions.BusManagement.ReconciliationApprove, L("Permission:BusManagement.Reconciliation.Approve"));
         var reports = bus.AddPermission(HCSPermissions.BusManagement.Reports, L("Permission:BusManagement.Reports"));
         AddCrud(reports);

@@ -71,7 +71,11 @@ public sealed class HCSRoleDataSeedContributor(
         var busPermissions = permissions
             .Where(permission => permission.StartsWith("HCS.BusManagement", StringComparison.Ordinal))
             .ToArray();
-        var stationManagerPermissions = busPermissions;
+        // A manager approves adjustment records created by accounting/operations; keeping
+        // creation out of this seeded role preserves maker-checker at role level as well.
+        var stationManagerPermissions = busPermissions
+            .Where(permission => !string.Equals(permission, "HCS.BusManagement.Reconciliation.Adjust", StringComparison.Ordinal))
+            .ToArray();
         var operationsPermissions = busPermissions.Where(permission =>
             permission.StartsWith("HCS.BusManagement.Departures", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Revenue", StringComparison.Ordinal)).ToArray();
@@ -81,6 +85,9 @@ public sealed class HCSRoleDataSeedContributor(
             permission.StartsWith("HCS.BusManagement.Premises", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Reconciliation", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Reports", StringComparison.Ordinal)).ToArray();
+        accountantPermissions = accountantPermissions
+            .Where(permission => !string.Equals(permission, "HCS.BusManagement.Reconciliation.AdjustApprove", StringComparison.Ordinal))
+            .ToArray();
         var controlPermissions = busPermissions.Where(permission =>
             permission.StartsWith("HCS.BusManagement.Departures", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.MasterData", StringComparison.Ordinal)).ToArray();
@@ -89,6 +96,7 @@ public sealed class HCSRoleDataSeedContributor(
             !permission.EndsWith(".Update", StringComparison.Ordinal) &&
             !permission.EndsWith(".Delete", StringComparison.Ordinal) &&
             !permission.EndsWith(".Approve", StringComparison.Ordinal) &&
+            !permission.EndsWith(".AdjustApprove", StringComparison.Ordinal) &&
             !permission.EndsWith(".Check", StringComparison.Ordinal) &&
             !permission.EndsWith(".Close", StringComparison.Ordinal) &&
             !permission.EndsWith(".Adjust", StringComparison.Ordinal) &&
