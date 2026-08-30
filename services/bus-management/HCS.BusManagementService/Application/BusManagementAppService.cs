@@ -355,6 +355,27 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         db.Tariffs.Add(tariff); await db.SaveChangesAsync(ct); return ToDto(tariff);
     }
 
+    public async Task<PagedBusDto<TariffDto>> GetTariffsAsync(Guid? stationId, Guid? routeId, string? vehicleType,
+        DateTime? effectiveOn, int skip, int take, CancellationToken ct)
+    {
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
+        var query = db.Tariffs.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
+        if (stationId.HasValue) query = query.Where(x => x.StationId == stationId);
+        if (routeId.HasValue) query = query.Where(x => x.RouteId == routeId);
+        if (!string.IsNullOrWhiteSpace(vehicleType)) query = query.Where(x => x.VehicleType == vehicleType.Trim());
+        if (effectiveOn.HasValue)
+        {
+            var date = effectiveOn.Value.Date;
+            query = query.Where(x => x.IsActive && x.EffectiveFrom <= date && (!x.EffectiveTo.HasValue || x.EffectiveTo.Value >= date));
+        }
+        var total = await query.LongCountAsync(ct);
+        var items = await query.OrderBy(x => x.StationId).ThenBy(x => x.FeeType).ThenByDescending(x => x.EffectiveFrom)
+            .Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).ToListAsync(ct);
+        return new(total, items.Select(ToDto).ToList());
+    }
+
     public async Task<PagedBusDto<ParkingTariffDto>> GetParkingTariffsAsync(Guid? stationId, string? vehicleType,
         DateTime? effectiveOn, int skip, int take, CancellationToken ct)
     {
@@ -851,6 +872,23 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var settlement = new ShiftSettlement(Guid.NewGuid(), input.StationId, date, input.ShiftCode, revenue, expense, UserId);
         db.ShiftSettlements.Add(settlement); AddSettlementOutbox(settlement); AddMutationAudit("ShiftSettlement.Create", settlement.Id, nameof(ShiftSettlement), settlement.StationId);
         await db.SaveChangesAsync(ct); return ToDto(settlement);
+    }
+
+    public async Task<PagedBusDto<SettlementDto>> GetSettlementsAsync(Guid? stationId, DateTime? from, DateTime? to,
+        string? status, int skip, int take, CancellationToken ct)
+    {
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
+        var query = db.ShiftSettlements.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
+        if (stationId.HasValue) query = query.Where(x => x.StationId == stationId);
+        if (from.HasValue) query = query.Where(x => x.BusinessDate >= from.Value.Date);
+        if (to.HasValue) query = query.Where(x => x.BusinessDate <= to.Value.Date);
+        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(x => x.Status == status);
+        var total = await query.LongCountAsync(ct);
+        var items = await query.OrderByDescending(x => x.BusinessDate).ThenBy(x => x.ShiftCode)
+            .Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).ToListAsync(ct);
+        return new(total, items.Select(ToDto).ToList());
     }
 
     public async Task<SettlementDto> TransitionSettlementAsync(Guid id, string action, CancellationToken ct)

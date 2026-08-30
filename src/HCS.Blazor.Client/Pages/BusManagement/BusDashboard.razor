@@ -25,36 +25,36 @@
     </header>
 
     <nav class="bus-dashboard__modules mb-4" aria-label="@L["Bus:NavigateModules"]">
-        <a class="bus-dashboard__module" href="#bus-stations" @onclick="@(() => NavigateToFragment("bus-stations"))" @onclick:preventDefault="true">
+        <NavLink class="bus-dashboard__module" href="/bus-management/stations">
             <i class="fa fa-building" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusStations"]</strong><small>@L["Bus:StationsHint"]</small></span>
-        </a>
-        <a class="bus-dashboard__module" href="#bus-departures" @onclick="@(() => NavigateToFragment("bus-departures"))" @onclick:preventDefault="true">
+        </NavLink>
+        <NavLink class="bus-dashboard__module" href="/bus-management/departures">
             <i class="fa fa-route" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusDepartures"]</strong><small>@L["Bus:DeparturesHint"]</small></span>
-        </a>
-        <a class="bus-dashboard__module" href="#bus-revenue" @onclick="@(() => NavigateToFragment("bus-revenue"))" @onclick:preventDefault="true">
+        </NavLink>
+        <NavLink class="bus-dashboard__module" href="/bus-management/revenue">
             <i class="fa fa-money-bill-wave" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusRevenue"]</strong><small>@L["Bus:RevenueHint"]</small></span>
-        </a>
-        <a class="bus-dashboard__module" href="#bus-expenses" @onclick="@(() => NavigateToFragment("bus-expenses"))" @onclick:preventDefault="true">
+        </NavLink>
+        <NavLink class="bus-dashboard__module" href="/bus-management/expenses">
             <i class="fa fa-receipt" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusExpenses"]</strong><small>@L["Bus:ExpensesHint"]</small></span>
-        </a>
-        <a class="bus-dashboard__module" href="#bus-premises" @onclick="@(() => NavigateToFragment("bus-premises"))" @onclick:preventDefault="true">
+        </NavLink>
+        <NavLink class="bus-dashboard__module" href="/bus-management/premises">
             <i class="fa fa-store" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusPremises"]</strong><small>@L["Bus:PremisesHint"]</small></span>
-        </a>
-        <a class="bus-dashboard__module" href="#bus-reconciliation" @onclick="@(() => NavigateToFragment("bus-reconciliation"))" @onclick:preventDefault="true">
+        </NavLink>
+        <NavLink class="bus-dashboard__module" href="/bus-management/reconciliation">
             <i class="fa fa-clipboard-check" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusReconciliation"]</strong><small>@L["Bus:ReconciliationHint"]</small></span>
-        </a>
+        </NavLink>
         @if (canViewReports)
         {
-            <a class="bus-dashboard__module" href="#bus-reports" @onclick="@(() => NavigateToFragment("bus-reports"))" @onclick:preventDefault="true">
+            <NavLink class="bus-dashboard__module" href="/bus-management">
                 <i class="fa fa-chart-column" aria-hidden="true"></i>
                 <span><strong>@L["Menu:BusReports"]</strong><small>@L["Bus:ReportsHint"]</small></span>
-            </a>
+            </NavLink>
         }
     </nav>
 

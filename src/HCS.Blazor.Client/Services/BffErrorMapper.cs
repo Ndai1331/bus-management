@@ -2,6 +2,7 @@ using System;
 using System.Net;
 using System.Text.Json;
 using HCS.Blazor.Client.Collaboration;
+using HCS.Blazor.Client.Pages.BusManagement;
 using Microsoft.Extensions.Localization;
 
 namespace HCS.Blazor.Client.Services;
@@ -22,6 +23,7 @@ public static class BffErrorMapper
         {
             BffApiException bff => bff.ResponseBody,
             CollaborationApiException collaboration => collaboration.ResponseBody,
+            BusManagementApiException busManagement => busManagement.ResponseBody,
             _ => null
         };
         if (TryLocalizeErrorCode(localizer, body, out var localized))
@@ -34,6 +36,7 @@ public static class BffErrorMapper
     {
         BffApiException bff => bff.StatusCode,
         CollaborationApiException collaboration => collaboration.StatusCode,
+        BusManagementApiException busManagement => busManagement.StatusCode,
         _ => null
     };
 

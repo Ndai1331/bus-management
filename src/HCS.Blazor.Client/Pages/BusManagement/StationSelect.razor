@@ -1,0 +1,23 @@
+@using HCS.BusManagementService.Contracts
+@using Microsoft.AspNetCore.Components
+
+<select class="form-select" value="@Value" @onchange="OnChanged">
+    <option value="@Guid.Empty">-- Chọn bến --</option>
+    @foreach (var station in Stations)
+    {
+        <option value="@station.Id">@station.Code - @station.Name</option>
+    }
+</select>
+
+@code {
+    [Parameter] public Guid Value { get; set; }
+    [Parameter] public EventCallback<Guid> ValueChanged { get; set; }
+    [Parameter] public IReadOnlyList<BusStationDto> Stations { get; set; } = [];
+
+    private Task OnChanged(ChangeEventArgs args)
+    {
+        return Guid.TryParse(args.Value?.ToString(), out var stationId)
+            ? ValueChanged.InvokeAsync(stationId)
+            : ValueChanged.InvokeAsync(Guid.Empty);
+    }
+}

@@ -24,6 +24,14 @@ public sealed class StationsController(BusManagementAppService service) : Contro
     public Task<StationAssignmentDto> Assign(AssignStationDto input, CancellationToken ct) => service.AssignStationAsync(input, ct);
 }
 
+[ApiController, Authorize(Policy = BusPermissions.Dashboard), Route("api/bus-management/station-scope")]
+public sealed class StationScopeController(BusManagementAppService service) : ControllerBase
+{
+    [HttpGet]
+    public Task<PagedBusDto<BusStationDto>> GetList(string? filter, int skip = 0, int take = 100, CancellationToken ct = default) =>
+        service.GetStationsAsync(filter, skip, take, ct);
+}
+
 [ApiController, Authorize(Policy = BusPermissions.MasterData), Route("api/bus-management/master-data")]
 public sealed class MasterDataController(BusManagementAppService service) : ControllerBase
 {
@@ -111,6 +119,10 @@ public sealed class RevenueController(BusManagementAppService service) : Control
     [HttpPost("tariffs")]
     [Authorize(Policy = BusPermissions.RevenueCreate)]
     public Task<TariffDto> CreateTariff(CreateTariffDto input, CancellationToken ct) => service.CreateTariffAsync(input, ct);
+    [HttpGet("tariffs")]
+    [Authorize(Policy = BusPermissions.Revenue)]
+    public Task<PagedBusDto<TariffDto>> GetTariffs(Guid? stationId, Guid? routeId, string? vehicleType, DateTime? effectiveOn,
+        int skip = 0, int take = 50, CancellationToken ct = default) => service.GetTariffsAsync(stationId, routeId, vehicleType, effectiveOn, skip, take, ct);
     [HttpGet("parking/tariffs")]
     [Authorize(Policy = BusPermissions.RevenueParking)]
     public Task<PagedBusDto<ParkingTariffDto>> GetParkingTariffs(Guid? stationId, string? vehicleType, DateTime? effectiveOn,
@@ -195,6 +207,10 @@ public sealed class FinanceController(BusManagementAppService service) : Control
     [HttpPost("reconciliation/shifts")]
     [Authorize(Policy = BusPermissions.ReconciliationCreate)]
     public Task<SettlementDto> CreateShift(CreateShiftSettlementDto input, CancellationToken ct) => service.CreateShiftSettlementAsync(input, ct);
+    [HttpGet("reconciliation/shifts")]
+    [Authorize(Policy = BusPermissions.Reconciliation)]
+    public Task<PagedBusDto<SettlementDto>> GetShifts(Guid? stationId, DateTime? from, DateTime? to, string? status,
+        int skip = 0, int take = 20, CancellationToken ct = default) => service.GetSettlementsAsync(stationId, from, to, status, skip, take, ct);
     [HttpPost("reconciliation/shifts/{id:guid}/submit")]
     [Authorize(Policy = BusPermissions.Reconciliation)]
     public Task<SettlementDto> SubmitShift(Guid id, CancellationToken ct) => service.TransitionSettlementAsync(id, "submit", ct);

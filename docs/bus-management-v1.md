@@ -11,6 +11,7 @@ Trạng thái: Phase 2–4B đã hoàn tất implementation và hardening; migra
 - API prefix: `/api/bus-management`
 - Database/schema: `hcs_bus_management`
 - Browser chỉ gọi BFF/YARP; service nhận bearer token từ Gateway. PostgreSQL, Gateway/BFF, Keycloak và browser smoke test vẫn là runtime gate, chưa được coi là đạt chỉ từ build/test tĩnh.
+- Các page nghiệp vụ dùng `/api/bus-management/station-scope` để lấy các bến mà user được phép thao tác; endpoint này không cho client tự mở rộng station scope.
 - Export cũng đi qua BFF bằng session cookie; không tạo URL service trực tiếp hoặc đưa bearer token ra browser.
 
 ## Luồng v1
@@ -25,20 +26,38 @@ Catalog nhà xe, tuyến, xe và tài xế mới có `StationId`; user không ph
 
 Blazor có menu **Quản lý bến xe** tại `/bus-management`. Menu cha được lọc khi user có bất kỳ claim `HCS.BusManagement.*` nào (quyền đọc hoặc quyền con/action); các mục con được lọc độc lập theo quyền tương ứng:
 
-| Mục menu | Fragment | Quyền |
+| Mục menu | Route | Quyền |
 |---|---|---|
 | Tổng quan bến xe | `/bus-management` | `HCS.BusManagement.Dashboard` (policy dashboard cho phép user đã xác thực có ít nhất một claim Bus Management) |
-| Bến xe & phân quyền | `#bus-stations` | `HCS.BusManagement.Stations` |
-| Chuyến xuất bến | `#bus-departures` | `HCS.BusManagement.Departures` |
-| Doanh thu & biểu giá | `#bus-revenue` | `HCS.BusManagement.Revenue` |
-| Chi phí vận hành | `#bus-expenses` | `HCS.BusManagement.Expenses` |
-| Mặt bằng & hợp đồng | `#bus-premises` | `HCS.BusManagement.Premises` |
-| Đối soát ca/ngày | `#bus-reconciliation` | `HCS.BusManagement.Reconciliation` |
-| Báo cáo & xuất file | `#bus-reports` | `HCS.BusManagement.Reports` |
+| Bến xe & phân quyền | `/bus-management/stations` | `HCS.BusManagement.Stations` |
+| Dữ liệu nền | `/bus-management/master-data` | `HCS.BusManagement.MasterData` |
+| Hợp đồng nhà xe | `/bus-management/contracts` | `HCS.BusManagement.OperatorsContracts` |
+| Hồ sơ pháp lý | `/bus-management/compliance` | `HCS.BusManagement.FleetCompliance` |
+| Chuyến xuất bến | `/bus-management/departures` | `HCS.BusManagement.Departures` |
+| Doanh thu & biểu giá | `/bus-management/revenue` | `HCS.BusManagement.Revenue` |
+| Chi phí vận hành | `/bus-management/expenses` | `HCS.BusManagement.Expenses` |
+| Mặt bằng & hợp đồng | `/bus-management/premises` | `HCS.BusManagement.Premises` |
+| Đối soát ca/ngày | `/bus-management/reconciliation` | `HCS.BusManagement.Reconciliation` |
+| Báo cáo & xuất file | `/bus-management` | `HCS.BusManagement.Reports` |
 
-Các liên kết fragment cuộn tới đúng khu vực trên dashboard (và vẫn dùng được với điều hướng fragment mặc định nếu JavaScript không sẵn sàng). Các khu vực hiện tại gồm: thẻ chỉ số chuyến xe, doanh thu thuần, chi phí thuần và ca chưa chốt; cảnh báo hồ sơ/hợp đồng/mặt bằng sắp hết hạn; bảng tổng hợp theo bến; và bảng doanh thu theo nguồn trong khu vực báo cáo.
+Dashboard vẫn giữ các thẻ tổng hợp; các module đã được tách thành route SPA riêng để mỗi page có form và danh sách nghiệp vụ.
 
-Menu và các thẻ điều hướng nội bộ dùng `NavigationManager` với `preventDefault`; khi đang ở `/bus-management`, click chỉ đổi fragment và cuộn tới khu vực tương ứng, không tải lại toàn bộ tài liệu. Deep link `/bus-management#bus-expenses` vẫn được xử lý khi mở trang trực tiếp.
+## CRUD/workflow pages đã triển khai
+
+`BusCrudPages.razor` cung cấp các route server-side BFF cho:
+
+- Bến xe: danh sách, tạo mới và cập nhật thông tin bến.
+- Dữ liệu nền: nhà xe, tuyến cố định, phương tiện và tài xế (tạo và tra cứu theo station scope).
+- Hợp đồng nhà xe và hồ sơ pháp lý xe: tạo, tra cứu, cảnh báo thời hạn.
+- Chuyến xuất bến: lập chuyến, hiển thị readiness result và chuyển `Blocked → Ready → Departed → Completed`.
+- Doanh thu: phát hành phiếu thu có idempotency key, tạo/tra cứu biểu giá và lưu snapshot dòng thu.
+- Chi phí: tạo, gửi và phê duyệt theo maker-checker.
+- Mặt bằng: tạo khu vực và hợp đồng thuê, tra cứu thời hạn.
+- Đối soát: lập ca, submit/check/approve/close, chốt ngày và duyệt adjustment.
+
+Danh sách lookup được nạp từ các endpoint có paging; client không gọi Bus Service trực tiếp. Các nút mutation chỉ hiện theo claim permission, còn server vẫn là nơi quyết định station scope và workflow.
+
+Menu dùng `NavLink` và route nội bộ của Blazor; click giữa các page không force reload tài liệu. Deep link fragment cũ trên dashboard vẫn được giữ tương thích.
 
 Dashboard gọi `/api/bus-management/dashboard` khi user qua policy dashboard. Khu vực **Báo cáo** và dữ liệu `/reports/revenue` chỉ được hiển thị/tải khi có claim `HCS.BusManagement.Reports`; không có quyền này, các thẻ tổng quan, cảnh báo và tổng hợp theo bến vẫn hiển thị nhưng khu vực báo cáo bị ẩn. Nút XLSX/PDF/In chỉ hiển thị khi có thêm `HCS.BusManagement.Reports.Export`; vì các nút nằm trong khu vực Báo cáo, để thấy và dùng liên kết xuất file trên UI cần cả `Reports` và `Reports.Export`. API export vẫn kiểm tra quyền `Reports.Export` ở server.
 
@@ -60,6 +79,7 @@ Service tự chạy migration cho `BusManagement` khi khởi động. Khi chạy
 ## Endpoint chính
 
 - `/api/bus-management/stations`
+- `/api/bus-management/station-scope`
 - `/api/bus-management/master-data/*`
 - `/api/bus-management/operators/contracts`
 - `/api/bus-management/compliance/vehicle-documents`

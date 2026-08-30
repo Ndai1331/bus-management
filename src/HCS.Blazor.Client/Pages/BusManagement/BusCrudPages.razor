@@ -1,0 +1,482 @@
+@page "/bus-management/stations"
+@page "/bus-management/master-data"
+@page "/bus-management/contracts"
+@page "/bus-management/compliance"
+@page "/bus-management/departures"
+@page "/bus-management/revenue"
+@page "/bus-management/expenses"
+@page "/bus-management/premises"
+@page "/bus-management/reconciliation"
+@attribute [Authorize]
+@inherits HCSComponentBase
+@using System.Globalization
+@using System.Linq
+@using System.Security.Claims
+@using HCS.BusManagementService.Contracts
+@using Microsoft.AspNetCore.Components.Authorization
+@inject BusManagementClient BusClient
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+
+<PageTitle>@PageTitleText · HCS</PageTitle>
+
+<section class="hcs-feature bus-crud-page" aria-labelledby="bus-crud-title">
+    <header class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+        <div>
+            <p class="text-muted mb-1">HCS Bus Management</p>
+            <h1 id="bus-crud-title" class="mb-1">@PageTitleText</h1>
+            <p class="text-muted mb-0">Dữ liệu được phân trang và giới hạn phạm vi bến xe ở phía máy chủ.</p>
+        </div>
+        <button class="btn btn-outline-primary" @onclick="LoadAsync" disabled="@isLoading">
+            <i class="fa fa-rotate me-1" aria-hidden="true"></i> Làm mới
+        </button>
+    </header>
+
+    <nav class="bus-crud-page__tabs mb-4" aria-label="Điều hướng quản lý bến xe">
+        <NavLink href="/bus-management" Match="NavLinkMatch.All">Tổng quan</NavLink>
+        <NavLink href="/bus-management/stations">Bến xe</NavLink>
+        <NavLink href="/bus-management/master-data">Dữ liệu nền</NavLink>
+        <NavLink href="/bus-management/contracts">Hợp đồng nhà xe</NavLink>
+        <NavLink href="/bus-management/compliance">Hồ sơ pháp lý</NavLink>
+        <NavLink href="/bus-management/departures">Chuyến xuất bến</NavLink>
+        <NavLink href="/bus-management/revenue">Doanh thu</NavLink>
+        <NavLink href="/bus-management/expenses">Chi phí</NavLink>
+        <NavLink href="/bus-management/premises">Mặt bằng</NavLink>
+        <NavLink href="/bus-management/reconciliation">Đối soát</NavLink>
+    </nav>
+
+    @if (isLoading)
+    {
+        <div class="alert alert-info" role="status"><i class="fa fa-spinner fa-spin me-2" aria-hidden="true"></i>Đang tải dữ liệu…</div>
+    }
+    @if (!string.IsNullOrWhiteSpace(error))
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+
+    @if (page == "stations")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div><h2 class="h5 mb-1">Danh sách bến xe</h2><p class="text-muted mb-0">Tạo mới và cập nhật thông tin 8 bến trong phạm vi được cấp quyền.</p></div>
+            @if (canCreate) { <button class="btn btn-primary" @onclick="BeginNewStation"><i class="fa fa-plus me-1"></i>Thêm bến xe</button> }
+        </div>
+        @if (showStationForm)
+        {
+            <div class="card mb-4"><div class="card-body">
+                <h3 class="h6">@(editingStationId.HasValue ? "Cập nhật bến xe" : "Thêm bến xe")</h3>
+                <div class="row g-3">
+                    <div class="col-md-3"><label class="form-label">Mã bến *</label><input class="form-control" @bind="stationCode" maxlength="64" disabled="@editingStationId.HasValue" /></div>
+                    <div class="col-md-5"><label class="form-label">Tên bến *</label><input class="form-control" @bind="stationName" maxlength="256" /></div>
+                    <div class="col-md-4"><label class="form-label">Múi giờ *</label><input class="form-control" @bind="stationTimeZone" /></div>
+                    <div class="col-md-8"><label class="form-label">Địa chỉ</label><input class="form-control" @bind="stationAddress" maxlength="500" /></div>
+                    <div class="col-md-4 d-flex align-items-end"><div class="form-check mb-2"><input class="form-check-input" type="checkbox" @bind="stationIsActive" id="station-active" /><label class="form-check-label" for="station-active">Đang hoạt động</label></div></div>
+                </div>
+                <div class="mt-3"><button class="btn btn-primary me-2" @onclick="SaveStationAsync" disabled="@isSaving">Lưu</button><button class="btn btn-outline-secondary" @onclick="CancelForm">Huỷ</button></div>
+            </div></div>
+        }
+        <div class="card"><div class="table-responsive"><table class="table table-hover align-middle mb-0">
+            <thead><tr><th>Mã</th><th>Tên bến</th><th>Địa chỉ</th><th>Múi giờ</th><th>Trạng thái</th><th class="text-end">Thao tác</th></tr></thead>
+            <tbody>@foreach (var item in stations)
+            { <tr><td class="font-monospace">@item.Code</td><td>@item.Name</td><td>@item.Address</td><td>@item.TimeZone</td><td><StatusBadge Active="@item.IsActive" /></td><td class="text-end">@if (canUpdate) { <button class="btn btn-sm btn-outline-primary" @onclick="@(() => EditStation(item))"><i class="fa fa-pen"></i></button> }</td></tr> }</tbody>
+        </table></div></div>
+    }
+    else if (page == "master-data")
+    {
+        <div class="d-flex flex-wrap justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Dữ liệu nền vận hành</h2><p class="text-muted mb-0">Nhà xe, tuyến cố định, phương tiện và tài xế.</p></div></div>
+        <div class="btn-group mb-3" role="group" aria-label="Loại dữ liệu nền">
+            <button class="btn @(masterTab == "operators" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => masterTab = "operators")">Nhà xe</button>
+            <button class="btn @(masterTab == "routes" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => masterTab = "routes")">Tuyến</button>
+            <button class="btn @(masterTab == "vehicles" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => masterTab = "vehicles")">Phương tiện</button>
+            <button class="btn @(masterTab == "drivers" ? "btn-primary" : "btn-outline-primary")" @onclick="@(() => masterTab = "drivers")">Tài xế</button>
+        </div>
+        @if (canMasterCreate)
+        {
+            <div class="card mb-4"><div class="card-body">
+                @if (masterTab == "operators")
+                {
+                    <h3 class="h6">Thêm nhà xe</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Mã *</label><input class="form-control" @bind="operatorCode" /></div><div class="col-md-5"><label class="form-label">Tên nhà xe *</label><input class="form-control" @bind="operatorName" /></div><div class="col-md-4"><label class="form-label">Bến quản lý *</label><StationSelect @bind-Value="masterStationId" Stations="stations" /></div></div>
+                    <button class="btn btn-primary mt-3" @onclick="CreateOperatorAsync" disabled="@isSaving">Thêm nhà xe</button>
+                }
+                else if (masterTab == "routes")
+                {
+                    <h3 class="h6">Thêm tuyến cố định</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Mã tuyến *</label><input class="form-control" @bind="routeCode" /></div><div class="col-md-4"><label class="form-label">Tên tuyến *</label><input class="form-control" @bind="routeName" /></div><div class="col-md-3"><label class="form-label">Nhà xe *</label><select class="form-select" @bind="routeOperatorId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in operators) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-2"><label class="form-label">Bến *</label><StationSelect @bind-Value="masterStationId" Stations="stations" /></div></div>
+                    <button class="btn btn-primary mt-3" @onclick="CreateRouteAsync" disabled="@isSaving">Thêm tuyến</button>
+                }
+                else if (masterTab == "vehicles")
+                {
+                    <h3 class="h6">Thêm phương tiện</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Biển số *</label><input class="form-control" @bind="vehiclePlate" /></div><div class="col-md-3"><label class="form-label">Loại xe *</label><input class="form-control" @bind="vehicleType" placeholder="Bus / Coach" /></div><div class="col-md-3"><label class="form-label">Nhà xe *</label><select class="form-select" @bind="vehicleOperatorId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in operators) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="masterStationId" Stations="stations" /></div></div>
+                    <button class="btn btn-primary mt-3" @onclick="CreateVehicleAsync" disabled="@isSaving">Thêm phương tiện</button>
+                }
+                else
+                {
+                    <h3 class="h6">Thêm tài xế</h3><div class="row g-3"><div class="col-md-4"><label class="form-label">Họ tên *</label><input class="form-control" @bind="driverName" /></div><div class="col-md-4"><label class="form-label">Số bằng lái *</label><input class="form-control" @bind="driverLicense" /></div><div class="col-md-4"><label class="form-label">Bến *</label><StationSelect @bind-Value="masterStationId" Stations="stations" /></div></div>
+                    <button class="btn btn-primary mt-3" @onclick="CreateDriverAsync" disabled="@isSaving">Thêm tài xế</button>
+                }
+            </div></div>
+        }
+        @if (masterTab == "operators")
+        { <SimpleTable Title="Nhà xe" Headers="Mã|Tên|Bến|Trạng thái"><tbody>@foreach (var item in operators) { <tr><td>@item.Code</td><td>@item.Name</td><td>@StationName(item.StationId)</td><td><StatusBadge Active="@item.IsActive" /></td></tr>}</tbody></SimpleTable> }
+        else if (masterTab == "routes")
+        { <SimpleTable Title="Tuyến cố định" Headers="Mã|Tên|Nhà xe|Bến|Trạng thái"><tbody>@foreach (var item in routes) { <tr><td>@item.Code</td><td>@item.Name</td><td>@OperatorName(item.OperatorId)</td><td>@StationName(item.StationId)</td><td><StatusBadge Active="@item.IsActive" /></td></tr>}</tbody></SimpleTable> }
+        else if (masterTab == "vehicles")
+        { <SimpleTable Title="Phương tiện" Headers="Biển số|Loại xe|Nhà xe|Bến|Trạng thái"><tbody>@foreach (var item in vehicles) { <tr><td class="font-monospace">@item.PlateNumber</td><td>@item.VehicleType</td><td>@OperatorName(item.OperatorId)</td><td>@StationName(item.StationId)</td><td><StatusBadge Active="@item.IsActive" /></td></tr>}</tbody></SimpleTable> }
+        else
+        { <SimpleTable Title="Tài xế" Headers="Họ tên|Bằng lái|Bến|Trạng thái"><tbody>@foreach (var item in drivers) { <tr><td>@item.FullName</td><td>@item.LicenseNumber</td><td>@StationName(item.StationId)</td><td><StatusBadge Active="@item.IsActive" /></td></tr>}</tbody></SimpleTable> }
+    }
+    else if (page == "contracts")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Hợp đồng nhà xe</h2><p class="text-muted mb-0">Theo dõi thời hạn hợp đồng theo bến và nhà xe.</p></div></div>
+        @if (canContractCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Thêm hợp đồng</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="contractStationId" Stations="stations" /></div><div class="col-md-3"><label class="form-label">Nhà xe *</label><select class="form-select" @bind="contractOperatorId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in operators) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-3"><label class="form-label">Số hợp đồng *</label><input class="form-control" @bind="contractNumber" /></div><div class="col-md-3"><label class="form-label">Tài liệu ID</label><input class="form-control" @bind="contractDocumentIdText" /></div><div class="col-md-3"><label class="form-label">Từ ngày *</label><input type="date" class="form-control" @bind="contractStartDate" /></div><div class="col-md-3"><label class="form-label">Đến ngày *</label><input type="date" class="form-control" @bind="contractEndDate" /></div></div><button class="btn btn-primary mt-3" @onclick="CreateContractAsync" disabled="@isSaving">Thêm hợp đồng</button></div></div> }
+        <SimpleTable Title="Danh sách hợp đồng" Headers="Số hợp đồng|Nhà xe|Bến|Từ ngày|Đến ngày|Trạng thái"><tbody>@foreach (var item in contracts) { <tr><td>@item.ContractNumber</td><td>@OperatorName(item.OperatorId)</td><td>@StationName(item.StationId)</td><td>@item.StartDate.ToString("dd/MM/yyyy")</td><td>@item.EndDate.ToString("dd/MM/yyyy")</td><td><StatusBadge Active="@item.IsActive" Text="@(item.IsActive ? "Hiệu lực" : "Không hiệu lực")" /></td></tr>}</tbody></SimpleTable>
+    }
+    else if (page == "compliance")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Hồ sơ pháp lý phương tiện</h2><p class="text-muted mb-0">Đăng kiểm, phù hiệu và bảo hiểm; các hồ sơ sắp hết hạn cần được gia hạn.</p></div></div>
+        @if (canComplianceCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Thêm hồ sơ</h3><div class="row g-3"><div class="col-md-4"><label class="form-label">Phương tiện *</label><select class="form-select" @bind="legalVehicleId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in vehicles) { <option value="@item.Id">@item.PlateNumber - @item.VehicleType</option> }</select></div><div class="col-md-3"><label class="form-label">Loại hồ sơ *</label><select class="form-select" @bind="legalDocumentType"><option>Inspection</option><option>RouteBadge</option><option>Insurance</option></select></div><div class="col-md-3"><label class="form-label">Hết hạn *</label><input type="date" class="form-control" @bind="legalExpiresOn" /></div><div class="col-md-2"><label class="form-label">Bến</label><StationSelect @bind-Value="legalStationId" Stations="stations" /></div></div><button class="btn btn-primary mt-3" @onclick="CreateLegalAsync" disabled="@isSaving">Thêm hồ sơ</button></div></div> }
+        <SimpleTable Title="Danh sách hồ sơ" Headers="Phương tiện|Loại hồ sơ|Hết hạn|Bến|Trạng thái"><tbody>@foreach (var item in legalDocuments) { <tr><td>@VehicleName(item.VehicleId)</td><td>@item.DocumentType</td><td class="@(item.ExpiresOn.Date <= DateTime.Today.AddDays(30) ? "text-danger fw-semibold" : "")">@item.ExpiresOn.ToString("dd/MM/yyyy")</td><td>@StationName(item.StationId)</td><td><StatusBadge Active="@item.IsActive" /></td></tr>}</tbody></SimpleTable>
+    }
+    else if (page == "departures")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Chuyến xuất bến</h2><p class="text-muted mb-0">Lập chuyến, cập nhật kiểm tra sẵn sàng và chuyển trạng thái vận hành.</p></div></div>
+        @if (canDepartureCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Lập chuyến xuất bến</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="departureStationId" Stations="stations" /></div><div class="col-md-3"><label class="form-label">Nhà xe *</label><select class="form-select" @bind="departureOperatorId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in operators) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-3"><label class="form-label">Tuyến *</label><select class="form-select" @bind="departureRouteId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in routes.Where(x => x.OperatorId == departureOperatorId || departureOperatorId == Guid.Empty)) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-3"><label class="form-label">Xe *</label><select class="form-select" @bind="departureVehicleId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in vehicles.Where(x => x.OperatorId == departureOperatorId || departureOperatorId == Guid.Empty)) { <option value="@item.Id">@item.PlateNumber - @item.VehicleType</option> }</select></div><div class="col-md-3"><label class="form-label">Tài xế *</label><select class="form-select" @bind="departureDriverId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in drivers) { <option value="@item.Id">@item.FullName - @item.LicenseNumber</option> }</select></div><div class="col-md-3"><label class="form-label">Ngày nghiệp vụ *</label><input type="date" class="form-control" @bind="departureDate" /></div><div class="col-md-2"><label class="form-label">Ca *</label><input class="form-control" @bind="departureShift" /></div><div class="col-md-2"><label class="form-label">Giờ dự kiến *</label><input type="time" class="form-control" @bind="departureTime" /></div><div class="col-md-2"><label class="form-label">Hành khách</label><input type="number" min="0" class="form-control" @bind="departurePassengers" /></div></div><div class="d-flex flex-wrap gap-3 mt-3"><CheckBox Label="Đăng kiểm" Value="@departureInspection" ValueChanged="@(value => departureInspection = value)" /><CheckBox Label="Phù hiệu" Value="@departureRouteBadge" ValueChanged="@(value => departureRouteBadge = value)" /><CheckBox Label="Bảo hiểm" Value="@departureInsurance" ValueChanged="@(value => departureInsurance = value)" /><CheckBox Label="Bằng lái" Value="@departureLicense" ValueChanged="@(value => departureLicense = value)" /><CheckBox Label="Lệnh vận chuyển" Value="@departureTransportOrder" ValueChanged="@(value => departureTransportOrder = value)" /><CheckBox Label="Hợp đồng" Value="@departureContract" ValueChanged="@(value => departureContract = value)" /><CheckBox Label="Đã thu phí" Value="@departureFeePaid" ValueChanged="@(value => departureFeePaid = value)" /><CheckBox Label="Kiểm soát duyệt" Value="@departureControl" ValueChanged="@(value => departureControl = value)" /></div><button class="btn btn-primary mt-3" @onclick="CreateDepartureAsync" disabled="@isSaving">Lập chuyến</button></div></div> }
+        <SimpleTable Title="Danh sách chuyến" Headers="Ngày|Ca|Bến|Nhà xe|Tuyến|Xe|Trạng thái|Thao tác"><tbody>@foreach (var item in departures) { <tr><td>@item.BusinessDate.ToString("dd/MM/yyyy")</td><td>@item.ShiftCode</td><td>@StationName(item.StationId)</td><td>@OperatorName(item.OperatorId)</td><td>@RouteName(item.RouteId)</td><td>@VehicleName(item.VehicleId)</td><td><StatusBadge Active="@IsDepartureActive(item.Status)" Text="@item.Status" /></td><td class="text-end"><div class="btn-group btn-group-sm">@if (canDepartureUpdate && item.Status == BusStatuses.Blocked) { <button class="btn btn-outline-primary" @onclick="@(() => TransitionDepartureAsync(item.Id, "ready"))">Sẵn sàng</button> } @if (canDepartureUpdate && item.Status == BusStatuses.Ready) { <button class="btn btn-outline-success" @onclick="@(() => TransitionDepartureAsync(item.Id, "depart"))">Xuất bến</button> } @if (canDepartureUpdate && item.Status == BusStatuses.Departed) { <button class="btn btn-outline-success" @onclick="@(() => TransitionDepartureAsync(item.Id, "complete"))">Hoàn tất</button> }</div></td></tr>}</tbody></SimpleTable>
+    }
+    else if (page == "revenue")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Doanh thu và biểu giá</h2><p class="text-muted mb-0">Phiếu thu v1 cho chuyến cố định; snapshot đơn giá được lưu tại thời điểm phát sinh.</p></div></div>
+        @if (canRevenueCreate)
+        @if (canRevenueCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Phát hành phiếu thu</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="receiptStationId" Stations="stations" /></div><div class="col-md-2"><label class="form-label">Ngày *</label><input type="date" class="form-control" @bind="receiptDate" /></div><div class="col-md-2"><label class="form-label">Ca *</label><input class="form-control" @bind="receiptShift" /></div><div class="col-md-2"><label class="form-label">Nguồn thu *</label><select class="form-select" @bind="receiptSource"><option>FixedRoute</option><option>VisitingVehicle</option><option>PublicBus</option><option>Other</option></select></div><div class="col-md-3"><label class="form-label">Mã tham chiếu</label><input class="form-control" @bind="receiptReference" /></div><div class="col-md-5"><label class="form-label">Diễn giải *</label><input class="form-control" @bind="receiptDescription" /></div><div class="col-md-2"><label class="form-label">Số lượng</label><input type="number" min="0.01" class="form-control" @bind="receiptQuantity" /></div><div class="col-md-2"><label class="form-label">Đơn giá (VND)</label><input type="number" min="0" class="form-control" @bind="receiptUnitAmount" /></div></div><button class="btn btn-primary mt-3" @onclick="CreateReceiptAsync" disabled="@isSaving">Phát hành phiếu thu</button></div></div>
+          <div class="card mb-4"><div class="card-body"><h3 class="h6">Thêm biểu giá phí bến</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="tariffStationId" Stations="stations" /></div><div class="col-md-3"><label class="form-label">Tuyến (tuỳ chọn)</label><select class="form-select" @bind="tariffRouteId"><option value="@Guid.Empty">Tất cả tuyến</option>@foreach (var item in routes) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-2"><label class="form-label">Loại xe *</label><input class="form-control" @bind="tariffVehicleType" /></div><div class="col-md-2"><label class="form-label">Loại phí *</label><input class="form-control" @bind="tariffFeeType" placeholder="StationFee" /></div><div class="col-md-2"><label class="form-label">Số tiền (VND) *</label><input type="number" min="0" class="form-control" @bind="tariffAmount" /></div><div class="col-md-3"><label class="form-label">Hiệu lực từ *</label><input type="date" class="form-control" @bind="tariffEffectiveFrom" /></div><div class="col-md-3"><label class="form-label">Hiệu lực đến</label><input type="date" class="form-control" @bind="tariffEffectiveTo" /></div></div><button class="btn btn-outline-primary mt-3" @onclick="CreateTariffAsync" disabled="@isSaving">Thêm biểu giá</button></div></div> }
+        <SimpleTable Title="Phiếu thu đã phát hành" Headers="Số phiếu|Ngày|Ca|Nguồn|Bến|Tổng tiền|Trạng thái"><tbody>@foreach (var item in receipts) { <tr><td class="font-monospace">@item.ReceiptNumber</td><td>@item.BusinessDate.ToString("dd/MM/yyyy")</td><td>@item.ShiftCode</td><td>@item.SourceType</td><td>@StationName(item.StationId)</td><td class="text-end">@item.TotalAmount.ToString("N0") đ</td><td><StatusBadge Active="@IsIssued(item.Status)" Text="@item.Status" /></td></tr>}</tbody></SimpleTable>
+        <SimpleTable Title="Phiếu thu đã phát hành" Headers="Số phiếu|Ngày|Ca|Nguồn|Bến|Tổng tiền|Trạng thái"><tbody>@foreach (var item in receipts) { <tr><td class="font-monospace">@item.ReceiptNumber</td><td>@item.BusinessDate.ToString("dd/MM/yyyy")</td><td>@item.ShiftCode</td><td>@item.SourceType</td><td>@StationName(item.StationId)</td><td class="text-end">@item.TotalAmount.ToString("N0") đ</td><td><StatusBadge Active="@IsIssued(item.Status)" Text="@item.Status" /></td></tr>}</tbody></SimpleTable>
+        <SimpleTable Title="Biểu giá hiện hành" Headers="Bến|Tuyến|Loại xe|Loại phí|Số tiền|Hiệu lực"><tbody>@foreach (var item in tariffs) { <tr><td>@StationName(item.StationId)</td><td>@(item.RouteId.HasValue ? RouteName(item.RouteId.Value) : "Tất cả tuyến")</td><td>@item.VehicleType</td><td>@item.FeeType</td><td class="text-end">@item.Amount.ToString("N0") đ</td><td>@item.EffectiveFrom.ToString("dd/MM/yyyy") – @(item.EffectiveTo?.ToString("dd/MM/yyyy") ?? "∞")</td></tr>}</tbody></SimpleTable>
+    }
+    else if (page == "expenses")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Chi phí vận hành</h2><p class="text-muted mb-0">Nhập chi phí, gửi kiểm tra và phê duyệt theo maker-checker.</p></div></div>
+        @if (canExpenseCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Nhập chi phí</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="expenseStationId" Stations="stations" /></div><div class="col-md-2"><label class="form-label">Ngày *</label><input type="date" class="form-control" @bind="expenseDate" /></div><div class="col-md-2"><label class="form-label">Ca *</label><input class="form-control" @bind="expenseShift" /></div><div class="col-md-2"><label class="form-label">Nhóm chi phí *</label><input class="form-control" @bind="expenseCategory" /></div><div class="col-md-3"><label class="form-label">Số tiền (VND) *</label><input type="number" min="0" class="form-control" @bind="expenseAmount" /></div><div class="col-md-8"><label class="form-label">Nội dung *</label><input class="form-control" @bind="expenseDescription" /></div><div class="col-md-4"><label class="form-label">Document ID</label><input class="form-control" @bind="expenseDocumentIdText" /></div></div><button class="btn btn-primary mt-3" @onclick="CreateExpenseAsync" disabled="@isSaving">Lưu chi phí</button></div></div> }
+        <SimpleTable Title="Danh sách chi phí" Headers="Ngày|Ca|Bến|Nhóm|Nội dung|Số tiền|Trạng thái|Thao tác"><tbody>@foreach (var item in expenses) { <tr><td>@item.BusinessDate.ToString("dd/MM/yyyy")</td><td>@item.ShiftCode</td><td>@StationName(item.StationId)</td><td>@item.Category</td><td>@item.Description</td><td class="text-end">@item.Amount.ToString("N0") đ</td><td><StatusBadge Active="@IsApproved(item.Status)" Text="@item.Status" /></td><td class="text-end"><div class="btn-group btn-group-sm">@if (canExpenseCreate && item.Status == BusStatuses.Draft) { <button class="btn btn-outline-primary" @onclick="@(() => TransitionExpenseAsync(item.Id, "submit"))">Gửi</button> } @if (canExpenseApprove && item.Status == BusStatuses.Submitted) { <button class="btn btn-outline-success" @onclick="@(() => TransitionExpenseAsync(item.Id, "approve"))">Duyệt</button> }</div></td></tr>}</tbody></SimpleTable>
+    }
+    else if (page == "premises")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Mặt bằng và hợp đồng</h2><p class="text-muted mb-0">Khai báo diện tích, đơn vị mặt bằng và kỳ thu tiền thuê.</p></div></div>
+        @if (canPremisesCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Thêm khu vực mặt bằng</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="premisesStationId" Stations="stations" /></div><div class="col-md-2"><label class="form-label">Mã khu vực *</label><input class="form-control" @bind="premisesCode" /></div><div class="col-md-3"><label class="form-label">Tên khu vực *</label><input class="form-control" @bind="premisesName" /></div><div class="col-md-2"><label class="form-label">Diện tích m² *</label><input type="number" min="0.01" class="form-control" @bind="premisesArea" /></div><div class="col-md-2"><label class="form-label">Vị trí</label><input class="form-control" @bind="premisesLocation" /></div></div><button class="btn btn-primary mt-3" @onclick="CreatePremisesAsync" disabled="@isSaving">Thêm khu vực</button></div></div> }
+        <SimpleTable Title="Khu vực mặt bằng" Headers="Mã|Tên|Bến|Diện tích|Vị trí|Trạng thái"><tbody>@foreach (var item in premises) { <tr><td>@item.Code</td><td>@item.Name</td><td>@StationName(item.StationId)</td><td>@item.AreaSquareMeters.ToString("N2")</td><td>@item.Location</td><td><StatusBadge Active="@item.IsActive" /></td></tr>}</tbody></SimpleTable>
+        @if (canPremisesCreate)
+        { <div class="card mt-4 mb-4"><div class="card-body"><h3 class="h6">Thêm hợp đồng mặt bằng</h3><div class="row g-3"><div class="col-md-3"><label class="form-label">Bến *</label><StationSelect @bind-Value="leaseStationId" Stations="stations" /></div><div class="col-md-3"><label class="form-label">Khu vực *</label><select class="form-select" @bind="leasePremisesId"><option value="@Guid.Empty">-- Chọn --</option>@foreach (var item in premises.Where(x => x.StationId == leaseStationId || leaseStationId == Guid.Empty)) { <option value="@item.Id">@item.Code - @item.Name</option> }</select></div><div class="col-md-3"><label class="form-label">Bên thuê *</label><input class="form-control" @bind="leaseTenant" /></div><div class="col-md-3"><label class="form-label">Kỳ thu *</label><input class="form-control" @bind="leasePeriod" placeholder="Monthly" /></div><div class="col-md-3"><label class="form-label">Từ ngày *</label><input type="date" class="form-control" @bind="leaseStartDate" /></div><div class="col-md-3"><label class="form-label">Đến ngày *</label><input type="date" class="form-control" @bind="leaseEndDate" /></div><div class="col-md-3"><label class="form-label">Tiền thuê (VND) *</label><input type="number" min="0" class="form-control" @bind="leaseRentAmount" /></div></div><button class="btn btn-primary mt-3" @onclick="CreateLeaseAsync" disabled="@isSaving">Thêm hợp đồng</button></div></div> }
+        <SimpleTable Title="Hợp đồng mặt bằng" Headers="Bên thuê|Khu vực|Bến|Thời hạn|Tiền thuê|Trạng thái"><tbody>@foreach (var item in leases) { <tr><td>@item.TenantName</td><td>@PremisesName(item.PremisesUnitId)</td><td>@StationName(item.StationId)</td><td>@item.StartDate.ToString("dd/MM/yyyy") – @item.EndDate.ToString("dd/MM/yyyy")</td><td class="text-end">@item.RentAmount.ToString("N0") đ / @item.RentPeriod</td><td>@item.Status</td></tr>}</tbody></SimpleTable>
+    }
+    else if (page == "reconciliation")
+    {
+        <div class="d-flex justify-content-between align-items-center mb-3"><div><h2 class="h5 mb-1">Đối soát ca và chốt ngày</h2><p class="text-muted mb-0">Lập ca → gửi → kiểm tra → phê duyệt → chốt. Sau chốt chỉ điều chỉnh bằng adjustment.</p></div></div>
+        @if (canReconciliationCreate)
+        { <div class="card mb-4"><div class="card-body"><h3 class="h6">Lập đối soát ca</h3><div class="row g-3"><div class="col-md-4"><label class="form-label">Bến *</label><StationSelect @bind-Value="shiftStationId" Stations="stations" /></div><div class="col-md-4"><label class="form-label">Ngày nghiệp vụ *</label><input type="date" class="form-control" @bind="shiftDate" /></div><div class="col-md-4"><label class="form-label">Ca *</label><input class="form-control" @bind="shiftCode" /></div></div><button class="btn btn-primary mt-3" @onclick="CreateShiftAsync" disabled="@isSaving">Lập ca đối soát</button></div></div> }
+        <SimpleTable Title="Đối soát ca" Headers="Ngày|Ca|Bến|Doanh thu|Chi phí|Trạng thái|Thao tác"><tbody>@foreach (var item in settlements) { <tr><td>@item.BusinessDate.ToString("dd/MM/yyyy")</td><td>@item.ShiftCode</td><td>@StationName(item.StationId)</td><td class="text-end">@item.TotalRevenue.ToString("N0") đ</td><td class="text-end">@item.TotalExpense.ToString("N0") đ</td><td>@item.Status</td><td class="text-end"><div class="btn-group btn-group-sm">@foreach (var action in SettlementActions(item.Status)) { <button class="btn btn-outline-primary" @onclick="@(() => TransitionShiftAsync(item.Id, action.Key))">@action.Value</button> }</div></td></tr>}</tbody></SimpleTable>
+        @if (canReconciliationClose)
+        { <div class="card mt-4"><div class="card-body"><h3 class="h6">Chốt ngày</h3><div class="row g-3 align-items-end"><div class="col-md-5"><label class="form-label">Bến *</label><StationSelect @bind-Value="dailyStationId" Stations="stations" /></div><div class="col-md-5"><label class="form-label">Ngày nghiệp vụ *</label><input type="date" class="form-control" @bind="dailyDate" /></div><div class="col-md-2"><button class="btn btn-danger w-100" @onclick="CloseDailyAsync" disabled="@isSaving">Chốt ngày</button></div></div></div></div> }
+        <SimpleTable Title="Điều chỉnh sau chốt" Headers="Bến|Mục tiêu|Số tiền|Lý do|Trạng thái|Thao tác"><tbody>@foreach (var item in adjustments) { <tr><td>@StationName(item.StationId)</td><td>@(item.ReceiptId.HasValue ? "Phiếu thu" : "Chi phí")</td><td class="text-end">@item.Amount.ToString("N0") đ</td><td>@item.Reason</td><td>@item.Status</td><td class="text-end">@if (canAdjustmentApprove && item.Status == BusStatuses.Submitted) { <button class="btn btn-sm btn-outline-success" @onclick="@(() => ApproveAdjustmentAsync(item.Id))">Duyệt</button> }</td></tr>}</tbody></SimpleTable>
+    }
+</section>
+
+@code {
+    private string page = "stations";
+    private bool isLoading;
+    private bool isSaving;
+    private string? error;
+    private bool canCreate, canUpdate, canMasterCreate, canContractCreate, canComplianceCreate;
+    private bool canDepartureCreate, canDepartureUpdate, canRevenueCreate, canExpenseCreate, canExpenseApprove;
+    private bool canPremisesCreate, canReconciliationCreate, canReconciliationClose, canAdjustmentApprove;
+    private ClaimsPrincipal currentUser = new();
+
+    private List<BusStationDto> stations = [];
+    private List<OperatorDto> operators = [];
+    private List<RouteDto> routes = [];
+    private List<VehicleDto> vehicles = [];
+    private List<DriverDto> drivers = [];
+    private List<CarrierContractDto> contracts = [];
+    private List<VehicleLegalDocumentDto> legalDocuments = [];
+    private List<DepartureDto> departures = [];
+    private List<RevenueReceiptDto> receipts = [];
+    private List<TariffDto> tariffs = [];
+    private List<ExpenseDto> expenses = [];
+    private List<PremisesUnitDto> premises = [];
+    private List<LeaseContractDto> leases = [];
+    private List<SettlementDto> settlements = [];
+    private List<AdjustmentDto> adjustments = [];
+
+    private bool showStationForm;
+    private Guid? editingStationId;
+    private string stationCode = "";
+    private string stationName = "";
+    private string stationAddress = "";
+    private string stationTimeZone = "Asia/Ho_Chi_Minh";
+    private bool stationIsActive = true;
+    private string masterTab = "operators";
+    private Guid masterStationId;
+    private string operatorCode = "";
+    private string operatorName = "";
+    private string routeCode = "";
+    private string routeName = "";
+    private Guid routeOperatorId;
+    private string vehiclePlate = "";
+    private string vehicleType = "Bus";
+    private Guid vehicleOperatorId;
+    private string driverName = "";
+    private string driverLicense = "";
+    private Guid contractStationId;
+    private Guid contractOperatorId;
+    private string contractNumber = "";
+    private string contractDocumentIdText = "";
+    private DateTime contractStartDate = DateTime.Today;
+    private DateTime contractEndDate = DateTime.Today.AddYears(1);
+    private Guid legalVehicleId;
+    private string legalDocumentType = "Inspection";
+    private DateTime legalExpiresOn = DateTime.Today.AddYears(1);
+    private Guid legalStationId;
+    private Guid departureStationId;
+    private Guid departureOperatorId;
+    private Guid departureRouteId;
+    private Guid departureVehicleId;
+    private Guid departureDriverId;
+    private DateTime departureDate = DateTime.Today;
+    private string departureShift = "S1";
+    private TimeOnly departureTime = new(8, 0);
+    private int departurePassengers;
+    private bool departureInspection, departureRouteBadge, departureInsurance, departureLicense, departureTransportOrder, departureContract, departureFeePaid, departureControl;
+    private Guid receiptStationId;
+    private DateTime receiptDate = DateTime.Today;
+    private string receiptShift = "S1";
+    private string receiptSource = RevenueSources.FixedRoute;
+    private string receiptReference = "";
+    private string receiptDescription = "Phí bến chuyến cố định";
+    private decimal receiptQuantity = 1;
+    private decimal receiptUnitAmount;
+    private Guid tariffStationId;
+    private Guid tariffRouteId;
+    private string tariffVehicleType = "Bus";
+    private string tariffFeeType = "StationFee";
+    private decimal tariffAmount;
+    private DateTime tariffEffectiveFrom = DateTime.Today;
+    private DateTime? tariffEffectiveTo;
+    private Guid expenseStationId;
+    private DateTime expenseDate = DateTime.Today;
+    private string expenseShift = "S1";
+    private string expenseCategory = "Vận hành";
+    private decimal expenseAmount;
+    private string expenseDescription = "";
+    private string expenseDocumentIdText = "";
+    private Guid premisesStationId;
+    private string premisesCode = "";
+    private string premisesName = "";
+    private decimal premisesArea;
+    private string premisesLocation = "";
+    private Guid leaseStationId;
+    private Guid leasePremisesId;
+    private string leaseTenant = "";
+    private DateTime leaseStartDate = DateTime.Today;
+    private DateTime leaseEndDate = DateTime.Today.AddYears(1);
+    private decimal leaseRentAmount;
+    private string leasePeriod = "Monthly";
+    private Guid shiftStationId;
+    private DateTime shiftDate = DateTime.Today;
+    private string shiftCode = "S1";
+    private Guid dailyStationId;
+    private DateTime dailyDate = DateTime.Today;
+
+    private string PageTitleText => page switch
+    {
+        "stations" => "Bến xe và thông tin cơ sở",
+        "master-data" => "Dữ liệu nền vận hành",
+        "contracts" => "Hợp đồng nhà xe",
+        "compliance" => "Hồ sơ pháp lý",
+        "departures" => "Chuyến xuất bến",
+        "revenue" => "Doanh thu và biểu giá",
+        "expenses" => "Chi phí vận hành",
+        "premises" => "Mặt bằng và hợp đồng",
+        "reconciliation" => "Đối soát ca và chốt ngày",
+        _ => "Quản lý bến xe"
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        currentUser = (await AuthenticationStateProvider.GetAuthenticationStateAsync()).User;
+        page = ResolvePage(Navigation.Uri);
+        RefreshPermissions();
+        await LoadAsync();
+    }
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Navigation.LocationChanged += OnLocationChanged;
+    }
+
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var next = ResolvePage(args.Location);
+        if (next == page) return;
+        page = next;
+        await InvokeAsync(async () =>
+        {
+            ResetPageState();
+            await LoadAsync();
+            StateHasChanged();
+        });
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing) Navigation.LocationChanged -= OnLocationChanged;
+        base.Dispose(disposing);
+    }
+
+    private static string ResolvePage(string uri)
+    {
+        var route = new Uri(uri).AbsolutePath.Trim('/').ToLowerInvariant();
+        return route.Split('/').LastOrDefault() switch
+        {
+            "stations" => "stations", "master-data" => "master-data", "contracts" => "contracts", "compliance" => "compliance",
+            "departures" => "departures", "revenue" => "revenue", "expenses" => "expenses", "premises" => "premises",
+            "reconciliation" => "reconciliation", _ => "stations"
+        };
+    }
+
+    private void RefreshPermissions()
+    {
+        var global = currentUser.IsInRole("admin") || currentUser.IsInRole("lanhdao");
+        bool Has(string permission, string group) => global || currentUser.HasClaim("permission", permission) || currentUser.HasClaim("permission", group);
+        canCreate = Has(BusPermissions.StationsCreate, BusPermissions.Stations);
+        canUpdate = Has(BusPermissions.StationsUpdate, BusPermissions.Stations);
+        canMasterCreate = Has(BusPermissions.MasterDataCreate, BusPermissions.MasterData);
+        canContractCreate = Has(BusPermissions.OperatorsContractsCreate, BusPermissions.OperatorsContracts);
+        canComplianceCreate = Has(BusPermissions.FleetComplianceCreate, BusPermissions.FleetCompliance);
+        canDepartureCreate = Has(BusPermissions.DeparturesCreate, BusPermissions.Departures);
+        canDepartureUpdate = Has(BusPermissions.DeparturesUpdate, BusPermissions.Departures);
+        canRevenueCreate = Has(BusPermissions.RevenueCreate, BusPermissions.Revenue);
+        canExpenseCreate = Has(BusPermissions.ExpensesCreate, BusPermissions.Expenses);
+        canExpenseApprove = Has(BusPermissions.ExpensesApprove, BusPermissions.Expenses);
+        canPremisesCreate = Has(BusPermissions.PremisesCreate, BusPermissions.Premises);
+        canReconciliationCreate = Has(BusPermissions.ReconciliationCreate, BusPermissions.Reconciliation);
+        canReconciliationClose = Has(BusPermissions.ReconciliationClose, BusPermissions.Reconciliation);
+        canAdjustmentApprove = Has(BusPermissions.ReconciliationAdjustApprove, BusPermissions.Reconciliation);
+    }
+
+    private async Task LoadAsync()
+    {
+        isLoading = true; error = null;
+        try
+        {
+            var stationResult = page == "stations"
+                ? await BusClient.GetStationsAsync(take: 100)
+                : await BusClient.GetStationScopeAsync(take: 100);
+            stations = stationResult.Items.ToList();
+            switch (page)
+            {
+                case "master-data":
+                    operators = (await BusClient.GetOperatorsAsync()).Items.ToList(); routes = (await BusClient.GetRoutesAsync()).Items.ToList();
+                    vehicles = (await BusClient.GetVehiclesAsync()).Items.ToList(); drivers = (await BusClient.GetDriversAsync()).Items.ToList(); break;
+                case "contracts":
+                    operators = (await BusClient.GetOperatorsAsync()).Items.ToList(); contracts = (await BusClient.GetCarrierContractsAsync()).Items.ToList(); break;
+                case "compliance":
+                    vehicles = (await BusClient.GetVehiclesAsync()).Items.ToList(); legalDocuments = (await BusClient.GetVehicleLegalDocumentsAsync()).Items.ToList(); break;
+                case "departures":
+                    operators = (await BusClient.GetOperatorsAsync()).Items.ToList(); routes = (await BusClient.GetRoutesAsync()).Items.ToList(); vehicles = (await BusClient.GetVehiclesAsync()).Items.ToList(); drivers = (await BusClient.GetDriversAsync()).Items.ToList(); departures = (await BusClient.GetDeparturesAsync(take: 100)).Items.ToList(); break;
+                case "revenue": routes = (await BusClient.GetRoutesAsync()).Items.ToList(); receipts = (await BusClient.GetReceiptsAsync(take: 100)).Items.ToList(); tariffs = (await BusClient.GetTariffsAsync(take: 100)).Items.ToList(); break;
+                case "expenses": expenses = (await BusClient.GetExpensesAsync(take: 100)).Items.ToList(); break;
+                case "premises": premises = (await BusClient.GetPremisesAsync(take: 100)).Items.ToList(); leases = (await BusClient.GetLeasesAsync(take: 100)).Items.ToList(); break;
+                case "reconciliation": settlements = (await BusClient.GetSettlementsAsync(take: 100)).Items.ToList(); adjustments = (await BusClient.GetAdjustmentsAsync(take: 100)).Items.ToList(); break;
+            }
+            SetDefaultStationValues();
+        }
+        catch (Exception exception)
+        {
+            error = exception.Message;
+            await NotifyErrorAsync(exception, BffErrorKind.Load);
+        }
+        finally { isLoading = false; }
+    }
+
+    private void SetDefaultStationValues()
+    {
+        if (stations.Count == 0) return;
+        var station = stations[0].Id;
+        if (masterStationId == Guid.Empty) masterStationId = station;
+        if (contractStationId == Guid.Empty) contractStationId = station;
+        if (legalStationId == Guid.Empty) legalStationId = station;
+        if (departureStationId == Guid.Empty) departureStationId = station;
+        if (receiptStationId == Guid.Empty) receiptStationId = station;
+        if (tariffStationId == Guid.Empty) tariffStationId = station;
+        if (expenseStationId == Guid.Empty) expenseStationId = station;
+        if (premisesStationId == Guid.Empty) premisesStationId = station;
+        if (leaseStationId == Guid.Empty) leaseStationId = station;
+        if (shiftStationId == Guid.Empty) shiftStationId = station;
+        if (dailyStationId == Guid.Empty) dailyStationId = station;
+    }
+
+    private void ResetPageState() { error = null; showStationForm = false; }
+    private void BeginNewStation() { editingStationId = null; stationCode = ""; stationName = ""; stationAddress = ""; stationTimeZone = "Asia/Ho_Chi_Minh"; stationIsActive = true; showStationForm = true; }
+    private void EditStation(BusStationDto item) { editingStationId = item.Id; stationCode = item.Code; stationName = item.Name; stationAddress = item.Address ?? ""; stationTimeZone = item.TimeZone; stationIsActive = item.IsActive; showStationForm = true; }
+    private void CancelForm() { showStationForm = false; editingStationId = null; }
+
+    private async Task SaveStationAsync()
+    {
+        if (string.IsNullOrWhiteSpace(stationCode) || string.IsNullOrWhiteSpace(stationName)) { error = "Mã và tên bến là bắt buộc."; return; }
+        await ExecuteMutationAsync(async () => { if (editingStationId.HasValue) await BusClient.UpdateStationAsync(editingStationId.Value, new(stationName.Trim(), NullIfEmpty(stationAddress), stationTimeZone.Trim(), stationIsActive)); else await BusClient.CreateStationAsync(new(stationCode.Trim(), stationName.Trim(), NullIfEmpty(stationAddress), stationTimeZone.Trim())); }, "Đã lưu thông tin bến xe.");
+        CancelForm();
+    }
+
+    private async Task CreateOperatorAsync() => await ExecuteMutationAsync(async () => { Require(masterStationId, "bến"); RequireText(operatorCode, "mã nhà xe"); RequireText(operatorName, "tên nhà xe"); await BusClient.CreateOperatorAsync(new(operatorCode.Trim(), operatorName.Trim(), masterStationId)); }, "Đã thêm nhà xe.");
+    private async Task CreateRouteAsync() => await ExecuteMutationAsync(async () => { Require(masterStationId, "bến"); Require(routeOperatorId, "nhà xe"); RequireText(routeCode, "mã tuyến"); RequireText(routeName, "tên tuyến"); await BusClient.CreateRouteAsync(new(routeCode.Trim(), routeName.Trim(), routeOperatorId, masterStationId)); }, "Đã thêm tuyến.");
+    private async Task CreateVehicleAsync() => await ExecuteMutationAsync(async () => { Require(masterStationId, "bến"); Require(vehicleOperatorId, "nhà xe"); RequireText(vehiclePlate, "biển số"); RequireText(vehicleType, "loại xe"); await BusClient.CreateVehicleAsync(new(vehiclePlate.Trim(), vehicleType.Trim(), vehicleOperatorId, masterStationId)); }, "Đã thêm phương tiện.");
+    private async Task CreateDriverAsync() => await ExecuteMutationAsync(async () => { Require(masterStationId, "bến"); RequireText(driverName, "họ tên"); RequireText(driverLicense, "bằng lái"); await BusClient.CreateDriverAsync(new(driverName.Trim(), driverLicense.Trim(), masterStationId)); }, "Đã thêm tài xế.");
+    private async Task CreateContractAsync() => await ExecuteMutationAsync(async () => { Require(contractStationId, "bến"); Require(contractOperatorId, "nhà xe"); RequireText(contractNumber, "số hợp đồng"); if (contractEndDate < contractStartDate) throw new InvalidOperationException("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."); await BusClient.CreateCarrierContractAsync(new(contractStationId, contractOperatorId, contractNumber.Trim(), contractStartDate, contractEndDate, ParseGuid(contractDocumentIdText))); }, "Đã thêm hợp đồng nhà xe.");
+    private async Task CreateLegalAsync() => await ExecuteMutationAsync(async () => { Require(legalVehicleId, "phương tiện"); RequireText(legalDocumentType, "loại hồ sơ"); await BusClient.CreateVehicleLegalDocumentAsync(new(legalVehicleId, legalDocumentType.Trim(), legalExpiresOn, null, legalStationId == Guid.Empty ? null : legalStationId)); }, "Đã thêm hồ sơ pháp lý.");
+    private async Task CreateDepartureAsync() => await ExecuteMutationAsync(async () => { Require(departureStationId, "bến"); Require(departureOperatorId, "nhà xe"); Require(departureRouteId, "tuyến"); Require(departureVehicleId, "phương tiện"); Require(departureDriverId, "tài xế"); RequireText(departureShift, "ca"); var local = DateTime.SpecifyKind(departureDate.Date.Add(departureTime.ToTimeSpan()), DateTimeKind.Local); await BusClient.CreateDepartureAsync(new(departureStationId, departureOperatorId, departureRouteId, departureVehicleId, departureDriverId, departureDate, departureShift.Trim(), local.ToUniversalTime(), departurePassengers, departureInspection, departureRouteBadge, departureInsurance, departureLicense, departureTransportOrder, departureContract, departureFeePaid, departureControl)); }, "Đã lập chuyến xuất bến.");
+    private async Task CreateReceiptAsync() => await ExecuteMutationAsync(async () => { Require(receiptStationId, "bến"); RequireText(receiptShift, "ca"); RequireText(receiptDescription, "diễn giải"); if (receiptQuantity <= 0 || receiptUnitAmount < 0) throw new InvalidOperationException("Số lượng phải lớn hơn 0 và đơn giá không âm."); await BusClient.CreateReceiptAsync(new(receiptStationId, receiptDate, receiptShift.Trim(), receiptSource, null, null, Guid.NewGuid().ToString("N"), [new(receiptDescription.Trim(), receiptQuantity, receiptUnitAmount)], NullIfEmpty(receiptReference))); }, "Đã phát hành phiếu thu.");
+    private async Task CreateTariffAsync() => await ExecuteMutationAsync(async () => { Require(tariffStationId, "bến"); RequireText(tariffVehicleType, "loại xe"); RequireText(tariffFeeType, "loại phí"); if (tariffAmount < 0 || (tariffEffectiveTo.HasValue && tariffEffectiveTo.Value < tariffEffectiveFrom)) throw new InvalidOperationException("Số tiền không âm và khoảng hiệu lực phải hợp lệ."); await BusClient.CreateTariffAsync(new(tariffStationId, tariffRouteId == Guid.Empty ? null : tariffRouteId, tariffVehicleType.Trim(), tariffFeeType.Trim(), tariffAmount, tariffEffectiveFrom, tariffEffectiveTo)); }, "Đã thêm biểu giá.");
+    private async Task CreateExpenseAsync() => await ExecuteMutationAsync(async () => { Require(expenseStationId, "bến"); RequireText(expenseShift, "ca"); RequireText(expenseCategory, "nhóm chi phí"); RequireText(expenseDescription, "nội dung"); if (expenseAmount < 0) throw new InvalidOperationException("Số tiền không được âm."); await BusClient.CreateExpenseAsync(new(expenseStationId, expenseDate, expenseShift.Trim(), expenseCategory.Trim(), expenseAmount, expenseDescription.Trim(), ParseGuid(expenseDocumentIdText))); }, "Đã lưu chi phí.");
+    private async Task CreatePremisesAsync() => await ExecuteMutationAsync(async () => { Require(premisesStationId, "bến"); RequireText(premisesCode, "mã khu vực"); RequireText(premisesName, "tên khu vực"); if (premisesArea <= 0) throw new InvalidOperationException("Diện tích phải lớn hơn 0."); await BusClient.CreatePremisesAsync(new(premisesStationId, premisesCode.Trim(), premisesName.Trim(), premisesArea, NullIfEmpty(premisesLocation))); }, "Đã thêm khu vực mặt bằng.");
+    private async Task CreateLeaseAsync() => await ExecuteMutationAsync(async () => { Require(leaseStationId, "bến"); Require(leasePremisesId, "khu vực"); RequireText(leaseTenant, "bên thuê"); RequireText(leasePeriod, "kỳ thu"); if (leaseEndDate < leaseStartDate) throw new InvalidOperationException("Ngày kết thúc phải lớn hơn hoặc bằng ngày bắt đầu."); await BusClient.CreateLeaseAsync(new(leaseStationId, leasePremisesId, leaseTenant.Trim(), leaseStartDate, leaseEndDate, leaseRentAmount, leasePeriod.Trim())); }, "Đã thêm hợp đồng mặt bằng.");
+    private async Task CreateShiftAsync() => await ExecuteMutationAsync(async () => { Require(shiftStationId, "bến"); RequireText(shiftCode, "ca"); await BusClient.CreateShiftAsync(new(shiftStationId, shiftDate, shiftCode.Trim())); }, "Đã lập ca đối soát.");
+    private async Task CloseDailyAsync() => await ExecuteMutationAsync(async () => { Require(dailyStationId, "bến"); await BusClient.CloseDailyAsync(new(dailyStationId, dailyDate)); }, "Đã chốt ngày.");
+    private async Task TransitionDepartureAsync(Guid id, string action) => await ExecuteMutationAsync(() => BusClient.TransitionDepartureAsync(id, action), "Đã cập nhật trạng thái chuyến.");
+    private async Task TransitionExpenseAsync(Guid id, string action) => await ExecuteMutationAsync(action == "submit" ? () => BusClient.SubmitExpenseAsync(id) : () => BusClient.ApproveExpenseAsync(id), "Đã cập nhật trạng thái chi phí.");
+    private async Task TransitionShiftAsync(Guid id, string action) => await ExecuteMutationAsync(() => BusClient.TransitionShiftAsync(id, action), "Đã cập nhật trạng thái đối soát.");
+    private async Task ApproveAdjustmentAsync(Guid id) => await ExecuteMutationAsync(() => BusClient.ApproveAdjustmentAsync(id), "Đã duyệt điều chỉnh.");
+
+    private async Task ExecuteMutationAsync(Func<Task> action, string success)
+    {
+        if (isSaving) return;
+        isSaving = true; error = null;
+        try { await action(); await NotifySuccessAsync(success); await LoadAsync(); }
+        catch (Exception exception) { error = exception.Message; await NotifyErrorAsync(exception, BffErrorKind.Save); }
+        finally { isSaving = false; }
+    }
+
+    private static void Require(Guid value, string name) { if (value == Guid.Empty) throw new InvalidOperationException($"Vui lòng chọn {name}."); }
+    private static void RequireText(string? value, string name) { if (string.IsNullOrWhiteSpace(value)) throw new InvalidOperationException($"Vui lòng nhập {name}."); }
+    private static string? NullIfEmpty(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+    private static Guid? ParseGuid(string? value) => Guid.TryParse(value, out var id) && id != Guid.Empty ? id : null;
+    private string StationName(Guid? id) => id.HasValue ? stations.FirstOrDefault(x => x.Id == id.Value)?.Name ?? id.Value.ToString("D") : "Toàn hệ thống";
+    private string OperatorName(Guid id) => operators.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString("D");
+    private string RouteName(Guid id) => routes.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString("D");
+    private string VehicleName(Guid id) => vehicles.FirstOrDefault(x => x.Id == id)?.PlateNumber ?? id.ToString("D");
+    private string PremisesName(Guid id) => premises.FirstOrDefault(x => x.Id == id)?.Name ?? id.ToString("D");
+    private static bool IsDepartureActive(string status) => status is BusStatuses.Ready or BusStatuses.Departed or BusStatuses.Completed;
+    private static bool IsIssued(string status) => status == BusStatuses.Issued;
+    private static bool IsApproved(string status) => status == BusStatuses.Approved;
+    private static IReadOnlyList<KeyValuePair<string, string>> SettlementActions(string status) => status switch
+    {
+        BusStatuses.Draft => [new("submit", "Gửi")],
+        BusStatuses.Submitted => [new("check", "Kiểm tra")],
+        BusStatuses.Checked => [new("approve", "Phê duyệt")],
+        BusStatuses.Approved => [new("close", "Chốt ca")],
+        _ => []
+    };
+}
