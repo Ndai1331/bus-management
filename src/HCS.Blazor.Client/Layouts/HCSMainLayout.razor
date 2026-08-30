@@ -158,25 +158,25 @@
                                 <Authorized><a href="/bus-management" aria-current="@(IsMenuHrefActive("/bus-management") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-gauge-high" aria-hidden="true"></i>@Localizer["Menu:BusDashboard"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Stations">
-                                <Authorized><a href="/bus-management#bus-stations" aria-current="@(IsMenuHrefActive("/bus-management#bus-stations") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-stations") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-building" aria-hidden="true"></i>@Localizer["Menu:BusStations"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-stations" aria-current="@(IsMenuHrefActive("/bus-management#bus-stations") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-stations") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-stations"))" @onclick:preventDefault="true"><i class="fa fa-building" aria-hidden="true"></i>@Localizer["Menu:BusStations"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Departures">
-                                <Authorized><a href="/bus-management#bus-departures" aria-current="@(IsMenuHrefActive("/bus-management#bus-departures") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-departures") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-route" aria-hidden="true"></i>@Localizer["Menu:BusDepartures"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-departures" aria-current="@(IsMenuHrefActive("/bus-management#bus-departures") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-departures") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-departures"))" @onclick:preventDefault="true"><i class="fa fa-route" aria-hidden="true"></i>@Localizer["Menu:BusDepartures"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Revenue">
-                                <Authorized><a href="/bus-management#bus-revenue" aria-current="@(IsMenuHrefActive("/bus-management#bus-revenue") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-revenue") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-money-bill-wave" aria-hidden="true"></i>@Localizer["Menu:BusRevenue"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-revenue" aria-current="@(IsMenuHrefActive("/bus-management#bus-revenue") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-revenue") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-revenue"))" @onclick:preventDefault="true"><i class="fa fa-money-bill-wave" aria-hidden="true"></i>@Localizer["Menu:BusRevenue"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Expenses">
-                                <Authorized><a href="/bus-management#bus-expenses" aria-current="@(IsMenuHrefActive("/bus-management#bus-expenses") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-expenses") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-receipt" aria-hidden="true"></i>@Localizer["Menu:BusExpenses"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-expenses" aria-current="@(IsMenuHrefActive("/bus-management#bus-expenses") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-expenses") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-expenses"))" @onclick:preventDefault="true"><i class="fa fa-receipt" aria-hidden="true"></i>@Localizer["Menu:BusExpenses"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Premises">
-                                <Authorized><a href="/bus-management#bus-premises" aria-current="@(IsMenuHrefActive("/bus-management#bus-premises") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-premises") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-store" aria-hidden="true"></i>@Localizer["Menu:BusPremises"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-premises" aria-current="@(IsMenuHrefActive("/bus-management#bus-premises") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-premises") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-premises"))" @onclick:preventDefault="true"><i class="fa fa-store" aria-hidden="true"></i>@Localizer["Menu:BusPremises"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Reconciliation">
-                                <Authorized><a href="/bus-management#bus-reconciliation" aria-current="@(IsMenuHrefActive("/bus-management#bus-reconciliation") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-reconciliation") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-clipboard-check" aria-hidden="true"></i>@Localizer["Menu:BusReconciliation"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-reconciliation" aria-current="@(IsMenuHrefActive("/bus-management#bus-reconciliation") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-reconciliation") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-reconciliation"))" @onclick:preventDefault="true"><i class="fa fa-clipboard-check" aria-hidden="true"></i>@Localizer["Menu:BusReconciliation"]</a></Authorized>
                             </AuthorizeView>
                             <AuthorizeView Policy="HCS.BusManagement.Reports">
-                                <Authorized><a href="/bus-management#bus-reports" aria-current="@(IsMenuHrefActive("/bus-management#bus-reports") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-reports") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-chart-column" aria-hidden="true"></i>@Localizer["Menu:BusReports"]</a></Authorized>
+                                <Authorized><a href="/bus-management#bus-reports" aria-current="@(IsMenuHrefActive("/bus-management#bus-reports") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-reports") ? "active" : null)" @onclick="@(() => NavigateToBusSection("bus-reports"))" @onclick:preventDefault="true"><i class="fa fa-chart-column" aria-hidden="true"></i>@Localizer["Menu:BusReports"]</a></Authorized>
                             </AuthorizeView>
                         </div>
                     </div>
@@ -425,6 +425,12 @@
         {
             await navToggle.FocusAsync();
         }
+    }
+
+    private async Task NavigateToBusSection(string fragment)
+    {
+        await CloseMobileNav();
+        Navigation.NavigateTo($"/bus-management#{fragment}");
     }
 
     private async Task HandleKeyDown(KeyboardEventArgs args)

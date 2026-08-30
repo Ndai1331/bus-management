@@ -38,6 +38,8 @@ Blazor có menu **Quản lý bến xe** tại `/bus-management`. Menu cha đư�
 
 Các liên kết fragment cuộn tới đúng khu vực trên dashboard (và vẫn dùng được với điều hướng fragment mặc định nếu JavaScript không sẵn sàng). Các khu vực hiện tại gồm: thẻ chỉ số chuyến xe, doanh thu thuần, chi phí thuần và ca chưa chốt; cảnh báo hồ sơ/hợp đồng/mặt bằng sắp hết hạn; bảng tổng hợp theo bến; và bảng doanh thu theo nguồn trong khu vực báo cáo.
 
+Menu và các thẻ điều hướng nội bộ dùng `NavigationManager` với `preventDefault`; khi đang ở `/bus-management`, click chỉ đổi fragment và cuộn tới khu vực tương ứng, không tải lại toàn bộ tài liệu. Deep link `/bus-management#bus-expenses` vẫn được xử lý khi mở trang trực tiếp.
+
 Dashboard gọi `/api/bus-management/dashboard` khi user qua policy dashboard. Khu vực **Báo cáo** và dữ liệu `/reports/revenue` chỉ được hiển thị/tải khi có claim `HCS.BusManagement.Reports`; không có quyền này, các thẻ tổng quan, cảnh báo và tổng hợp theo bến vẫn hiển thị nhưng khu vực báo cáo bị ẩn. Nút XLSX/PDF/In chỉ hiển thị khi có thêm `HCS.BusManagement.Reports.Export`; vì các nút nằm trong khu vực Báo cáo, để thấy và dùng liên kết xuất file trên UI cần cả `Reports` và `Reports.Export`. API export vẫn kiểm tra quyền `Reports.Export` ở server.
 
 Sau khi thêm/sửa permission definition hoặc permission seed, cần rebuild các host liên quan và chạy lại DbMigrator/seed theo quy trình local trước khi kiểm tra. Sau đó phải đăng xuất rồi đăng nhập lại (hoặc làm mới BFF session) để nhận permission claims mới; hard-refresh chỉ làm mới giao diện, không thay thế việc cấp lại claims trong session.

@@ -25,33 +25,33 @@
     </header>
 
     <nav class="bus-dashboard__modules mb-4" aria-label="@L["Bus:NavigateModules"]">
-        <a class="bus-dashboard__module" href="#bus-stations">
+        <a class="bus-dashboard__module" href="#bus-stations" @onclick="@(() => NavigateToFragment("bus-stations"))" @onclick:preventDefault="true">
             <i class="fa fa-building" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusStations"]</strong><small>@L["Bus:StationsHint"]</small></span>
         </a>
-        <a class="bus-dashboard__module" href="#bus-departures">
+        <a class="bus-dashboard__module" href="#bus-departures" @onclick="@(() => NavigateToFragment("bus-departures"))" @onclick:preventDefault="true">
             <i class="fa fa-route" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusDepartures"]</strong><small>@L["Bus:DeparturesHint"]</small></span>
         </a>
-        <a class="bus-dashboard__module" href="#bus-revenue">
+        <a class="bus-dashboard__module" href="#bus-revenue" @onclick="@(() => NavigateToFragment("bus-revenue"))" @onclick:preventDefault="true">
             <i class="fa fa-money-bill-wave" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusRevenue"]</strong><small>@L["Bus:RevenueHint"]</small></span>
         </a>
-        <a class="bus-dashboard__module" href="#bus-expenses">
+        <a class="bus-dashboard__module" href="#bus-expenses" @onclick="@(() => NavigateToFragment("bus-expenses"))" @onclick:preventDefault="true">
             <i class="fa fa-receipt" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusExpenses"]</strong><small>@L["Bus:ExpensesHint"]</small></span>
         </a>
-        <a class="bus-dashboard__module" href="#bus-premises">
+        <a class="bus-dashboard__module" href="#bus-premises" @onclick="@(() => NavigateToFragment("bus-premises"))" @onclick:preventDefault="true">
             <i class="fa fa-store" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusPremises"]</strong><small>@L["Bus:PremisesHint"]</small></span>
         </a>
-        <a class="bus-dashboard__module" href="#bus-reconciliation">
+        <a class="bus-dashboard__module" href="#bus-reconciliation" @onclick="@(() => NavigateToFragment("bus-reconciliation"))" @onclick:preventDefault="true">
             <i class="fa fa-clipboard-check" aria-hidden="true"></i>
             <span><strong>@L["Menu:BusReconciliation"]</strong><small>@L["Bus:ReconciliationHint"]</small></span>
         </a>
         @if (canViewReports)
         {
-            <a class="bus-dashboard__module" href="#bus-reports">
+            <a class="bus-dashboard__module" href="#bus-reports" @onclick="@(() => NavigateToFragment("bus-reports"))" @onclick:preventDefault="true">
                 <i class="fa fa-chart-column" aria-hidden="true"></i>
                 <span><strong>@L["Menu:BusReports"]</strong><small>@L["Bus:ReportsHint"]</small></span>
             </a>
@@ -166,6 +166,13 @@
     private bool isLoading;
     private string? error;
     private string? lastScrolledFragment;
+    private string? pendingFragment;
+
+    protected override void OnInitialized()
+    {
+        base.OnInitialized();
+        Navigation.LocationChanged += OnLocationChanged;
+    }
 
     protected override async Task OnInitializedAsync()
     {
@@ -182,22 +189,49 @@
             return;
         }
 
-        var fragment = new Uri(Navigation.Uri).Fragment.TrimStart('#');
+        var fragment = pendingFragment ?? GetFragment(Navigation.Uri);
+
+        pendingFragment = null;
         if (string.IsNullOrWhiteSpace(fragment) || string.Equals(fragment, lastScrolledFragment, StringComparison.Ordinal))
         {
             return;
         }
 
-        lastScrolledFragment = fragment;
         try
         {
-            await Js.InvokeVoidAsync("hcsScrollToFragment", fragment);
+            if (await Js.InvokeAsync<bool>("hcsScrollToFragment", fragment))
+            {
+                lastScrolledFragment = fragment;
+            }
         }
         catch (JSException)
         {
             // Fragment navigation remains usable when JavaScript is unavailable.
         }
     }
+
+    private void OnLocationChanged(object? sender, LocationChangedEventArgs args)
+    {
+        var route = Navigation.ToBaseRelativePath(args.Location).Split('?', '#')[0].Trim('/');
+        if (!string.Equals(route, "bus-management", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        pendingFragment = GetFragment(args.Location);
+        if (string.IsNullOrWhiteSpace(pendingFragment))
+        {
+            lastScrolledFragment = null;
+        }
+
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private void NavigateToFragment(string fragment) =>
+        Navigation.NavigateTo($"/bus-management#{fragment}");
+
+    private static string GetFragment(string location) =>
+        Uri.TryCreate(location, UriKind.Absolute, out var uri) ? uri.Fragment.TrimStart('#') : string.Empty;
 
     private async Task RefreshAsync()
     {
@@ -236,6 +270,16 @@
     }
     private DateTime from => dashboard?.From ?? new DateTime(DateTime.Now.Year, DateTime.Now.Month, 1);
     private DateTime to => dashboard?.To ?? DateTime.Now.Date;
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            Navigation.LocationChanged -= OnLocationChanged;
+        }
+
+        base.Dispose(disposing);
+    }
 
 }
 
