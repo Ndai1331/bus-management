@@ -94,7 +94,9 @@ services:
       - /bin/sh
       - -c
       - >-
-        if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'hcs_bus_management'" | grep -q 1; then
+        set -eu;
+        database_exists="$$(psql -Atqc "SELECT 1 FROM pg_database WHERE datname = 'hcs_bus_management'")";
+        if [ "$$database_exists" != "1" ]; then
           psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE hcs_bus_management";
         fi
 
@@ -236,6 +238,7 @@ services:
     build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj, APP_DLL: HCS.BusManagementService.dll } }
     environment:
       <<: *common-env
+      BusManagement__SeedDemoData: "true"
       AuthServer__Authority: https://auth.hcs.localhost
       AuthServer__Audience: HCS.BusManagementService
       AuthServer__RequireHttpsMetadata: "true"

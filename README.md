@@ -83,6 +83,8 @@ docker compose ps
 
 Mở `https://hcs.localhost`. Nếu browser chưa tin local CA của Caddy, tin cậy certificate local một lần hoặc dùng môi trường có TLS certificate hợp lệ. Dừng nhưng giữ Docker volumes bằng `./scripts/docker-down.sh`.
 
+Compose bật seed dữ liệu mẫu Bus Management (`BusManagement__SeedDemoData=true`) để có sẵn 8 bến, nhà xe, tuyến, xe, tài xế, hồ sơ pháp lý, biểu giá, doanh thu, chi phí, mặt bằng, bãi đỗ và đối soát. Seed chạy idempotent sau migration; không cập nhật hoặc xóa dữ liệu người dùng. Muốn chạy service mà không tạo dữ liệu mẫu, đặt biến này thành `false` trong override Compose hoặc môi trường runtime.
+
 Handoff triển khai và rollback: [`../../docs/runbooks/hcs-docker-compose-handoff.md`](../../docs/runbooks/hcs-docker-compose-handoff.md).
 
 Production 2 server Ubuntu 24 (data + apps, Docker Hub, Nginx + Let's Encrypt): [`docs/runbooks/deploy-server.md`](./docs/runbooks/deploy-server.md) — **hướng dẫn deploy step-by-step**.

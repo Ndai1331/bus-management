@@ -1,6 +1,7 @@
 using HCS.BusManagementService;
 using HCS.BusManagementService.Data;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Serilog;
 
 Log.Logger = new LoggerConfiguration().WriteTo.Console().CreateLogger();
@@ -14,6 +15,11 @@ try
     {
         var db = scope.ServiceProvider.GetRequiredService<BusManagementDbContext>();
         await db.Database.MigrateAsync();
+        if (app.Configuration.GetValue<bool>(BusManagementDemoDataSeeder.ConfigurationKey))
+        {
+            var created = await BusManagementDemoDataSeeder.SeedAsync(db);
+            Log.Information("Bus Management demo seed completed. Created {CreatedCount} records.", created);
+        }
     }
     await app.InitializeApplicationAsync();
     await app.RunAsync();
