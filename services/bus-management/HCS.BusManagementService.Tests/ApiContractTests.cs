@@ -8,6 +8,16 @@ namespace HCS.BusManagementService.Tests;
 public sealed class ApiContractTests
 {
     [Fact]
+    public void Dashboard_has_a_read_only_dashboard_permission_boundary()
+    {
+        var method = typeof(ReportsController).GetMethod(nameof(ReportsController.Dashboard))!;
+        var authorize = method.GetCustomAttributes(typeof(AuthorizeAttribute), inherit: true)
+            .Cast<AuthorizeAttribute>().Single();
+
+        Assert.Equal(BusPermissions.Dashboard, authorize.Policy);
+    }
+
+    [Fact]
     public void Parking_operations_stay_under_the_revenue_bff_route()
     {
         var route = typeof(RevenueController).GetCustomAttributes(typeof(RouteAttribute), inherit: true)

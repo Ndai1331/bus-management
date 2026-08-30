@@ -104,7 +104,7 @@
                     <i class="fa fa-file-lines" aria-hidden="true"></i><span>@Localizer["Menu:Documents"]</span>
                     <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
                 </button>
-                <div class="hcs-nav-menu__panel" role="menu">
+                <div class="hcs-nav-menu__panel">
                     <AuthorizeView Policy="Documents.View">
                         <Authorized>
                             <NavLink href="/manage-documents?sourceType=0" @onclick="CloseMobileNav"><i class="fa fa-folder-open" aria-hidden="true"></i>@Localizer["Menu:DocumentList"]</NavLink>
@@ -141,6 +141,48 @@
                 ("/survey-sessions", "fa-clipboard-list", Localizer["Menu:SurveySessions"].Value),
                 ("/survey-results", "fa-square-poll-vertical", Localizer["Menu:SurveyResults"].Value))
 
+            <AuthorizeView Policy="HCS.BusManagement.Menu">
+                <Authorized Context="busManagementMenuAuthorized">
+                    <div class="hcs-nav-menu @(IsExpanded("bus-management") ? "hcs-nav-menu--expanded" : null)"
+                         @onpointerenter="@(() => OnMenuPointerEnter("bus-management"))">
+                        <button class="hcs-nav-menu__trigger" type="button"
+                                aria-expanded="@IsExpanded("bus-management").ToString().ToLowerInvariant()"
+                                aria-haspopup="true" @onmousedown:preventDefault
+                                @onclick="@(() => ToggleSection("bus-management"))">
+                            <i class="fa fa-bus" aria-hidden="true"></i><span>@Localizer["Menu:BusManagement"]</span>
+                            <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
+                        </button>
+                        <div class="hcs-nav-menu__panel hcs-nav-menu__panel--wide">
+                            <p class="hcs-nav-menu__label">@Localizer["Menu:BusManagement"]</p>
+                            <AuthorizeView Policy="HCS.BusManagement.Dashboard">
+                                <Authorized><a href="/bus-management" aria-current="@(IsMenuHrefActive("/bus-management") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-gauge-high" aria-hidden="true"></i>@Localizer["Menu:BusDashboard"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Stations">
+                                <Authorized><a href="/bus-management#bus-stations" aria-current="@(IsMenuHrefActive("/bus-management#bus-stations") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-stations") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-building" aria-hidden="true"></i>@Localizer["Menu:BusStations"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Departures">
+                                <Authorized><a href="/bus-management#bus-departures" aria-current="@(IsMenuHrefActive("/bus-management#bus-departures") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-departures") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-route" aria-hidden="true"></i>@Localizer["Menu:BusDepartures"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Revenue">
+                                <Authorized><a href="/bus-management#bus-revenue" aria-current="@(IsMenuHrefActive("/bus-management#bus-revenue") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-revenue") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-money-bill-wave" aria-hidden="true"></i>@Localizer["Menu:BusRevenue"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Expenses">
+                                <Authorized><a href="/bus-management#bus-expenses" aria-current="@(IsMenuHrefActive("/bus-management#bus-expenses") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-expenses") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-receipt" aria-hidden="true"></i>@Localizer["Menu:BusExpenses"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Premises">
+                                <Authorized><a href="/bus-management#bus-premises" aria-current="@(IsMenuHrefActive("/bus-management#bus-premises") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-premises") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-store" aria-hidden="true"></i>@Localizer["Menu:BusPremises"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Reconciliation">
+                                <Authorized><a href="/bus-management#bus-reconciliation" aria-current="@(IsMenuHrefActive("/bus-management#bus-reconciliation") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-reconciliation") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-clipboard-check" aria-hidden="true"></i>@Localizer["Menu:BusReconciliation"]</a></Authorized>
+                            </AuthorizeView>
+                            <AuthorizeView Policy="HCS.BusManagement.Reports">
+                                <Authorized><a href="/bus-management#bus-reports" aria-current="@(IsMenuHrefActive("/bus-management#bus-reports") ? "page" : null)" class="@(IsMenuHrefActive("/bus-management#bus-reports") ? "active" : null)" @onclick="CloseMobileNav"><i class="fa fa-chart-column" aria-hidden="true"></i>@Localizer["Menu:BusReports"]</a></Authorized>
+                            </AuthorizeView>
+                        </div>
+                    </div>
+                </Authorized>
+            </AuthorizeView>
+
             <div class="hcs-nav-menu hcs-nav-menu--catalog @(IsExpanded("catalog") ? "hcs-nav-menu--expanded" : null)"
                  @onpointerenter="@(() => OnMenuPointerEnter("catalog"))">
                 <button class="hcs-nav-menu__trigger"
@@ -152,7 +194,7 @@
                     <i class="fa fa-layer-group" aria-hidden="true"></i><span>@Localizer["Menu:Catalogs"]</span>
                     <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
                 </button>
-                <div class="hcs-nav-menu__panel hcs-nav-menu__panel--wide" role="menu">
+                <div class="hcs-nav-menu__panel hcs-nav-menu__panel--wide">
                     <AuthorizeView Policy="HCS.Organization.MasterData">
                         <Authorized>
                             <p class="hcs-nav-menu__label">@Localizer["Menu:DocumentCatalogs"]</p>
@@ -325,10 +367,10 @@
                 <i class="fa @icon" aria-hidden="true"></i><span>@label</span>
                 <i class="fa fa-chevron-down hcs-nav-menu__chevron" aria-hidden="true"></i>
             </button>
-            <div class="hcs-nav-menu__panel" role="menu">
+            <div class="hcs-nav-menu__panel">
                 @foreach (var item in items)
                 {
-                    <a href="@item.Href" class="@(IsMenuHrefActive(item.Href) ? "active" : null)" @onclick="CloseMobileNav">
+                    <a href="@item.Href" aria-current="@(IsMenuHrefActive(item.Href) ? "page" : null)" class="@(IsMenuHrefActive(item.Href) ? "active" : null)" @onclick="CloseMobileNav">
                         <i class="fa @item.Icon" aria-hidden="true"></i>@item.Text
                     </a>
                 }
@@ -405,7 +447,10 @@
 
     private bool IsMenuHrefActive(string href)
     {
-        var current = "/" + Navigation.ToBaseRelativePath(Navigation.Uri).Split('#')[0];
+        var relativeUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+        var currentHashIndex = relativeUrl.IndexOf('#');
+        var currentFragment = currentHashIndex >= 0 ? relativeUrl[(currentHashIndex + 1)..] : string.Empty;
+        var current = "/" + (currentHashIndex >= 0 ? relativeUrl[..currentHashIndex] : relativeUrl);
         if (href.Contains("sourceType=", StringComparison.OrdinalIgnoreCase))
         {
             if (current.Contains("/my-documents", StringComparison.OrdinalIgnoreCase))
@@ -415,7 +460,14 @@
 
         var hrefPath = href.Split('?', '#')[0].TrimEnd('/');
         var currentPath = current.Split('?', '#')[0].TrimEnd('/');
-        return string.Equals(currentPath, hrefPath, StringComparison.OrdinalIgnoreCase);
+        if (!string.Equals(currentPath, hrefPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var hrefHashIndex = href.IndexOf('#');
+        var hrefFragment = hrefHashIndex >= 0 ? href[(hrefHashIndex + 1)..] : string.Empty;
+        return string.Equals(currentFragment, hrefFragment, StringComparison.OrdinalIgnoreCase);
     }
 
     private void Logout()

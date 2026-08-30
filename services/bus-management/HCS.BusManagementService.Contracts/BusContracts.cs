@@ -5,6 +5,7 @@ namespace HCS.BusManagementService.Contracts;
 public static class BusPermissions
 {
     public const string Group = "HCS.BusManagement";
+    public const string Dashboard = Group + ".Dashboard";
     public const string Stations = Group + ".Stations";
     public const string MasterData = Group + ".MasterData";
     public const string OperatorsContracts = Group + ".OperatorsContracts";
@@ -43,7 +44,7 @@ public static class BusPermissions
 
     public static readonly IReadOnlyList<string> All =
     [
-        Stations, MasterData, OperatorsContracts, FleetCompliance, Departures,
+        Dashboard, Stations, MasterData, OperatorsContracts, FleetCompliance, Departures,
         Revenue, RevenueParking, Expenses, Premises, Reconciliation, ReconciliationCheck,
         ReconciliationClose, ReconciliationAdjust, ReconciliationAdjustApprove, Reports, StationAssignments, StationsCreate, StationsUpdate,
         MasterDataCreate, OperatorsContractsCreate, FleetComplianceCreate, DeparturesCreate, RevenueCreate, RevenueUpdate,

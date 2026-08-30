@@ -63,7 +63,7 @@ public sealed class HCSMenuContributor : IMenuContributor
         context.Menu.AddItem(organization);
 
         context.Menu.AddItem(Item("HCS.BusManagement", "Quản lý bến xe", "/bus-management", "fa fa-bus", 250)
-            .RequirePermissions(HCSPermissions.BusManagement.Reports));
+            .RequirePermissions(HCSPermissions.BusManagement.Dashboard));
 
         var catalogs = Item("HCS.Catalogs", "Danh mục", icon: "fa fa-tags", order: 300);
         catalogs.AddItem(Item("HCS.Catalogs.MasterData", "Danh mục dùng chung", "/master-datas", "fa fa-list", 10)

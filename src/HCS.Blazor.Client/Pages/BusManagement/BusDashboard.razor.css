@@ -1,0 +1,85 @@
+.bus-dashboard [id] {
+    scroll-margin-top: calc(var(--hcs-header-height, 72px) + 1rem);
+}
+
+@media (min-width: 1101px) {
+    .bus-dashboard [id] {
+        scroll-margin-top: calc(var(--hcs-header-height, 72px) + 4.5rem);
+    }
+}
+
+.bus-dashboard__modules {
+    display: grid;
+    gap: .65rem;
+    grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr));
+}
+
+.bus-dashboard__module {
+    align-items: center;
+    background: var(--hcs-color-surface, #fff);
+    border: 1px solid var(--hcs-color-border, #dde4ee);
+    border-left: 3px solid var(--hcs-color-primary, #00b4a9);
+    border-radius: var(--hcs-radius-md, 8px);
+    color: var(--hcs-color-ink, #1a1a2e);
+    display: flex;
+    gap: .65rem;
+    min-height: 4.25rem;
+    padding: .7rem .8rem;
+    text-decoration: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.bus-dashboard__module:hover,
+.bus-dashboard__module:focus-visible {
+    border-color: var(--hcs-color-primary, #00b4a9);
+    box-shadow: 0 5px 14px rgba(19, 47, 70, .1);
+    color: var(--hcs-color-primary-dark, #007f7c);
+    transform: translateY(-1px);
+}
+
+.bus-dashboard__module:focus-visible {
+    outline: 3px solid rgba(0, 180, 169, .28);
+    outline-offset: 2px;
+}
+
+.bus-dashboard__module > i {
+    color: var(--hcs-color-primary, #00b4a9);
+    flex: 0 0 1.15rem;
+    text-align: center;
+}
+
+.bus-dashboard__module span {
+    display: flex;
+    flex-direction: column;
+    gap: .16rem;
+    min-width: 0;
+}
+
+.bus-dashboard__module strong {
+    font-size: .86rem;
+    line-height: 1.2;
+}
+
+.bus-dashboard__module small {
+    color: var(--hcs-color-muted, #5c6578);
+    font-size: .7rem;
+    line-height: 1.25;
+}
+
+@media (max-width: 575.98px) {
+    .bus-dashboard__modules {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .bus-dashboard__module {
+        align-items: flex-start;
+        min-height: 4.75rem;
+        padding: .65rem;
+    }
+}
+
+@media (max-width: 360px) {
+    .bus-dashboard__modules {
+        grid-template-columns: 1fr;
+    }
+}

@@ -63,6 +63,7 @@ public class HCSPermissionDefinitionProvider : PermissionDefinitionProvider
         collaboration.AddPermission(HCSPermissions.Collaboration.Administration, L("Permission:Collaboration.Administration"));
 
         var bus = context.AddGroup(HCSPermissions.BusManagement.Default, L("Permission:BusManagement"));
+        bus.AddPermission(HCSPermissions.BusManagement.Dashboard, L("Permission:BusManagement.Dashboard"));
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.Stations, L("Permission:BusManagement.Stations")));
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.MasterData, L("Permission:BusManagement.MasterData")));
         AddCrud(bus.AddPermission(HCSPermissions.BusManagement.OperatorsContracts, L("Permission:BusManagement.OperatorsContracts")));

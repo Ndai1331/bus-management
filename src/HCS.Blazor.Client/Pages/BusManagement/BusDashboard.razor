@@ -1,9 +1,14 @@
 @page "/bus-management"
-@attribute [Authorize(Policy = "HCS.BusManagement.Reports")]
+@attribute [Authorize(Policy = "HCS.BusManagement.Dashboard")]
 @inherits HCSComponentBase
 @using HCS.BusManagementService.Contracts
+@using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Authorization
+@using Microsoft.JSInterop
 @inject BusManagementClient BusClient
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation
+@inject IJSRuntime Js
 
 <PageTitle>Quản lý bến xe · HCS</PageTitle>
 
@@ -19,6 +24,40 @@
         </button>
     </header>
 
+    <nav class="bus-dashboard__modules mb-4" aria-label="@L["Bus:NavigateModules"]">
+        <a class="bus-dashboard__module" href="#bus-stations">
+            <i class="fa fa-building" aria-hidden="true"></i>
+            <span><strong>@L["Menu:BusStations"]</strong><small>@L["Bus:StationsHint"]</small></span>
+        </a>
+        <a class="bus-dashboard__module" href="#bus-departures">
+            <i class="fa fa-route" aria-hidden="true"></i>
+            <span><strong>@L["Menu:BusDepartures"]</strong><small>@L["Bus:DeparturesHint"]</small></span>
+        </a>
+        <a class="bus-dashboard__module" href="#bus-revenue">
+            <i class="fa fa-money-bill-wave" aria-hidden="true"></i>
+            <span><strong>@L["Menu:BusRevenue"]</strong><small>@L["Bus:RevenueHint"]</small></span>
+        </a>
+        <a class="bus-dashboard__module" href="#bus-expenses">
+            <i class="fa fa-receipt" aria-hidden="true"></i>
+            <span><strong>@L["Menu:BusExpenses"]</strong><small>@L["Bus:ExpensesHint"]</small></span>
+        </a>
+        <a class="bus-dashboard__module" href="#bus-premises">
+            <i class="fa fa-store" aria-hidden="true"></i>
+            <span><strong>@L["Menu:BusPremises"]</strong><small>@L["Bus:PremisesHint"]</small></span>
+        </a>
+        <a class="bus-dashboard__module" href="#bus-reconciliation">
+            <i class="fa fa-clipboard-check" aria-hidden="true"></i>
+            <span><strong>@L["Menu:BusReconciliation"]</strong><small>@L["Bus:ReconciliationHint"]</small></span>
+        </a>
+        @if (canViewReports)
+        {
+            <a class="bus-dashboard__module" href="#bus-reports">
+                <i class="fa fa-chart-column" aria-hidden="true"></i>
+                <span><strong>@L["Menu:BusReports"]</strong><small>@L["Bus:ReportsHint"]</small></span>
+            </a>
+        }
+    </nav>
+
     @if (isLoading)
     {
         <div class="alert alert-info" role="status">Đang tải dữ liệu bến xe…</div>
@@ -30,50 +69,57 @@
     else if (dashboard is not null)
     {
         <div class="row g-3 mb-4">
-            @Metric("Doanh thu thuần", $"{dashboard.NetRevenue:N0} đ", "fa-money-bill-wave")
-            @Metric("Chi phí thuần", $"{dashboard.NetExpense:N0} đ", "fa-receipt")
-            @Metric("Chuyến xe", dashboard.DepartureCount.ToString("N0"), "fa-bus")
-            @Metric("Ca chưa chốt", dashboard.UnreconciledShiftCount.ToString("N0"), "fa-clipboard-check")
+            @Metric("Doanh thu thuần", $"{dashboard.NetRevenue:N0} đ", "fa-money-bill-wave", "bus-revenue")
+            @Metric("Chi phí thuần", $"{dashboard.NetExpense:N0} đ", "fa-receipt", "bus-expenses")
+            @Metric("Chuyến xe", dashboard.DepartureCount.ToString("N0"), "fa-bus", "bus-departures")
+            @Metric("Ca chưa chốt", dashboard.UnreconciledShiftCount.ToString("N0"), "fa-clipboard-check", "bus-reconciliation")
         </div>
 
         <div class="row g-3">
-            <div class="col-12 col-xl-8">
-                <div class="card h-100">
-                    <div class="card-body">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                            <h2 class="h5 mb-0">Doanh thu theo nguồn</h2>
-                            <AuthorizeView Policy="HCS.BusManagement.Reports.Export">
-                                <Authorized>
-                                    <div class="btn-group btn-group-sm" role="group" aria-label="Xuất báo cáo doanh thu">
-                                        <a class="btn btn-outline-secondary" href="@ExportUrl("revenue", "xlsx")">XLSX</a>
-                                        <a class="btn btn-outline-secondary" href="@ExportUrl("revenue", "pdf")">PDF</a>
-                                        <a class="btn btn-outline-secondary" target="_blank" rel="noopener" href="@ExportUrl("revenue", "html")">In</a>
-                                    </div>
-                                </Authorized>
-                            </AuthorizeView>
-                        </div>
-                        @if (revenueRows.Count == 0)
-                        {
-                            <p class="text-muted mb-0">Chưa có số liệu trong kỳ.</p>
-                        }
-                        else
-                        {
-                            <div class="table-responsive">
-                                <table class="table table-sm align-middle mb-0">
-                                    <thead><tr><th>Nguồn thu</th><th class="text-end">Số phiếu</th><th class="text-end">Điều chỉnh</th><th class="text-end">Thuần</th></tr></thead>
-                                    <tbody>
-                                    @foreach (var row in revenueRows)
-                                    {
-                                        <tr><td>@row.SourceType</td><td class="text-end">@row.ReceiptCount</td><td class="text-end">@row.AdjustmentAmount.ToString("N0") đ</td><td class="text-end">@row.NetAmount.ToString("N0") đ</td></tr>
-                                    }
-                                    </tbody>
-                                </table>
+        @if (canViewReports)
+        {
+                <div id="bus-reports" class="col-12 col-xl-8">
+                    <div class="card h-100">
+                        <div class="card-body">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <h2 class="h5 mb-0">Doanh thu theo nguồn</h2>
+                                <AuthorizeView Policy="HCS.BusManagement.Reports.Export">
+                                    <Authorized>
+                                        <div class="btn-group btn-group-sm" role="group" aria-label="Xuất báo cáo doanh thu">
+                                            <a class="btn btn-outline-secondary" href="@ExportUrl("revenue", "xlsx")">XLSX</a>
+                                            <a class="btn btn-outline-secondary" href="@ExportUrl("revenue", "pdf")">PDF</a>
+                                            <a class="btn btn-outline-secondary" target="_blank" rel="noopener" href="@ExportUrl("revenue", "html")">In</a>
+                                        </div>
+                                    </Authorized>
+                                </AuthorizeView>
                             </div>
-                        }
+                            @if (!string.IsNullOrWhiteSpace(reportError))
+                            {
+                                <p class="alert alert-warning mt-3 mb-0" role="status">@reportError</p>
+                            }
+                            else if (revenueRows.Count == 0)
+                            {
+                                <p class="text-muted mb-0">Chưa có số liệu trong kỳ.</p>
+                            }
+                            else
+                            {
+                                <div class="table-responsive">
+                                    <table class="table table-sm align-middle mb-0">
+                                        <thead><tr><th>Nguồn thu</th><th class="text-end">Số phiếu</th><th class="text-end">Điều chỉnh</th><th class="text-end">Thuần</th></tr></thead>
+                                        <tbody>
+                                        @foreach (var row in revenueRows)
+                                        {
+                                            <tr><td>@row.SourceType</td><td class="text-end">@row.ReceiptCount</td><td class="text-end">@row.AdjustmentAmount.ToString("N0") đ</td><td class="text-end">@row.NetAmount.ToString("N0") đ</td></tr>
+                                        }
+                                        </tbody>
+                                    </table>
+                                </div>
+                            }
+                        </div>
                     </div>
                 </div>
-            </div>
-            <div class="col-12 col-xl-4">
+        }
+            <div id="bus-premises" class="col-12 col-xl-4">
                 <div class="card h-100">
                     <div class="card-body">
                         <h2 class="h5">Cảnh báo vận hành</h2>
@@ -86,11 +132,15 @@
             </div>
         </div>
 
-        @if (dashboard.StationRows is { Count: > 0 })
-        {
-            <div class="card mt-3">
-                <div class="card-body">
-                    <h2 class="h5">Tổng hợp theo bến</h2>
+        <div id="bus-stations" class="card mt-3">
+            <div class="card-body">
+                <h2 class="h5">Tổng hợp theo bến</h2>
+                @if (dashboard.StationRows is not { Count: > 0 })
+                {
+                    <p class="text-muted mb-0">Chưa có số liệu theo bến trong kỳ.</p>
+                }
+                else
+                {
                     <div class="table-responsive">
                         <table class="table table-sm align-middle mb-0">
                             <thead><tr><th>Bến</th><th class="text-end">Doanh thu thuần</th><th class="text-end">Chi phí thuần</th><th class="text-end">Chuyến</th><th class="text-end">Ca chưa chốt</th></tr></thead>
@@ -102,29 +152,77 @@
                             </tbody>
                         </table>
                     </div>
-                </div>
+                }
             </div>
-        }
+        </div>
     }
 </section>
 
 @code {
     private DashboardSummaryDto? dashboard;
     private IReadOnlyList<RevenueReportRowDto> revenueRows = [];
+    private bool canViewReports;
+    private string? reportError;
     private bool isLoading;
     private string? error;
+    private string? lastScrolledFragment;
 
-    protected override async Task OnInitializedAsync() => await RefreshAsync();
+    protected override async Task OnInitializedAsync()
+    {
+        var authenticationState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        canViewReports = authenticationState.User.HasClaim("permission", "HCS.BusManagement.Reports");
+        await RefreshAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (dashboard is null)
+        {
+            return;
+        }
+
+        var fragment = new Uri(Navigation.Uri).Fragment.TrimStart('#');
+        if (string.IsNullOrWhiteSpace(fragment) || string.Equals(fragment, lastScrolledFragment, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        lastScrolledFragment = fragment;
+        try
+        {
+            await Js.InvokeVoidAsync("hcsScrollToFragment", fragment);
+        }
+        catch (JSException)
+        {
+            // Fragment navigation remains usable when JavaScript is unavailable.
+        }
+    }
 
     private async Task RefreshAsync()
     {
-        isLoading = true; error = null;
+        isLoading = true; error = null; reportError = null;
         try
         {
             var to = DateTime.Now.Date;
             var from = new DateTime(to.Year, to.Month, 1);
             dashboard = await BusClient.GetDashboardAsync(from, to) ?? throw new InvalidOperationException("Gateway returned an empty dashboard.");
-            revenueRows = await BusClient.GetRevenueReportAsync(from, to) ?? [];
+            if (canViewReports)
+            {
+                try
+                {
+                    revenueRows = await BusClient.GetRevenueReportAsync(from, to) ?? [];
+                }
+                catch (Exception exception)
+                {
+                    revenueRows = [];
+                    reportError = exception.Message;
+                }
+            }
+            else
+            {
+                revenueRows = [];
+            }
         }
         catch (Exception exception) { error = exception.Message; }
         finally { isLoading = false; }
@@ -143,14 +241,14 @@
 
 @* Keep the metric markup local so this first vertical slice does not introduce a shared UI dependency. *@
 @code {
-    private RenderFragment Metric(string Title, string Value, string Icon) => builder =>
+    private RenderFragment Metric(string Title, string Value, string Icon, string AnchorId) => builder =>
     {
-        builder.OpenElement(0, "div"); builder.AddAttribute(1, "class", "col-12 col-sm-6 col-xl-3");
-        builder.OpenElement(2, "div"); builder.AddAttribute(3, "class", "card h-100"); builder.OpenElement(4, "div"); builder.AddAttribute(5, "class", "card-body");
-        builder.OpenElement(6, "div"); builder.AddAttribute(7, "class", "d-flex align-items-center justify-content-between");
-        builder.OpenElement(8, "div"); builder.OpenElement(9, "div"); builder.AddAttribute(10, "class", "text-muted small"); builder.AddContent(11, Title); builder.CloseElement();
-        builder.OpenElement(12, "div"); builder.AddAttribute(13, "class", "h4 mb-0"); builder.AddContent(14, Value); builder.CloseElement(); builder.CloseElement();
-        builder.OpenElement(15, "i"); builder.AddAttribute(16, "class", $"fa {Icon} fa-2x text-primary"); builder.AddAttribute(17, "aria-hidden", "true"); builder.CloseElement();
+        builder.OpenElement(0, "div"); builder.AddAttribute(1, "id", AnchorId); builder.AddAttribute(2, "class", "col-12 col-sm-6 col-xl-3");
+        builder.OpenElement(3, "div"); builder.AddAttribute(4, "class", "card h-100"); builder.OpenElement(5, "div"); builder.AddAttribute(6, "class", "card-body");
+        builder.OpenElement(7, "div"); builder.AddAttribute(8, "class", "d-flex align-items-center justify-content-between");
+        builder.OpenElement(9, "div"); builder.OpenElement(10, "div"); builder.AddAttribute(11, "class", "text-muted small"); builder.AddContent(12, Title); builder.CloseElement();
+        builder.OpenElement(13, "div"); builder.AddAttribute(14, "class", "h4 mb-0"); builder.AddContent(15, Value); builder.CloseElement(); builder.CloseElement();
+        builder.OpenElement(16, "i"); builder.AddAttribute(17, "class", $"fa {Icon} fa-2x text-primary"); builder.AddAttribute(18, "aria-hidden", "true"); builder.CloseElement();
         builder.CloseElement(); builder.CloseElement(); builder.CloseElement(); builder.CloseElement();
     };
 }

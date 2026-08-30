@@ -26,6 +26,7 @@ internal static class FeatureCatalog
             "tasks" or "project-task-detail" => F("Công việc", "Theo dõi phân công, ưu tiên và tiến độ thực hiện.", "/api/project-tasks", "fa fa-list-check"),
             "calendar-events" or "calendar-event-detail" => F("Lịch công tác", "Lịch cá nhân, đơn vị và các mốc liên quan công việc.", "/api/calendar", "fa fa-calendar-days"),
             "survey-results" or "survey-sessions" or "survey-collections" => F("Khảo sát", "Quản lý đợt khảo sát và tổng hợp kết quả.", "/api/surveys/sessions", "fa fa-square-poll-vertical"),
+            "bus-management" => F("Quản lý bến xe", "Tổng hợp vận hành, doanh thu, chi phí, mặt bằng và đối soát theo phạm vi bến được gán.", "/api/bus-management/dashboard", "fa fa-bus"),
             "survey-locations" => F("Địa điểm khảo sát", "Danh mục địa điểm thu thập khảo sát.", "/api/surveys/locations", "fa fa-location-dot"),
             "survey-criterias" => F("Tiêu chí khảo sát", "Danh mục tiêu chí chấm điểm khảo sát.", "/api/surveys/criteria", "fa fa-list-ol"),
             "departments" => F("Phòng ban", "Cơ cấu phòng ban và quan hệ cấp trên.", "/api/organization/departments", "fa fa-sitemap"),

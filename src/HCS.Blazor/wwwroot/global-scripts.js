@@ -100,6 +100,23 @@ window.hcsSetCulture = (culture) => {
     window.localStorage?.setItem("hcs.culture", selected);
 };
 
+window.hcsScrollToFragment = (fragment) => {
+    if (!fragment || !/^[A-Za-z][A-Za-z0-9_-]*$/.test(fragment)) {
+        return false;
+    }
+
+    const target = document.getElementById(fragment);
+    if (!target) {
+        return false;
+    }
+
+    target.scrollIntoView({
+        block: "start",
+        behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"
+    });
+    return true;
+};
+
 window.hcsNotifications = (() => {
     let outsideClickHandler = null;
 

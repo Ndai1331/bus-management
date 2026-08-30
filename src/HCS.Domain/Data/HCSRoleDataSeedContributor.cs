@@ -77,9 +77,11 @@ public sealed class HCSRoleDataSeedContributor(
             .Where(permission => !string.Equals(permission, "HCS.BusManagement.Reconciliation.Adjust", StringComparison.Ordinal))
             .ToArray();
         var operationsPermissions = busPermissions.Where(permission =>
+            string.Equals(permission, "HCS.BusManagement.Dashboard", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Departures", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Revenue", StringComparison.Ordinal)).ToArray();
         var accountantPermissions = busPermissions.Where(permission =>
+            string.Equals(permission, "HCS.BusManagement.Dashboard", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Revenue", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Expenses", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Premises", StringComparison.Ordinal) ||
@@ -91,6 +93,7 @@ public sealed class HCSRoleDataSeedContributor(
                 !string.Equals(permission, "HCS.BusManagement.Revenue.Parking.Update", StringComparison.Ordinal))
             .ToArray();
         var controlPermissions = busPermissions.Where(permission =>
+            string.Equals(permission, "HCS.BusManagement.Dashboard", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.Departures", StringComparison.Ordinal) ||
             permission.StartsWith("HCS.BusManagement.MasterData", StringComparison.Ordinal)).ToArray();
         var leadershipPermissions = busPermissions.Where(permission =>

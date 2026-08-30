@@ -222,10 +222,10 @@ public sealed class FinanceController(BusManagementAppService service) : Control
     public Task<AdjustmentDto> ApproveAdjustment(Guid id, CancellationToken ct) => service.ApproveAdjustmentAsync(id, ct);
 }
 
-[ApiController, Authorize(Policy = BusPermissions.Reports), Route("api/bus-management")]
+[ApiController, Route("api/bus-management")]
 public sealed class ReportsController(BusManagementAppService service, BusReportExportService exportService) : ControllerBase
 {
-    [HttpGet("dashboard")]
+    [HttpGet("dashboard"), Authorize(Policy = BusPermissions.Dashboard)]
     public Task<DashboardSummaryDto> Dashboard(DateTime? from, DateTime? to, Guid? stationId, CancellationToken ct = default)
     {
         var end = to?.Date ?? DateTime.UtcNow.Date;
@@ -233,7 +233,7 @@ public sealed class ReportsController(BusManagementAppService service, BusReport
         return service.GetDashboardAsync(start, end, stationId, ct);
     }
 
-    [HttpGet("reports/revenue")]
+    [HttpGet("reports/revenue"), Authorize(Policy = BusPermissions.Reports)]
     public Task<IReadOnlyList<RevenueReportRowDto>> Revenue(DateTime? from, DateTime? to, Guid? stationId, CancellationToken ct = default)
     {
         var end = to?.Date ?? DateTime.UtcNow.Date;
@@ -241,7 +241,7 @@ public sealed class ReportsController(BusManagementAppService service, BusReport
         return service.GetRevenueReportAsync(start, end, stationId, ct);
     }
 
-    [HttpGet("reports/departures")]
+    [HttpGet("reports/departures"), Authorize(Policy = BusPermissions.Reports)]
     public Task<IReadOnlyList<DepartureReportRowDto>> Departures(DateTime? from, DateTime? to, Guid? stationId, CancellationToken ct = default)
     {
         var end = to?.Date ?? DateTime.UtcNow.Date;
@@ -249,7 +249,7 @@ public sealed class ReportsController(BusManagementAppService service, BusReport
         return service.GetDepartureReportAsync(start, end, stationId, ct);
     }
 
-    [HttpGet("reports/reconciliation")]
+    [HttpGet("reports/reconciliation"), Authorize(Policy = BusPermissions.Reports)]
     public Task<IReadOnlyList<ReconciliationReportRowDto>> Reconciliation(DateTime? from, DateTime? to, Guid? stationId, CancellationToken ct = default)
     {
         var end = to?.Date ?? DateTime.UtcNow.Date;
@@ -257,7 +257,7 @@ public sealed class ReportsController(BusManagementAppService service, BusReport
         return service.GetReconciliationReportAsync(start, end, stationId, ct);
     }
 
-    [HttpGet("reports/compliance")]
+    [HttpGet("reports/compliance"), Authorize(Policy = BusPermissions.Reports)]
     public Task<IReadOnlyList<ComplianceReportRowDto>> Compliance(Guid? stationId, DateTime? asOf = null, CancellationToken ct = default) => service.GetComplianceReportAsync(stationId, asOf, ct);
 
     [HttpGet("exports/{reportType}")]

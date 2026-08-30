@@ -58,10 +58,18 @@ public sealed class HcsBusManagementServiceModule : AbpModule
         });
         context.Services.AddAuthorization(options =>
         {
-            foreach (var permission in BusPermissions.All)
+            foreach (var permission in BusPermissions.All.Where(permission =>
+                !string.Equals(permission, BusPermissions.Dashboard, StringComparison.Ordinal)))
             {
                 options.AddPolicy(permission, policy => policy.RequireClaim("permission", permission));
             }
+
+            // Dashboard is a read-only entry point. Any scoped Bus Management read
+            // permission is sufficient to see the dashboard; reports remain separately
+            // protected by BusPermissions.Reports below.
+            options.AddPolicy(BusPermissions.Dashboard, policy =>
+                policy.RequireAuthenticatedUser().RequireAssertion(context => context.User.Claims.Any(claim =>
+                    claim.Type == "permission" && claim.Value.StartsWith("HCS.BusManagement.", StringComparison.Ordinal))));
         });
         Configure<AbpAntiForgeryOptions>(BearerApiAntiforgery.DisableCookieValidation);
         context.Services.AddAbpDbContext<BusManagementDbContext>();

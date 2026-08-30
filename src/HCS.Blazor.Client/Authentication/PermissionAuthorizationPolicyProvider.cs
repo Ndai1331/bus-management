@@ -14,6 +14,10 @@ namespace HCS.Blazor.Client.Authentication;
 public sealed class PermissionAuthorizationPolicyProvider(IOptions<AuthorizationOptions> options)
     : DefaultAuthorizationPolicyProvider(options)
 {
+    private const string BusManagementMenuPolicy = "HCS.BusManagement.Menu";
+    private const string BusManagementDashboardPolicy = "HCS.BusManagement.Dashboard";
+    private const string BusManagementPermissionPrefix = "HCS.BusManagement.";
+
     private static readonly string[] PermissionPrefixes =
     [
         "AbpIdentity.",
@@ -32,6 +36,16 @@ public sealed class PermissionAuthorizationPolicyProvider(IOptions<Authorization
         if (configuredPolicy is not null || !IsPermissionPolicy(policyName))
         {
             return configuredPolicy;
+        }
+
+        if (string.Equals(policyName, BusManagementMenuPolicy, StringComparison.Ordinal) ||
+            string.Equals(policyName, BusManagementDashboardPolicy, StringComparison.Ordinal))
+        {
+            return new AuthorizationPolicyBuilder()
+                .RequireAuthenticatedUser()
+                .RequireAssertion(context => context.User.Claims.Any(claim =>
+                    claim.Type == "permission" && claim.Value.StartsWith(BusManagementPermissionPrefix, StringComparison.Ordinal)))
+                .Build();
         }
 
         return new AuthorizationPolicyBuilder()

@@ -21,6 +21,27 @@ Mọi truy vấn có station scope ở server. `admin` và `lanhdao` là global;
 
 Catalog nhà xe, tuyến, xe và tài xế mới có `StationId`; user không phải global phải truyền một bến đang được gán. Dữ liệu legacy không có station không được trả về cho scope bến. Riêng hồ sơ pháp lý xe legacy chỉ fallback khi lịch sử departure xác định đúng một station; nếu mơ hồ thì không suy diễn ownership.
 
+## Blazor: menu, dashboard và quyền truy cập
+
+Blazor có menu **Quản lý bến xe** tại `/bus-management`. Menu cha được lọc khi user có bất kỳ claim `HCS.BusManagement.*` nào (quyền đọc hoặc quyền con/action); các mục con được lọc độc lập theo quyền tương ứng:
+
+| Mục menu | Fragment | Quyền |
+|---|---|---|
+| Tổng quan bến xe | `/bus-management` | `HCS.BusManagement.Dashboard` (policy dashboard cho phép user đã xác thực có ít nhất một claim Bus Management) |
+| Bến xe & phân quyền | `#bus-stations` | `HCS.BusManagement.Stations` |
+| Chuyến xuất bến | `#bus-departures` | `HCS.BusManagement.Departures` |
+| Doanh thu & biểu giá | `#bus-revenue` | `HCS.BusManagement.Revenue` |
+| Chi phí vận hành | `#bus-expenses` | `HCS.BusManagement.Expenses` |
+| Mặt bằng & hợp đồng | `#bus-premises` | `HCS.BusManagement.Premises` |
+| Đối soát ca/ngày | `#bus-reconciliation` | `HCS.BusManagement.Reconciliation` |
+| Báo cáo & xuất file | `#bus-reports` | `HCS.BusManagement.Reports` |
+
+Các liên kết fragment cuộn tới đúng khu vực trên dashboard (và vẫn dùng được với điều hướng fragment mặc định nếu JavaScript không sẵn sàng). Các khu vực hiện tại gồm: thẻ chỉ số chuyến xe, doanh thu thuần, chi phí thuần và ca chưa chốt; cảnh báo hồ sơ/hợp đồng/mặt bằng sắp hết hạn; bảng tổng hợp theo bến; và bảng doanh thu theo nguồn trong khu vực báo cáo.
+
+Dashboard gọi `/api/bus-management/dashboard` khi user qua policy dashboard. Khu vực **Báo cáo** và dữ liệu `/reports/revenue` chỉ được hiển thị/tải khi có claim `HCS.BusManagement.Reports`; không có quyền này, các thẻ tổng quan, cảnh báo và tổng hợp theo bến vẫn hiển thị nhưng khu vực báo cáo bị ẩn. Nút XLSX/PDF/In chỉ hiển thị khi có thêm `HCS.BusManagement.Reports.Export`; vì các nút nằm trong khu vực Báo cáo, để thấy và dùng liên kết xuất file trên UI cần cả `Reports` và `Reports.Export`. API export vẫn kiểm tra quyền `Reports.Export` ở server.
+
+Sau khi thêm/sửa permission definition hoặc permission seed, cần rebuild các host liên quan và chạy lại DbMigrator/seed theo quy trình local trước khi kiểm tra. Sau đó phải đăng xuất rồi đăng nhập lại (hoặc làm mới BFF session) để nhận permission claims mới; hard-refresh chỉ làm mới giao diện, không thay thế việc cấp lại claims trong session.
+
 ## Chạy cục bộ
 
 ```bash

@@ -114,6 +114,7 @@ public static class HCSPermissions
     public static class BusManagement
     {
         public const string Default = "HCS.BusManagement";
+        public const string Dashboard = Default + ".Dashboard";
         public const string Stations = Default + ".Stations";
         public const string MasterData = Default + ".MasterData";
         public const string OperatorsContracts = Default + ".OperatorsContracts";
@@ -152,7 +153,7 @@ public static class HCSPermissions
 
         public static readonly string[] All =
         [
-            Stations, MasterData, OperatorsContracts, FleetCompliance, Departures, Revenue, RevenueParking,
+            Dashboard, Stations, MasterData, OperatorsContracts, FleetCompliance, Departures, Revenue, RevenueParking,
             Expenses, Premises, Reconciliation, ReconciliationCheck, ReconciliationClose,
             ReconciliationAdjust, ReconciliationAdjustApprove, Reports, StationAssignments, StationsCreate, StationsUpdate, MasterDataCreate,
             OperatorsContractsCreate, FleetComplianceCreate, FleetComplianceUpdate, DeparturesCreate, RevenueCreate, RevenueUpdate,
