@@ -29,6 +29,15 @@ public sealed class OpenIddictClientContractTests
         Assert.Equal("https://localhost:44402/signout-callback-oidc", registration.LogoutCallbackUrl);
     }
 
+    [Fact]
+    public void Gateway_scope_includes_bus_management_audience_for_bff_tokens()
+    {
+        var scope = OpenIddictDataSeedContributor.CreateGatewayScopeDescriptor();
+
+        Assert.Contains("HCS", scope.Resources);
+        Assert.Contains("HCS.BusManagementService", scope.Resources);
+    }
+
     [Theory]
     [InlineData("http://localhost:44403")]
     [InlineData("https://localhost:44403/path")]

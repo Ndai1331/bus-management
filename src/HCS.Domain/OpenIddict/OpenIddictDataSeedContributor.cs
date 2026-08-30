@@ -18,8 +18,11 @@ namespace HCS.OpenIddict;
  */
 public class OpenIddictDataSeedContributor : OpenIddictDataSeedContributorBase, IDataSeedContributor, ITransientDependency
 {
+    private readonly IOpenIddictScopeManager scopeManager;
+
     internal const string GatewayScope = "HCS";
     internal const string GatewayAudience = "HCS";
+    internal const string BusManagementAudience = "HCS.BusManagementService";
     internal const string DefaultGatewayRootUrl = "https://localhost:44402";
     internal const string DefaultBlazorRootUrl = "https://localhost:44403";
     public OpenIddictDataSeedContributor(
@@ -30,6 +33,7 @@ public class OpenIddictDataSeedContributor : OpenIddictDataSeedContributorBase, 
         IOpenIddictScopeManager scopeManager)
         : base(configuration, openIddictApplicationRepository, applicationManager, openIddictScopeRepository, scopeManager)
     {
+        this.scopeManager = scopeManager;
     }
 
     [UnitOfWork]
@@ -41,12 +45,28 @@ public class OpenIddictDataSeedContributor : OpenIddictDataSeedContributorBase, 
 
     private async Task CreateScopesAsync()
     {
-        await CreateScopesAsync(new OpenIddictScopeDescriptor 
+        var descriptor = CreateGatewayScopeDescriptor();
+        var existingScope = await scopeManager.FindByNameAsync(GatewayScope);
+        if (existingScope is null)
+        {
+            await CreateScopesAsync(descriptor);
+            return;
+        }
+
+        // The ABP seed helper is create-only for an existing scope. Update the
+        // resource list explicitly so existing installations receive newly added
+        // downstream audiences on the next idempotent DbMigrator run.
+        await scopeManager.UpdateAsync(existingScope, descriptor);
+    }
+
+    internal static OpenIddictScopeDescriptor CreateGatewayScopeDescriptor()
+    {
+        return new OpenIddictScopeDescriptor
         {
             Name = GatewayScope,
             DisplayName = "HCS Web Gateway API",
-            Resources = { GatewayAudience }
-        });
+            Resources = { GatewayAudience, BusManagementAudience }
+        };
     }
 
     private async Task CreateApplicationsAsync()

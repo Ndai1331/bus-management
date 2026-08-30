@@ -42,6 +42,8 @@ Dashboard gọi `/api/bus-management/dashboard` khi user qua policy dashboard. K
 
 Sau khi thêm/sửa permission definition hoặc permission seed, cần rebuild các host liên quan và chạy lại DbMigrator/seed theo quy trình local trước khi kiểm tra. Sau đó phải đăng xuất rồi đăng nhập lại (hoặc làm mới BFF session) để nhận permission claims mới; hard-refresh chỉ làm mới giao diện, không thay thế việc cấp lại claims trong session.
 
+> Lưu ý xác thực BFF: scope `HCS` phải chứa resource `HCS.BusManagementService` để access token do Gateway cấp được service chấp nhận. `OpenIddictDataSeedContributor` cập nhật cả scope đã tồn tại, vì vậy sau khi nâng cấp phải chạy `db-migrator` một lần; các session/token cũ cần đăng xuất và đăng nhập lại.
+
 ## Chạy cục bộ
 
 ```bash
@@ -162,6 +164,7 @@ Runtime evidence ngày 2026-08-30:
 - Local PostgreSQL đã apply đủ 8 migration; kiểm tra trực tiếp xác nhận schema `hcs_bus_management`, các bảng parking/reservation, composite FK parking receipt và source check constraint đều tồn tại. `has-pending-model-changes` không có thay đổi.
 - Bus service chạy được cả standalone `https://localhost:44416` (`/health=200`, Swagger `200`) và smoke container HTTP nội bộ; container ghi nhận migration up-to-date, kết nối RabbitMQ tạm thời và `Application started`.
 - Gateway smoke container trả health `Healthy`; request chưa xác thực tới `/api/bus-management/dashboard` trả `401`, chứng minh protected BFF boundary. Compose root, Ubuntu và Panel đều parse thành công với service `bus-management`.
+- Sau khi cập nhật resource scope, `db-migrator` hoàn tất với exit code `0` và PostgreSQL xác nhận `HCS` có resources `HCS` và `HCS.BusManagementService`; cần tạo lại BFF session bằng cách đăng xuất/đăng nhập trước khi kiểm tra request đã xác thực.
 - Keycloak `http://localhost:5110/realms/bd/.well-known/openid-configuration` trả `200`. AuthServer đã kiểm thử quy tắc user mới nhận `nhanvien` và đăng nhập lại không ghi đè role ABP local; token claim và station assignment end-to-end vẫn cần test user/seed acceptance riêng.
 - Browser smoke được thử trên In-app Browser và Chrome nhưng cả hai không trust CA nội bộ của `hcs.localhost` (`ERR_CERT_AUTHORITY_INVALID`). Không bypass chứng thư; cần trust CA local rồi chạy lại login, route, permission và export download.
 
