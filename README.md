@@ -74,7 +74,7 @@ Phase 2–4B currently includes server-side station scope, source-specific reven
 
 ## Docker Compose: runtime mặc định
 
-Docker Compose chạy toàn bộ tám HCS host, DbMigrator, PostgreSQL, Redis, RabbitMQ, MinIO và Caddy HTTPS proxy. Tạo `.env` từ `.env.k8s.example`, điền toàn bộ secret (bao gồm `HCS_ADMIN_PASSWORD`), sau đó:
+Docker Compose chạy toàn bộ chín HCS host, DbMigrator, PostgreSQL, Redis, RabbitMQ, MinIO và Caddy HTTPS proxy. Tạo `.env` từ `.env.k8s.example`, điền toàn bộ secret (bao gồm `HCS_ADMIN_PASSWORD`), sau đó:
 
 ```bash
 ./scripts/docker-up.sh
