@@ -19,6 +19,12 @@ public static class BusDates
 {
     public static DateTime BusinessDate(DateTime value) => DateTime.SpecifyKind(value.Date, DateTimeKind.Unspecified);
 
+    // Assignment boundaries are stored as timestamptz. Keep date-only values at
+    // UTC midnight so Npgsql never receives an Unspecified DateTime.
+    public static DateTime? UtcDate(DateTime? value) => value.HasValue
+        ? DateTime.SpecifyKind(value.Value.Date, DateTimeKind.Utc)
+        : null;
+
     public static DateTime Utc(DateTime value) => value.Kind == DateTimeKind.Utc
         ? value
         : DateTime.SpecifyKind(value, DateTimeKind.Utc);
@@ -62,7 +68,7 @@ public sealed class UserStationAssignment : Entity<Guid>
         if (validFrom.HasValue && validTo.HasValue && validTo < validFrom)
             throw new BusinessException("Bus:AssignmentDateRange");
         UserId = userId; StationId = stationId; IsPrimary = isPrimary; IsActive = true;
-        ValidFrom = validFrom?.Date; ValidTo = validTo?.Date;
+        ValidFrom = BusDates.UtcDate(validFrom); ValidTo = BusDates.UtcDate(validTo);
     }
 
     public Guid UserId { get; private set; }
@@ -76,7 +82,7 @@ public sealed class UserStationAssignment : Entity<Guid>
     {
         if (validFrom.HasValue && validTo.HasValue && validTo < validFrom)
             throw new BusinessException("Bus:AssignmentDateRange");
-        IsPrimary = isPrimary; ValidFrom = validFrom?.Date; ValidTo = validTo?.Date;
+        IsPrimary = isPrimary; ValidFrom = BusDates.UtcDate(validFrom); ValidTo = BusDates.UtcDate(validTo);
     }
 
     public void Deactivate() => IsActive = false;

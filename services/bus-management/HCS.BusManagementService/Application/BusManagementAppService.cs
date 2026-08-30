@@ -274,6 +274,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         if (checks.Values.All(x => x)) trip.MarkReady(); else trip.Block();
         db.OutboxMessages.Add(BusOutbox.Create(new BusDepartureChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
             trip.Id, trip.StationId, trip.Status), Guid.NewGuid().ToString("N")));
+        AddMutationAudit("Departure.Create", trip.Id, nameof(DepartureTrip), trip.StationId);
         await db.SaveChangesAsync(ct); return await GetDepartureAsync(trip.Id, ct);
     }
 
@@ -297,6 +298,8 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var trip = await db.DepartureTrips.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:DepartureNotFound");
         await scope.EnsureStationAsync(trip.StationId, ct);
         await EnsureOpenDayAsync(trip.StationId, trip.BusinessDate, ct);
+        await db.Entry(trip).ReloadAsync(ct);
+        if (db.Entry(trip).State == EntityState.Detached) throw new BusinessException("Bus:DepartureNotFound");
         if (trip.Status is not (BusStatuses.Registered or BusStatuses.Blocked)) throw new BusinessException("Bus:DepartureChecksLocked");
         var allowed = new HashSet<string>(["Inspection", "RouteBadge", "Insurance", "DriverLicense", "TransportOrder", "Contract", "Fee", "Control"], StringComparer.Ordinal);
         if (input.Checks is null || input.Checks.Any(x => string.IsNullOrWhiteSpace(x.CheckType))) throw new BusinessException("Bus:DepartureChecksInvalid");
@@ -320,6 +323,8 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var trip = await db.DepartureTrips.SingleOrDefaultAsync(x => x.Id == id, ct) ?? throw new BusinessException("Bus:DepartureNotFound");
         await scope.EnsureStationAsync(trip.StationId, ct);
         await EnsureOpenDayAsync(trip.StationId, trip.BusinessDate, ct);
+        await db.Entry(trip).ReloadAsync(ct);
+        if (db.Entry(trip).State == EntityState.Detached) throw new BusinessException("Bus:DepartureNotFound");
         switch (action.Trim().ToLowerInvariant())
         {
             case "ready":
@@ -336,6 +341,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         }
         db.OutboxMessages.Add(BusOutbox.Create(new BusDepartureChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
             trip.Id, trip.StationId, trip.Status), Guid.NewGuid().ToString("N")));
+        AddMutationAudit($"Departure.{action.Trim().ToUpperInvariant()}", trip.Id, nameof(DepartureTrip), trip.StationId);
         await db.SaveChangesAsync(ct); return await GetDepartureAsync(id, ct);
     }
 
@@ -389,6 +395,126 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         }, ct);
     }
 
+    public async Task<PagedBusDto<ParkingSpotDto>> GetParkingSpotsAsync(Guid? stationId, string? filter,
+        bool includeInactive, int skip, int take, CancellationToken ct)
+    {
+        if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        var query = db.ParkingSpots.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
+        if (stationId.HasValue) query = query.Where(x => x.StationId == stationId.Value);
+        if (!includeInactive) query = query.Where(x => x.IsActive);
+        if (!string.IsNullOrWhiteSpace(filter))
+        {
+            var normalized = filter.Trim();
+            query = query.Where(x => x.Code.Contains(normalized) || x.Name.Contains(normalized));
+        }
+        var total = await query.LongCountAsync(ct);
+        var items = await query.OrderBy(x => x.StationId).ThenBy(x => x.Code)
+            .Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).ToListAsync(ct);
+        return new(total, items.Select(ToDto).ToList());
+    }
+
+    public async Task<ParkingSpotDto> CreateParkingSpotAsync(CreateParkingSpotDto input, CancellationToken ct)
+    {
+        await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
+        var spot = new ParkingSpot(Guid.NewGuid(), input.StationId, input.Code, input.Name, input.VehicleType);
+        db.ParkingSpots.Add(spot);
+        AddMutationAudit("ParkingSpot.Create", spot.Id, nameof(ParkingSpot), spot.StationId);
+        await db.SaveChangesAsync(ct);
+        return ToDto(spot);
+    }
+
+    public async Task<ParkingSpotDto> UpdateParkingSpotAsync(Guid id, UpdateParkingSpotDto input, CancellationToken ct)
+    {
+        var spot = await db.ParkingSpots.SingleOrDefaultAsync(x => x.Id == id, ct)
+            ?? throw new BusinessException("Bus:ParkingSpotNotFound");
+        await scope.EnsureStationAsync(spot.StationId, ct);
+        spot.Change(input.Name, input.VehicleType, input.IsActive);
+        AddMutationAudit("ParkingSpot.Update", spot.Id, nameof(ParkingSpot), spot.StationId);
+        await db.SaveChangesAsync(ct);
+        return ToDto(spot);
+    }
+
+    public async Task<PagedBusDto<ParkingReservationDto>> GetParkingReservationsAsync(Guid? stationId,
+        DateTime? fromUtc, DateTime? toUtc, string? status, string? vehiclePlateNumber, int skip, int take, CancellationToken ct)
+    {
+        if (stationId.HasValue) await scope.EnsureStationAsync(stationId.Value, ct);
+        var stationIds = await scope.GetStationIdsAsync(ct);
+        var query = db.ParkingReservations.AsNoTracking();
+        if (stationIds is not null) query = query.Where(x => stationIds.Contains(x.StationId));
+        if (stationId.HasValue) query = query.Where(x => x.StationId == stationId.Value);
+        if (fromUtc.HasValue) query = query.Where(x => x.EndUtc >= BusDates.Utc(fromUtc.Value));
+        if (toUtc.HasValue) query = query.Where(x => x.StartUtc <= BusDates.Utc(toUtc.Value));
+        if (!string.IsNullOrWhiteSpace(status)) query = query.Where(x => x.Status == status.Trim());
+        if (!string.IsNullOrWhiteSpace(vehiclePlateNumber))
+            query = query.Where(x => x.VehiclePlateNumber == ParkingSession.NormalizePlate(vehiclePlateNumber));
+        var total = await query.LongCountAsync(ct);
+        var reservations = await query.OrderByDescending(x => x.StartUtc)
+            .Skip(Math.Max(skip, 0)).Take(Math.Clamp(take, 1, 100)).ToListAsync(ct);
+        var spotIds = reservations.Select(x => x.ParkingSpotId).Distinct().ToArray();
+        var spotCodes = await db.ParkingSpots.AsNoTracking().Where(x => spotIds.Contains(x.Id))
+            .ToDictionaryAsync(x => x.Id, x => x.Code, ct);
+        return new(total, reservations.Select(x => ToDto(x, spotCodes.GetValueOrDefault(x.ParkingSpotId, ""))).ToList());
+    }
+
+    public async Task<ParkingReservationDto> CreateParkingReservationAsync(CreateParkingReservationDto input, CancellationToken ct)
+    {
+        return await ExecuteMutationTransactionAsync(async () =>
+        {
+            await scope.EnsureStationAsync(input.StationId, ct); await RequireStationAsync(input.StationId, ct);
+            ValidateUtcRange(input.StartUtc, input.EndUtc, "Bus:ParkingReservationTimeInvalid");
+            var spot = await db.ParkingSpots.SingleOrDefaultAsync(x => x.Id == input.ParkingSpotId &&
+                x.StationId == input.StationId && x.IsActive, ct)
+                ?? throw new BusinessException("Bus:ParkingSpotNotFound");
+            var vehicleType = input.VehicleType.Trim();
+            if (!string.IsNullOrWhiteSpace(spot.VehicleType) &&
+                !string.Equals(spot.VehicleType, vehicleType, StringComparison.Ordinal))
+                throw new BusinessException("Bus:ParkingSpotVehicleTypeMismatch");
+            var plate = ParkingSession.NormalizePlate(input.VehiclePlateNumber);
+            await LockParkingStationAsync(input.StationId, ct);
+            var overlapping = await db.ParkingReservations.AnyAsync(x => x.StationId == input.StationId &&
+                (x.Status == BusStatuses.ParkingReserved || x.Status == BusStatuses.ParkingCheckedIn) &&
+                (x.ParkingSpotId == input.ParkingSpotId || x.VehiclePlateNumber == plate) &&
+                x.StartUtc < input.EndUtc && input.StartUtc < x.EndUtc, ct);
+            if (overlapping) throw new BusinessException("Bus:ParkingReservationOverlap");
+            var reservation = new ParkingReservation(Guid.NewGuid(), input.StationId, spot.Id, plate, vehicleType,
+                input.StartUtc, input.EndUtc, input.Note, UserId ?? throw new AbpAuthorizationException("Authenticated user required."));
+            db.ParkingReservations.Add(reservation);
+            AddParkingReservationOutbox(reservation);
+            AddMutationAudit("ParkingReservation.Create", reservation.Id, nameof(ParkingReservation), reservation.StationId);
+            return ToDto(reservation, spot.Code);
+        }, ct);
+    }
+
+    public async Task<ParkingReservationDto> TransitionParkingReservationAsync(Guid id, string action, CancellationToken ct)
+    {
+        return await ExecuteMutationTransactionAsync(async () =>
+        {
+            var reservation = await db.ParkingReservations.SingleOrDefaultAsync(x => x.Id == id, ct)
+                ?? throw new BusinessException("Bus:ParkingReservationNotFound");
+            await scope.EnsureStationAsync(reservation.StationId, ct);
+            await LockParkingStationAsync(reservation.StationId, ct);
+            await db.Entry(reservation).ReloadAsync(ct);
+            if (db.Entry(reservation).State == EntityState.Detached)
+                throw new BusinessException("Bus:ParkingReservationNotFound");
+            switch (action.Trim().ToLowerInvariant())
+            {
+                case "check-in":
+                case "checkin": reservation.CheckIn(DateTime.UtcNow); break;
+                case "cancel": reservation.Cancel(); break;
+                case "complete": reservation.Complete(); break;
+                default: throw new BusinessException("Bus:UnsupportedParkingReservationAction");
+            }
+            var spotCode = await db.ParkingSpots.AsNoTracking().Where(x => x.Id == reservation.ParkingSpotId)
+                .Select(x => x.Code).SingleAsync(ct);
+            AddParkingReservationOutbox(reservation);
+            AddMutationAudit($"ParkingReservation.{action.Trim().ToUpperInvariant()}", reservation.Id,
+                nameof(ParkingReservation), reservation.StationId);
+            return ToDto(reservation, spotCode);
+        }, ct);
+    }
+
     public async Task<PagedBusDto<ParkingSessionDto>> GetParkingSessionsAsync(Guid? stationId, DateTime? from, DateTime? to,
         string? status, string? vehiclePlateNumber, int skip, int take, CancellationToken ct)
     {
@@ -428,12 +554,44 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
                 x.Status == BusStatuses.ParkingOpen, ct))
                 throw new BusinessException("Bus:ParkingSessionAlreadyOpen");
 
+            Guid? parkingSpotId = input.ParkingSpotId;
+            ParkingReservation? reservation = null;
+            var reservationCheckedIn = false;
+            if (input.ParkingReservationId.HasValue)
+            {
+                reservation = await db.ParkingReservations.SingleOrDefaultAsync(x => x.Id == input.ParkingReservationId.Value, ct)
+                    ?? throw new BusinessException("Bus:ParkingReservationNotFound");
+                if (reservation.StationId != input.StationId || (parkingSpotId.HasValue && reservation.ParkingSpotId != parkingSpotId.Value) ||
+                    reservation.VehiclePlateNumber != plate || !string.Equals(reservation.VehicleType, input.VehicleType.Trim(), StringComparison.Ordinal) ||
+                    (reservation.Status != BusStatuses.ParkingReserved && reservation.Status != BusStatuses.ParkingCheckedIn) ||
+                    input.ArrivalUtc < reservation.StartUtc || input.ArrivalUtc > reservation.EndUtc)
+                    throw new BusinessException("Bus:ParkingReservationMismatch");
+                parkingSpotId = reservation.ParkingSpotId;
+                if (reservation.Status == BusStatuses.ParkingReserved)
+                {
+                    reservation.CheckIn(input.ArrivalUtc);
+                    reservationCheckedIn = true;
+                }
+            }
+            if (parkingSpotId.HasValue && !await db.ParkingSpots.AnyAsync(x => x.Id == parkingSpotId.Value &&
+                x.StationId == input.StationId && x.IsActive &&
+                (x.VehicleType == null || x.VehicleType == input.VehicleType.Trim()), ct))
+                throw new BusinessException("Bus:ParkingSpotNotFound");
+            if (parkingSpotId.HasValue && await db.ParkingSessions.AnyAsync(x => x.StationId == input.StationId &&
+                x.ParkingSpotId == parkingSpotId.Value && x.Status == BusStatuses.ParkingOpen, ct))
+                throw new BusinessException("Bus:ParkingSpotOccupied");
+
             var tariff = await ResolveParkingTariffAsync(input.StationId, input.VehicleType, input.BusinessDate, input.ParkingTariffId, ct);
             var session = new ParkingSession(Guid.NewGuid(), input.StationId, input.BusinessDate, shiftCode, plate,
                 input.VehicleType, input.ArrivalUtc, tariff.Id, tariff.BillingUnitMinutes, tariff.RatePerUnit,
-                tariff.MinimumCharge, tariff.Description);
+                tariff.MinimumCharge, tariff.Description, parkingSpotId, reservation?.Id);
             db.ParkingSessions.Add(session);
             AddParkingOutbox(session, null);
+            if (reservationCheckedIn)
+            {
+                AddParkingReservationOutbox(reservation!);
+                AddMutationAudit("ParkingReservation.CheckIn", reservation!.Id, nameof(ParkingReservation), reservation.StationId);
+            }
             AddMutationAudit("ParkingSession.Create", session.Id, nameof(ParkingSession), session.StationId);
             return ToDto(session, null);
         }, ct);
@@ -461,11 +619,17 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
                 receipt.AddLine(Guid.NewGuid(), $"{session.TariffDescription} - {quote.BilledUnits} đơn vị", 1, quote.Amount);
                 receipt.Issue(DateTime.UtcNow);
                 session.Close(exitUtc);
+                if (session.ParkingReservationId.HasValue)
+                {
+                    var reservation = await db.ParkingReservations.SingleAsync(x => x.Id == session.ParkingReservationId.Value, ct);
+                    reservation.Complete();
+                    AddParkingReservationOutbox(reservation);
+                }
 
                 db.RevenueReceipts.Add(receipt);
                 foreach (var line in receipt.Lines) db.RevenueLines.Add(line);
                 db.OutboxMessages.Add(BusOutbox.Create(new BusRevenueRecordedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
-                    receipt.Id, receipt.StationId, receipt.TotalAmount, receipt.SourceType), Guid.NewGuid().ToString("N")));
+                    receipt.Id, receipt.StationId, receipt.TotalAmount, receipt.SourceType, receipt.ParkingSessionId), Guid.NewGuid().ToString("N")));
                 AddParkingOutbox(session, receipt.Id);
                 AddMutationAudit("ParkingSession.Close", session.Id, nameof(ParkingSession), session.StationId);
                 return ToDto(session, receipt.Id);
@@ -493,6 +657,12 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
             await EnsureOpenDayAsync(session.StationId, session.BusinessDate, ct);
             await EnsureShiftAcceptsSourceMutationAsync(session.StationId, session.BusinessDate, session.ShiftCode, ct);
             session.Cancel(input.Reason);
+            if (session.ParkingReservationId.HasValue)
+            {
+                var reservation = await db.ParkingReservations.SingleAsync(x => x.Id == session.ParkingReservationId.Value, ct);
+                reservation.Cancel();
+                AddParkingReservationOutbox(reservation);
+            }
             AddParkingOutbox(session, null);
             AddMutationAudit("ParkingSession.Cancel", session.Id, nameof(ParkingSession), session.StationId);
             return ToDto(session, null);
@@ -544,7 +714,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         receipt.Issue(DateTime.UtcNow); db.RevenueReceipts.Add(receipt);
         foreach (var line in receipt.Lines) db.RevenueLines.Add(line);
         db.OutboxMessages.Add(BusOutbox.Create(new BusRevenueRecordedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
-            receipt.Id, receipt.StationId, receipt.TotalAmount, receipt.SourceType), Guid.NewGuid().ToString("N")));
+            receipt.Id, receipt.StationId, receipt.TotalAmount, receipt.SourceType, receipt.ParkingSessionId), Guid.NewGuid().ToString("N")));
         AddMutationAudit("RevenueReceipt.Issue", receipt.Id, nameof(RevenueReceipt), receipt.StationId);
         try
         {
@@ -791,11 +961,14 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         var adjustment = await db.AdjustmentEntries.SingleOrDefaultAsync(x => x.Id == id, ct)
             ?? throw new BusinessException("Bus:AdjustmentNotFound");
         await scope.EnsureStationAsync(adjustment.StationId, ct);
-        var targetDate = adjustment.ReceiptId.HasValue
-            ? await db.RevenueReceipts.Where(x => x.Id == adjustment.ReceiptId.Value).Select(x => (DateTime?)x.BusinessDate).SingleOrDefaultAsync(ct)
-            : await db.ExpenseEntries.Where(x => x.Id == adjustment.ExpenseId!.Value).Select(x => (DateTime?)x.BusinessDate).SingleOrDefaultAsync(ct);
-        if (!targetDate.HasValue) throw new BusinessException("Bus:AdjustmentTargetNotFound");
-        await EnsureClosedDayAsync(adjustment.StationId, targetDate.Value, ct);
+        var target = adjustment.ReceiptId.HasValue
+            ? await db.RevenueReceipts.Where(x => x.Id == adjustment.ReceiptId.Value)
+                .Select(x => new { x.StationId, x.BusinessDate }).SingleOrDefaultAsync(ct)
+            : await db.ExpenseEntries.Where(x => x.Id == adjustment.ExpenseId!.Value)
+                .Select(x => new { x.StationId, x.BusinessDate }).SingleOrDefaultAsync(ct);
+        if (target is null) throw new BusinessException("Bus:AdjustmentTargetNotFound");
+        if (target.StationId != adjustment.StationId) throw new BusinessException("Bus:AdjustmentStationMismatch");
+        await EnsureClosedDayAsync(adjustment.StationId, target.BusinessDate, ct);
         adjustment.Approve(UserId ?? throw new AbpAuthorizationException("Authenticated user required."), DateTime.UtcNow);
         AddAdjustmentOutbox(adjustment);
         AddMutationAudit("Adjustment.Approve", adjustment.Id, nameof(AdjustmentEntry), adjustment.StationId);
@@ -1014,7 +1187,7 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
             var operatorEntity = await db.TransportOperators.AsNoTracking()
                 .SingleOrDefaultAsync(x => x.Id == input.OperatorId && x.IsActive, ct)
                 ?? throw new BusinessException("Bus:OperatorNotFound");
-            if (operatorEntity.StationId.HasValue && operatorEntity.StationId != input.StationId)
+            if (operatorEntity.StationId != input.StationId && !(scope.IsGlobal && !operatorEntity.StationId.HasValue))
                 throw new BusinessException("Bus:MasterDataStationMismatch");
         }
 
@@ -1184,6 +1357,20 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
         await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
     }
 
+    private async Task LockParkingStationAsync(Guid stationId, CancellationToken ct)
+    {
+        if (!db.Database.IsRelational()) return;
+        var keyBytes = SHA256.HashData(Encoding.UTF8.GetBytes($"parking-reservations:{stationId:N}"));
+        var lockKey = BitConverter.ToInt32(keyBytes, 0);
+        await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({lockKey})", ct);
+    }
+
+    private static void ValidateUtcRange(DateTime startUtc, DateTime endUtc, string errorCode)
+    {
+        if (startUtc.Kind != DateTimeKind.Utc || endUtc.Kind != DateTimeKind.Utc || endUtc <= startUtc)
+            throw new BusinessException(errorCode);
+    }
+
     private static bool IsUniqueViolation(DbUpdateException exception, string constraintName)
     {
         var inner = exception.InnerException;
@@ -1211,8 +1398,17 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     {
         db.OutboxMessages.Add(BusOutbox.Create(new BusParkingSessionChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
             session.Id, session.StationId, session.BusinessDate, session.Status, session.ChargedAmount, receiptId,
-            session.BillingUnitMinutes, session.CancellationReason),
+            session.BillingUnitMinutes, session.CancellationReason, session.VehicleType, session.ParkingTariffId,
+            session.RatePerUnit, session.MinimumCharge, session.TariffDescription, session.ArrivalUtc, session.ExitUtc,
+            session.DurationMinutes, session.BilledUnits),
             Guid.NewGuid().ToString("N")));
+    }
+
+    private void AddParkingReservationOutbox(ParkingReservation reservation)
+    {
+        db.OutboxMessages.Add(BusOutbox.Create(new BusParkingReservationChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, null,
+            reservation.Id, reservation.StationId, reservation.ParkingSpotId, reservation.VehiclePlateNumber,
+            reservation.StartUtc, reservation.EndUtc, reservation.Status), Guid.NewGuid().ToString("N")));
     }
 
     private async Task<bool> HasCurrentReadinessAsync(DepartureTrip trip, CancellationToken ct)
@@ -1273,6 +1469,9 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
     private static AdjustmentDto ToDto(AdjustmentEntry x) => new(x.Id, x.StationId, x.ReceiptId, x.ExpenseId, x.Amount, x.Reason, x.Status, x.CreatedByUserId, x.ApprovedByUserId, x.ApprovedAtUtc);
     private static SettlementDto ToDto(ShiftSettlement x) => new(x.Id, x.StationId, x.BusinessDate, x.ShiftCode, x.TotalRevenue, x.TotalExpense, x.Status, x.SubmittedByUserId, x.CheckedByUserId, x.ApprovedByUserId);
     private static ParkingTariffDto ToDto(ParkingTariff x) => new(x.Id, x.StationId, x.VehicleType, x.BillingUnitMinutes, x.RatePerUnit, x.MinimumCharge, x.Description, x.EffectiveFrom, x.EffectiveTo, x.IsActive);
+    private static ParkingSpotDto ToDto(ParkingSpot x) => new(x.Id, x.StationId, x.Code, x.Name, x.VehicleType, x.IsActive);
+    private static ParkingReservationDto ToDto(ParkingReservation x, string spotCode) => new(x.Id, x.StationId, x.ParkingSpotId,
+        spotCode, x.VehiclePlateNumber, x.VehicleType, x.StartUtc, x.EndUtc, x.Status, x.Note, x.CreatedByUserId);
     private async Task<ParkingSessionDto> ToParkingSessionDtoAsync(ParkingSession session, CancellationToken ct)
     {
         var receiptId = await db.RevenueReceipts.AsNoTracking()
@@ -1286,7 +1485,8 @@ public sealed class BusManagementAppService(BusManagementDbContext db, BusAccess
 
     private static ParkingSessionDto ToDto(ParkingSession x, Guid? receiptId) => new(x.Id, x.StationId, x.BusinessDate, x.ShiftCode, x.VehiclePlateNumber, x.VehicleType,
         x.ArrivalUtc, x.ExitUtc, x.DurationMinutes, x.BilledUnits, x.BillingUnitMinutes, x.RatePerUnit, x.MinimumCharge,
-        x.TariffDescription, x.ChargedAmount, x.Status, x.ParkingTariffId, receiptId, x.CancellationReason);
+        x.TariffDescription, x.ChargedAmount, x.Status, x.ParkingTariffId, receiptId, x.CancellationReason,
+        x.ParkingSpotId, x.ParkingReservationId);
 
     private void AddMutationAudit(string action, Guid entityId, string entityType, Guid stationId)
     {

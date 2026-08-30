@@ -88,8 +88,9 @@ The slice remains behind the existing Gateway/BFF, uses the existing `Revenue` p
 - [x] Contracts, domain invariants, station-scoped tariff/session APIs and parking receipt integration.
 - [x] EF migration `20260829133927_AddBusPhaseFourParking` with legacy parking backfill, composite station-safe receipt FK, unique open-session and parking-receipt constraints.
 - [x] Outbox event, permission/localization catalog and role seed integration.
-- [x] Focused tests: 27 passed; full solution tests: 383 passed after final Phase 4A hardening.
+- [x] Focused tests: 40 passed; full solution test count is refreshed by the Phase 4B verification.
 - [x] Build: 0 warning/0 error; EF pending-model: no changes; diff check and license/secret audit.
-- [ ] PostgreSQL migration apply, concurrency/rollback integration and Gateway/Keycloak/browser runtime gate when local infrastructure is running.
+- [x] PostgreSQL migration apply, service health, RabbitMQ startup, Keycloak OIDC discovery and unauthenticated Gateway/BFF route smoke.
+- [ ] PostgreSQL concurrent close/rollback integration and authenticated Gateway/Keycloak/browser acceptance.
 
-The implementation is complete in the working tree. Keep this plan `in-progress` because the PostgreSQL/Gateway/Keycloak/browser runtime gate has not run.
+The Phase 4A implementation is complete in the working tree. Phase 4B continues with parking spots and reservations; authenticated role/station acceptance, browser certificate trust, and PostgreSQL concurrent close/rollback integration are still open.

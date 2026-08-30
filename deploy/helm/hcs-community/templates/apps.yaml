@@ -108,6 +108,25 @@ spec:
     spec:
       restartPolicy: OnFailure
       securityContext: { runAsNonRoot: true }
+      initContainers:
+        - name: ensure-bus-management-database
+          image: postgres:17-alpine
+          imagePullPolicy: IfNotPresent
+          envFrom: [{ secretRef: { name: {{ .Values.runtimeSecretName }} } }]
+          env:
+            - { name: PGHOST, value: postgres }
+            - { name: PGPORT, value: "5432" }
+            - { name: PGUSER, value: hcs }
+            - { name: PGDATABASE, value: postgres }
+            - { name: PGPASSWORD, valueFrom: { secretKeyRef: { name: {{ .Values.runtimeSecretName }}, key: HCS_POSTGRES_PASSWORD } } }
+          command:
+            - /bin/sh
+            - -c
+            - >-
+              until pg_isready -h "$${PGHOST}" -p "$${PGPORT}" -U "$${PGUSER}" -d "$${PGDATABASE}"; do sleep 2; done;
+              if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'hcs_bus_management'" | grep -q 1; then
+                psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE hcs_bus_management";
+              fi
       containers:
         - name: db-migrator
           image: "{{ .Values.images.dbMigrator.repository }}:{{ .Values.images.dbMigrator.tag }}"

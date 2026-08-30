@@ -1,31 +1,33 @@
 ---
-title: Bus Management Phase 0–3 vertical slice
+title: Bus Management Phase 0–4B vertical slice
 description: Synchronized implementation, verification evidence, and release limitations for the bus-management bounded context.
 status: in-progress
 priority: P1
 effort: large
 branch: codex/bus-management
-tags: [bus-management, station-scope, finance, reconciliation, exports]
+tags: [bus-management, station-scope, finance, reconciliation, exports, parking, reservation]
 created: 2026-08-28
 ---
 
-# Bus Management Phase 0–3
+# Bus Management Phase 0–4B
 
-Status: **in-progress — implementation complete, release gates open**
-Progress: **90% (18/20 tracked items complete)**
+Status: **in-progress — implementation complete through Phase 4B; release gates open**
+Progress: **implementation complete; release verification remains open**
 
 ## Phase status
 
 | Phase | Status | Evidence / remaining gate |
 |---|---|---|
-| Phase 0 — service/runtime foundation | Completed | Service, schema, local port `44416`, permissions and Gateway/BFF route are present. Runtime smoke remains unverified. |
+| Phase 0 — service/runtime foundation | Completed | Service, schema, local port `44416`, permissions and Gateway/BFF route are present; live migration/service/Gateway boundary smoke passed. |
 | Phase 1 — v1 operational slice | Completed | Server station scope, catalog, departure lifecycle, revenue/expense/settlement/daily close, outbox and audit hooks are implemented. |
 | Phase 2A — expanded revenue | Completed (implementation) | Source snapshots, allow-list/reference validation, tariff snapshot checks and premises ownership constraint. |
 | Phase 2B — adjustment and period lock | Completed (implementation) | Adjustment API/invariants, closed-day guard, maker-checker, base/adjustment/net totals, advisory locking and events/audit hooks. |
 | Phase 2C — compliance and contracts | Completed (implementation) | Station ownership, vehicle-document renewal/update, legacy fallback and 30-day expiry warnings. |
 | Phase 3A — server-side exports | Completed (implementation) | XLSX/PDF/HTML exports, server-side filtering/scope, permission gate and output limits. |
 | Phase 3B — leadership dashboard | Completed (implementation) | Station breakdown, net totals, expiry counters and Gateway export links. |
-| Release verification | In progress | Integration/API, live migration, infrastructure and browser smoke evidence are still missing. |
+| Phase 4A — parking tariff/session and hardening | Completed (implementation) | Idempotent parking lifecycle, station-safe receipt FK, UTC/business-date validation, explicit transactions and downstream snapshots; live migration applied. |
+| Phase 4B — parking spots/reservations | Completed (implementation) | Station-safe spots, reservation overlap locking, session linking, occupancy guard and reservation outbox; authenticated/browser acceptance remains open. |
+| Release verification | In progress | Live migration, service health, RabbitMQ, Keycloak OIDC discovery and unauthenticated BFF boundary passed; authenticated token/role/station and browser acceptance remain open. |
 
 ## Synced checklist
 
@@ -50,18 +52,26 @@ Progress: **90% (18/20 tracked items complete)**
 - [x] Export limits, filter/date/station scope and `HCS.BusManagement.Reports.Export` authorization.
 - [x] Leadership dashboard station rows, net totals, expiry warnings and Gateway links.
 
+### Phase 4A–4B
+
+- [x] Parking tariff/session lifecycle, idempotent parking receipts and station-safe Phase 4A hardening.
+- [x] Parking spots, reservation lifecycle, overlap locking, station-safe links and open-spot occupancy guard.
+- [x] Reservation outbox events and mutation audit records in the same save boundary.
+
 ### Verification
 
-- [x] Bus-management tests: 19 passed, 0 failed.
+- [x] Bus-management tests: 40 passed, 0 failed.
+- [x] Full solution tests: 396 passed, 0 failed.
 - [x] Auth tests: 18 passed, 0 failed.
 - [x] Gateway tests: 118 passed, 0 failed.
 - [x] Full solution build: 0 warnings, 0 errors.
 - [x] EF model-contract and outbox-contract tests pass.
-- [x] Phase 2/3 migration files are present in the bus service.
-- [ ] Application/API integration and live PostgreSQL migration/schema-drift verification.
-- [ ] Keycloak/RabbitMQ/Gateway/browser runtime smoke verification.
+- [x] Phase 2–4B migration files are present in the bus service.
+- [x] Live PostgreSQL migration/schema-drift verification and Bus service health smoke.
+- [x] RabbitMQ connectivity, Keycloak OIDC discovery and unauthenticated Gateway/BFF bus-route boundary smoke.
+- [ ] Authenticated token forwarding, role × permission × station scope and browser export acceptance.
 
-The implementation work for Phases 0–3 is complete in the local working tree. The two unchecked items are release verification gates that require the local infrastructure to be running; they are intentionally not marked as passed from static build/test evidence.
+The implementation work for Phases 0–4B and the local infrastructure gate is complete in the working tree. Authenticated acceptance remains unchecked because the local browser does not trust the internal Caddy CA and no seeded acceptance identity was used to verify the full role/station matrix.
 
 ## Mục tiêu
 
@@ -69,13 +79,15 @@ Tiếp tục vertical slice bến xe sau v1 bằng các khả năng nghiệp v�
 
 1. Phase 2 — nguồn thu mở rộng, adjustment sau chốt, gia hạn hồ sơ và cảnh báo hợp đồng/mặt bằng.
 2. Phase 3 — báo cáo export server-side và dashboard tổng hợp theo từng bến, vẫn qua BFF/YARP và giữ station scope ở server.
+3. Phase 4A — tariff/session parking, receipt idempotency and transaction/snapshot hardening.
+4. Phase 4B — parking spots, reservation lifecycle, station-safe links and occupancy protection.
 
 Không tích hợp join database với Work/Document ở đợt này; chỉ giữ outbox event làm điểm nối. Không triển khai kế toán tổng hợp, VAT, công nợ, ngân hàng hoặc realtime vận hành.
 
 ## Baseline đã xác nhận
 
 - Service hiện có tại `services/bus-management/HCS.BusManagementService`.
-- PostgreSQL schema `hcs_bus_management`, migration v1 đã tồn tại.
+- PostgreSQL schema `hcs_bus_management`, migration chain through Phase 4B đã tồn tại.
 - `RevenueReceipt` remains immutable after `Issued`; `AdjustmentEntry` now has application create/list/approve flow.
 - Receipt stores source context and validates the source/reference contract server-side.
 - Dashboard and compliance reports include station breakdown plus vehicle-document, carrier-contract and lease-expiry warnings.
@@ -100,7 +112,7 @@ Không tích hợp join database với Work/Document ở đợt này; chỉ gi�
   - `Parking`: phải có context lượt/biển số.
   - `Premises`: phải tham chiếu mặt bằng cùng bến.
   - `Other`: bắt buộc mô tả dòng thu.
-- Giữ cùng receipt aggregate và outbox; chưa tách riêng parking/session aggregate khi chưa có yêu cầu vận hành chi tiết.
+  - Ở Phase 2A, giữ cùng receipt aggregate và outbox; parking/session aggregate được bổ sung ở Phase 4A khi có yêu cầu vận hành chi tiết.
 
 ### Phase 2B — adjustment và khóa kỳ
 
@@ -132,30 +144,36 @@ Không tích hợp join database với Work/Document ở đợt này; chỉ gi�
 - UI hiển thị breakdown theo bến, net revenue/expense, cảnh báo expiry và các link export qua Gateway.
 - Giữ loading/error/empty state hiện có và không đưa logic tổng hợp tài chính về client.
 
+### Phase 4A–4B — parking operations
+
+- Phase 4A bổ sung tariff/session lifecycle, snapshot charge, idempotent parking receipt, composite receipt FK, UTC/business-date validation, explicit transaction và advisory lock.
+- Phase 4B bổ sung parking spot/reservation CRUD, overlap locking theo bến, reservation/session linking, composite station FK, partial occupancy index và versioned reservation outbox.
+- Giữ mọi lookup/mutation station-scoped và để browser đi qua Gateway/BFF.
+
 ## Kiểm thử và nghiệm thu
 
 - Domain: adjustment target/maker-checker, source allow-list, renewal, settlement refresh and immutable source/close invariants are covered by the bus test project.
 - EF model: model-contract tests cover ownership columns, source/adjustment constraints, composite premises FK and the intended receipt-line relationship.
 - Outbox: contract tests cover departure/revenue/expense/reconciliation plus settlement and adjustment event names/payloads.
 - Build: `dotnet build HCS_web_free_license.sln --no-restore --nologo` passed with 0 warnings and 0 errors in 1m16.84s.
-- Focused tests: bus `19/19`, auth `18/18`, Gateway `118/118`; all passed with `--no-build --no-restore` after the successful build.
-- Full-solution tests: `375 passed, 0 failed` with `--no-build --no-restore`; the test-runner also reports the expected no-test result for the non-test `HCS.TestBase` assembly.
-- Application/API integration, live PostgreSQL migration/schema-drift, runtime infrastructure and browser smoke remain pending.
+- Focused tests: bus `40/40`, auth `18/18`, Gateway `118/118`; all passed with `--no-build --no-restore` after the successful build.
+- Full-solution tests: `396 passed, 0 failed` with `--no-build --no-restore`; the test-runner also reports the expected no-test result for the non-test `HCS.TestBase` assembly.
+- Live PostgreSQL migration/schema-drift and unauthenticated service/Gateway infrastructure smoke passed; authenticated API and browser acceptance remain pending.
 
 ## Evidence and release limitations
 
 - Business mutation paths add their outbox and mutation-audit records to the bus `DbContext` before `SaveChanges`; settlement and adjustment events are implemented.
 - The generic HTTP audit middleware still creates a separate scope/context after the request UoW and suppresses persistence errors. HTTP audit durability/atomicity is therefore not release-verified.
 - Departure readiness still accepts client-provided transport-order/control flags and only partially derives legal state from server records. Full authoritative legal validation and revalidation at departure remain a release gate.
-- Keycloak group-to-local-role synchronization for bus roles is not implemented/verified; local bus-role seeding exists, but provisioning reconciliation remains open.
-- `BusManagementDbContext` inherits directly from `DbContext`; optimistic concurrency rotation and live database migration behavior require explicit verification before release.
-- No runtime smoke evidence was collected for PostgreSQL, Keycloak, RabbitMQ, Bus Management `:44416`, Gateway `:44402`, authenticated token forwarding, or browser export downloads.
+- Keycloak group-to-local-role synchronization is intentionally not used: Keycloak supplies authentication/group claims, while ABP local roles remain the business authorization source. Provisioning assigns `nhanvien` only to new users and never overwrites local roles on later login; this behavior is covered by AuthServer tests.
+- `BusManagementDbContext` now inherits from ABP `AbpDbContext` and is registered through `AddAbpDbContext`; optimistic concurrency rotation and automated concurrent close/rollback coverage still require explicit verification before release.
+- Runtime smoke evidence now covers PostgreSQL migration/schema, Bus Management health/Swagger, RabbitMQ startup, Keycloak OIDC discovery and the unauthenticated Gateway bus boundary. Authenticated token forwarding, role/station scope and browser export downloads remain unverified.
 - Final static checks: `dotnet ef migrations has-pending-model-changes` reports no pending model changes; `git diff --check` and `./scripts/audit-license-clean.sh` pass.
-- Keep plan status `in-progress` until the two unchecked verification items and the listed release limitations are closed.
+- Keep this plan status `in-progress` until authenticated role/station acceptance, browser export smoke, automated concurrent close/rollback coverage and authoritative departure-readiness limitations are closed.
 
 ## Thứ tự thực thi
 
 1. Contract/domain/EF migration.
 2. Application service, outbox/audit, controllers.
-3. Export service và dashboard DTO/UI.
-4. Test, code review, docs, commit local trên `codex/bus-management`.
+3. Export service, dashboard DTO/UI and parking operations.
+4. Test, runtime verification, code review and documentation.

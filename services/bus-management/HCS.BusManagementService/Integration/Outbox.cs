@@ -54,6 +54,8 @@ public static class BusOutbox
                     ? BusAdjustmentChangedEto.EventName
                 : typeof(T) == typeof(BusParkingSessionChangedEto)
                     ? BusParkingSessionChangedEto.EventName
+                : typeof(T) == typeof(BusParkingReservationChangedEto)
+                    ? BusParkingReservationChangedEto.EventName
                 : typeof(T) == typeof(BusReconciliationClosedEto)
                     ? BusReconciliationClosedEto.EventName
                     : typeof(T).FullName!;
@@ -89,6 +91,8 @@ public sealed class OutboxDispatcher(BusManagementDbContext db, IDistributedEven
                     await eventBus.PublishAsync(JsonSerializer.Deserialize<BusAdjustmentChangedEto>(message.Payload)!, onUnitOfWorkComplete: false);
                 else if (message.EventName == BusParkingSessionChangedEto.EventName)
                     await eventBus.PublishAsync(JsonSerializer.Deserialize<BusParkingSessionChangedEto>(message.Payload)!, onUnitOfWorkComplete: false);
+                else if (message.EventName == BusParkingReservationChangedEto.EventName)
+                    await eventBus.PublishAsync(JsonSerializer.Deserialize<BusParkingReservationChangedEto>(message.Payload)!, onUnitOfWorkComplete: false);
                 else if (message.EventName == BusReconciliationClosedEto.EventName)
                     await eventBus.PublishAsync(JsonSerializer.Deserialize<BusReconciliationClosedEto>(message.Payload)!, onUnitOfWorkComplete: false);
                 else { message.MarkFailed($"Unknown event type: {message.EventName}"); continue; }

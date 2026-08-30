@@ -49,5 +49,6 @@ build_one organization services/organization/HCS.OrganizationService.Host/HCS.Or
 build_one document services/document/HCS.DocumentService/HCS.DocumentService.csproj HCS.DocumentService.dll '' true
 build_one work-management services/work-management/HCS.WorkManagementService/HCS.WorkManagementService.csproj HCS.WorkManagementService.dll
 build_one collaboration services/collaboration/HCS.CollaborationService/HCS.CollaborationService.csproj HCS.CollaborationService.dll
+build_one bus-management services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj HCS.BusManagementService.dll
 
 echo "Done. Images pushed to ${registry}:<service>"

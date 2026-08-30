@@ -120,6 +120,17 @@ public sealed class DomainInvariantTests
     }
 
     [Fact]
+    public void Station_assignment_boundaries_are_utc_date_values_for_timestamptz()
+    {
+        var assignment = new UserStationAssignment(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(), true,
+            new DateTime(2026, 8, 29, 17, 45, 0, DateTimeKind.Unspecified),
+            new DateTime(2026, 9, 2, 8, 30, 0, DateTimeKind.Local));
+
+        Assert.Equal(new DateTime(2026, 8, 29, 0, 0, 0, DateTimeKind.Utc), assignment.ValidFrom);
+        Assert.Equal(new DateTime(2026, 9, 2, 0, 0, 0, DateTimeKind.Utc), assignment.ValidTo);
+    }
+
+    [Fact]
     public void Vehicle_document_can_be_renewed_or_deactivated()
     {
         var document = new VehicleLegalDocument(Guid.NewGuid(), Guid.NewGuid(), "Inspection", DateTime.Today.AddDays(1));
@@ -213,5 +224,29 @@ public sealed class DomainInvariantTests
 
         Assert.Equal(BusStatuses.ParkingCancelled, session.Status);
         Assert.Throws<BusinessException>(() => session.Close(DateTime.UtcNow.AddMinutes(5)));
+    }
+
+    [Fact]
+    public void Parking_reservation_enforces_window_and_maker_lifecycle()
+    {
+        var start = DateTime.UtcNow.AddMinutes(-5);
+        var reservation = new ParkingReservation(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "51a-123.45", "Bus", start, start.AddHours(1), "Đón khách", Guid.NewGuid());
+
+        Assert.True(reservation.Overlaps(start.AddMinutes(10), start.AddMinutes(20)));
+        reservation.CheckIn(DateTime.UtcNow);
+        reservation.Complete();
+        Assert.Equal(BusStatuses.ParkingCompleted, reservation.Status);
+        Assert.Throws<BusinessException>(() => reservation.Cancel());
+    }
+
+    [Fact]
+    public void Parking_reservation_rejects_non_utc_or_inverted_window()
+    {
+        var start = DateTime.SpecifyKind(DateTime.Today, DateTimeKind.Unspecified);
+        Assert.Throws<BusinessException>(() => new ParkingReservation(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "51A-123.45", "Bus", start, start.AddHours(1), null, Guid.NewGuid()));
+        Assert.Throws<BusinessException>(() => new ParkingReservation(Guid.NewGuid(), Guid.NewGuid(), Guid.NewGuid(),
+            "51A-123.45", "Bus", DateTime.UtcNow.AddHours(1), DateTime.UtcNow, null, Guid.NewGuid()));
     }
 }

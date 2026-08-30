@@ -72,6 +72,9 @@ public static class BusStatuses
     public const string ParkingCancelled = "Cancelled";
     public const string Issued = "Issued";
     public const string Voided = "Voided";
+    public const string ParkingReserved = "Reserved";
+    public const string ParkingCheckedIn = "CheckedIn";
+    public const string ParkingCompleted = "Completed";
 }
 
 public static class RevenueSources
@@ -135,14 +138,24 @@ public sealed record CreateParkingTariffDto(Guid StationId, string VehicleType, 
     decimal RatePerUnit, decimal MinimumCharge, string? Description, DateTime EffectiveFrom, DateTime? EffectiveTo = null);
 public sealed record ParkingTariffDto(Guid Id, Guid StationId, string VehicleType, int BillingUnitMinutes,
     decimal RatePerUnit, decimal MinimumCharge, string Description, DateTime EffectiveFrom, DateTime? EffectiveTo, bool IsActive);
+public sealed record ParkingSpotDto(Guid Id, Guid StationId, string Code, string Name, string? VehicleType, bool IsActive);
+public sealed record CreateParkingSpotDto(Guid StationId, string Code, string Name, string? VehicleType = null);
+public sealed record UpdateParkingSpotDto(string Name, string? VehicleType, bool IsActive);
+public sealed record ParkingReservationDto(Guid Id, Guid StationId, Guid ParkingSpotId, string ParkingSpotCode,
+    string VehiclePlateNumber, string VehicleType, DateTime StartUtc, DateTime EndUtc, string Status,
+    string? Note, Guid CreatedByUserId);
+public sealed record CreateParkingReservationDto(Guid StationId, Guid ParkingSpotId, string VehiclePlateNumber,
+    string VehicleType, DateTime StartUtc, DateTime EndUtc, string? Note = null);
 public sealed record CreateParkingSessionDto(Guid StationId, DateTime BusinessDate, string ShiftCode,
-    string VehiclePlateNumber, string VehicleType, DateTime ArrivalUtc, Guid? ParkingTariffId = null);
+    string VehiclePlateNumber, string VehicleType, DateTime ArrivalUtc, Guid? ParkingTariffId = null,
+    Guid? ParkingSpotId = null, Guid? ParkingReservationId = null);
 public sealed record CloseParkingSessionDto(DateTime? ExitUtc = null);
 public sealed record CancelParkingSessionDto(string Reason);
 public sealed record ParkingSessionDto(Guid Id, Guid StationId, DateTime BusinessDate, string ShiftCode,
     string VehiclePlateNumber, string VehicleType, DateTime ArrivalUtc, DateTime? ExitUtc, int? DurationMinutes,
     int? BilledUnits, int BillingUnitMinutes, decimal RatePerUnit, decimal MinimumCharge, string TariffDescription,
-    decimal? ChargedAmount, string Status, Guid ParkingTariffId, Guid? ReceiptId, string? CancellationReason = null);
+    decimal? ChargedAmount, string Status, Guid ParkingTariffId, Guid? ReceiptId, string? CancellationReason = null,
+    Guid? ParkingSpotId = null, Guid? ParkingReservationId = null);
 public sealed record RevenueLineInput(string Description, decimal Quantity, decimal UnitAmount, Guid? TariffId = null);
 public sealed record CreateRevenueReceiptDto(Guid StationId, DateTime BusinessDate, string ShiftCode,
     string SourceType, Guid? DepartureId, Guid? OperatorId, string? IdempotencyKey,
@@ -218,7 +231,7 @@ public sealed record BusDepartureChangedEto(Guid EventId, DateTimeOffset Occurre
     public const string EventName = "hcs.bus.departure.changed.v1";
 }
 public sealed record BusRevenueRecordedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
-    Guid ReceiptId, Guid StationId, decimal Amount, string SourceType) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
+    Guid ReceiptId, Guid StationId, decimal Amount, string SourceType, Guid? ParkingSessionId = null) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
 {
     public const string EventName = "hcs.bus.revenue.recorded.v1";
 }
@@ -240,9 +253,17 @@ public sealed record BusAdjustmentChangedEto(Guid EventId, DateTimeOffset Occurr
 }
 public sealed record BusParkingSessionChangedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
     Guid ParkingSessionId, Guid StationId, DateTime BusinessDate, string Status, decimal? ChargedAmount, Guid? ReceiptId,
-    int BillingUnitMinutes, string? CancellationReason) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
+    int BillingUnitMinutes, string? CancellationReason, string VehicleType = "", Guid? ParkingTariffId = null,
+    decimal? RatePerUnit = null, decimal? MinimumCharge = null, string? TariffDescription = null,
+    DateTime? ArrivalUtc = null, DateTime? ExitUtc = null, int? DurationMinutes = null, int? BilledUnits = null) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
 {
     public const string EventName = "hcs.bus.parking-session.changed.v1";
+}
+public sealed record BusParkingReservationChangedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
+    Guid ReservationId, Guid StationId, Guid ParkingSpotId, string VehiclePlateNumber,
+    DateTime StartUtc, DateTime EndUtc, string Status) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)
+{
+    public const string EventName = "hcs.bus.parking-reservation.changed.v1";
 }
 public sealed record BusReconciliationClosedEto(Guid EventId, DateTimeOffset OccurredAtUtc, string? CorrelationId,
     Guid DailyCloseId, Guid StationId, DateTime BusinessDate) : IntegrationEvent(EventId, OccurredAtUtc, CorrelationId)

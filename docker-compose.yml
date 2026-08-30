@@ -80,10 +80,34 @@ services:
     volumes: ["minio-data:/data"]
     healthcheck: { test: ["CMD", "mc", "ready", "local"], interval: 5s, timeout: 5s, retries: 30 }
 
+  bus-db-init:
+    image: postgres:17-alpine
+    restart: "no"
+    depends_on: { postgres: { condition: service_healthy } }
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGUSER: hcs
+      PGPASSWORD: ${HCS_POSTGRES_PASSWORD}
+      PGDATABASE: postgres
+    command:
+      - /bin/sh
+      - -c
+      - >-
+        if ! psql -tAc "SELECT 1 FROM pg_database WHERE datname = 'hcs_bus_management'" | grep -q 1; then
+          psql -v ON_ERROR_STOP=1 -c "CREATE DATABASE hcs_bus_management";
+        fi
+
   db-migrator:
     <<: *hcs-image
     build: { context: ., dockerfile: deploy/docker/Dockerfile, args: { PROJECT: src/HCS.DbMigrator/HCS.DbMigrator.csproj, APP_DLL: HCS.DbMigrator.dll } }
     restart: "no"
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      rabbitmq: { condition: service_healthy }
+      minio: { condition: service_healthy }
+      bus-db-init: { condition: service_completed_successfully }
     environment:
       <<: *common-env
       Identity__AdminPassword: ${HCS_ADMIN_PASSWORD}

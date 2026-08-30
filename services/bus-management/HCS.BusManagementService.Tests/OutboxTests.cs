@@ -54,10 +54,26 @@ public sealed class OutboxTests
     {
         var sessionId = Guid.NewGuid();
         var message = BusOutbox.Create(new BusParkingSessionChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, "corr",
-            sessionId, Guid.NewGuid(), DateTime.Today, BusStatuses.ParkingClosed, 75_000, Guid.NewGuid(), 60, null), "corr");
+            sessionId, Guid.NewGuid(), DateTime.Today, BusStatuses.ParkingClosed, 75_000, Guid.NewGuid(), 60, null,
+            "Truck", Guid.NewGuid(), 75_000, 100_000, "Phí bãi", DateTime.UtcNow.AddHours(-2), DateTime.UtcNow, 120, 2), "corr");
 
         Assert.Equal(BusParkingSessionChangedEto.EventName, message.EventName);
         Assert.Contains(sessionId.ToString(), message.Payload, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("billingUnitMinutes", message.Payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("tariffDescription", message.Payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("billedUnits", message.Payload, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Parking_reservation_event_uses_canonical_versioned_name()
+    {
+        var reservationId = Guid.NewGuid();
+        var message = BusOutbox.Create(new BusParkingReservationChangedEto(Guid.NewGuid(), DateTimeOffset.UtcNow, "corr",
+            reservationId, Guid.NewGuid(), Guid.NewGuid(), "51A-123.45", DateTime.UtcNow, DateTime.UtcNow.AddHours(1),
+            BusStatuses.ParkingReserved), "corr");
+
+        Assert.Equal(BusParkingReservationChangedEto.EventName, message.EventName);
+        Assert.Contains(reservationId.ToString(), message.Payload, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("parkingSpotId", message.Payload, StringComparison.OrdinalIgnoreCase);
     }
 }

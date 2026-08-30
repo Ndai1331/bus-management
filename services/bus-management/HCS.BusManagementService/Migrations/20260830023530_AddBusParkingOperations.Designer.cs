@@ -3,6 +3,7 @@ using System;
 using HCS.BusManagementService.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using Volo.Abp.EntityFrameworkCore;
@@ -12,9 +13,11 @@ using Volo.Abp.EntityFrameworkCore;
 namespace HCS.BusManagementService.Migrations
 {
     [DbContext(typeof(BusManagementDbContext))]
-    partial class BusManagementDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260830023530_AddBusParkingOperations")]
+    partial class AddBusParkingOperations
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1042,10 +1045,6 @@ namespace HCS.BusManagementService.Migrations
                     b.HasIndex("ParkingReservationId", "StationId");
 
                     b.HasIndex("ParkingSpotId", "StationId");
-
-                    b.HasIndex("StationId", "ParkingSpotId")
-                        .IsUnique()
-                        .HasFilter("\"Status\" = 'Open' AND \"ParkingSpotId\" IS NOT NULL");
 
                     b.HasIndex("StationId", "BusinessDate", "Status");
 

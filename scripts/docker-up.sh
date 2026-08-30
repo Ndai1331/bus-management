@@ -19,7 +19,7 @@ docker rm -f hcs-ingress-local >/dev/null 2>&1 || true
 docker compose --env-file .env build
 # docker compose --env-file .env up -d postgres redis rabbitmq minio
 # docker compose --env-file .env up db-migrator
-docker compose --env-file .env up -d auth-server web-gateway blazor platform organization document work-management collaboration caddy
+docker compose --env-file .env up -d auth-server web-gateway blazor platform organization document work-management collaboration bus-management caddy
 # docker compose --env-file .env up -d blazor
 
 echo "HCS Compose is running at https://hcs.localhost"

@@ -59,6 +59,7 @@ if [[ ${HCS_SKIP_BUILD:-false} != true ]]; then
   build "$image_prefix/document" services/document/HCS.DocumentService/HCS.DocumentService.csproj HCS.DocumentService.dll
   build "$image_prefix/work-management" services/work-management/HCS.WorkManagementService/HCS.WorkManagementService.csproj HCS.WorkManagementService.dll
   build "$image_prefix/collaboration" services/collaboration/HCS.CollaborationService/HCS.CollaborationService.csproj HCS.CollaborationService.dll
+  build "$image_prefix/bus-management" services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj HCS.BusManagementService.dll
   build "$image_prefix/db-migrator" src/HCS.DbMigrator/HCS.DbMigrator.csproj HCS.DbMigrator.dll
 fi
 
@@ -113,6 +114,7 @@ printf 'ConnectionStrings__Organization=Host=postgres;Port=5432;Database=hcs_org
 printf 'ConnectionStrings__DocumentService=Host=postgres;Port=5432;Database=hcs_document;Username=hcs;%s=%s\n' "$connection_password_key" "$HCS_POSTGRES_PASSWORD" >>"$runtime_env"
 printf 'ConnectionStrings__WorkManagement=Host=postgres;Port=5432;Database=hcs_work;Username=hcs;%s=%s\n' "$connection_password_key" "$HCS_POSTGRES_PASSWORD" >>"$runtime_env"
 printf 'ConnectionStrings__Collaboration=Host=postgres;Port=5432;Database=hcs_collaboration;Username=hcs;%s=%s\n' "$connection_password_key" "$HCS_POSTGRES_PASSWORD" >>"$runtime_env"
+printf 'ConnectionStrings__BusManagement=Host=postgres;Port=5432;Database=hcs_bus_management;Username=hcs;%s=%s\n' "$connection_password_key" "$HCS_POSTGRES_PASSWORD" >>"$runtime_env"
 
 kubectl create namespace "$namespace" --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n "$namespace" create secret generic hcs-runtime --from-env-file="$runtime_env" --dry-run=client -o yaml | kubectl apply -f -
@@ -133,6 +135,7 @@ helm upgrade --install "$release" "$root_dir/deploy/helm/hcs-community" --namesp
   --set-string images.blazor.repository="$image_prefix/blazor" --set-string images.platform.repository="$image_prefix/platform" \
   --set-string images.organization.repository="$image_prefix/organization" --set-string images.document.repository="$image_prefix/document" \
   --set-string images.workManagement.repository="$image_prefix/work-management" --set-string images.collaboration.repository="$image_prefix/collaboration" \
+  --set-string images.busManagement.repository="$image_prefix/bus-management" \
   --set-string images.dbMigrator.repository="$image_prefix/db-migrator" \
   --set ingress.tlsSecretName="$HCS_TLS_SECRET" --set-string deploymentNonce="$(date +%s)" \
   --set-string ingress.internalControllerIp="$ingress_controller_ip" \

@@ -118,6 +118,37 @@ public sealed class RevenueController(BusManagementAppService service) : Control
     [HttpPost("parking/tariffs")]
     [Authorize(Policy = BusPermissions.RevenueParkingCreate)]
     public Task<ParkingTariffDto> CreateParkingTariff(CreateParkingTariffDto input, CancellationToken ct) => service.CreateParkingTariffAsync(input, ct);
+    [HttpGet("parking/spots")]
+    [Authorize(Policy = BusPermissions.RevenueParking)]
+    public Task<PagedBusDto<ParkingSpotDto>> GetParkingSpots(Guid? stationId, string? filter, bool includeInactive = false,
+        int skip = 0, int take = 50, CancellationToken ct = default) => service.GetParkingSpotsAsync(stationId, filter, includeInactive, skip, take, ct);
+    [HttpPost("parking/spots")]
+    [Authorize(Policy = BusPermissions.RevenueParkingCreate)]
+    public Task<ParkingSpotDto> CreateParkingSpot(CreateParkingSpotDto input, CancellationToken ct) => service.CreateParkingSpotAsync(input, ct);
+    [HttpPut("parking/spots/{id:guid}")]
+    [Authorize(Policy = BusPermissions.RevenueParkingUpdate)]
+    public Task<ParkingSpotDto> UpdateParkingSpot(Guid id, UpdateParkingSpotDto input, CancellationToken ct) => service.UpdateParkingSpotAsync(id, input, ct);
+    [HttpGet("parking/reservations")]
+    [Authorize(Policy = BusPermissions.RevenueParking)]
+    public Task<PagedBusDto<ParkingReservationDto>> GetParkingReservations(Guid? stationId, DateTime? fromUtc, DateTime? toUtc,
+        string? status, string? vehiclePlateNumber, int skip = 0, int take = 50, CancellationToken ct = default) =>
+        service.GetParkingReservationsAsync(stationId, fromUtc, toUtc, status, vehiclePlateNumber, skip, take, ct);
+    [HttpPost("parking/reservations")]
+    [Authorize(Policy = BusPermissions.RevenueParkingCreate)]
+    public Task<ParkingReservationDto> CreateParkingReservation(CreateParkingReservationDto input, CancellationToken ct) =>
+        service.CreateParkingReservationAsync(input, ct);
+    [HttpPost("parking/reservations/{id:guid}/check-in")]
+    [Authorize(Policy = BusPermissions.RevenueParkingUpdate)]
+    public Task<ParkingReservationDto> CheckInParkingReservation(Guid id, CancellationToken ct) =>
+        service.TransitionParkingReservationAsync(id, "check-in", ct);
+    [HttpPost("parking/reservations/{id:guid}/cancel")]
+    [Authorize(Policy = BusPermissions.RevenueParkingUpdate)]
+    public Task<ParkingReservationDto> CancelParkingReservation(Guid id, CancellationToken ct) =>
+        service.TransitionParkingReservationAsync(id, "cancel", ct);
+    [HttpPost("parking/reservations/{id:guid}/complete")]
+    [Authorize(Policy = BusPermissions.RevenueParkingUpdate)]
+    public Task<ParkingReservationDto> CompleteParkingReservation(Guid id, CancellationToken ct) =>
+        service.TransitionParkingReservationAsync(id, "complete", ct);
     [HttpGet("parking/sessions")]
     [Authorize(Policy = BusPermissions.RevenueParking)]
     public Task<PagedBusDto<ParkingSessionDto>> GetParkingSessions(Guid? stationId, DateTime? from, DateTime? to, string? status,

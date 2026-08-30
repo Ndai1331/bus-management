@@ -10,6 +10,7 @@ using Volo.Abp.AspNetCore.Mvc;
 using Volo.Abp.AspNetCore.Mvc.AntiForgery;
 using Volo.Abp.AspNetCore.Serilog;
 using Volo.Abp.Autofac;
+using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.PostgreSql;
 using Volo.Abp.EventBus.RabbitMq;
 using Volo.Abp.Modularity;
@@ -63,8 +64,9 @@ public sealed class HcsBusManagementServiceModule : AbpModule
             }
         });
         Configure<AbpAntiForgeryOptions>(BearerApiAntiforgery.DisableCookieValidation);
-        context.Services.AddDbContext<BusManagementDbContext>(options =>
-            options.UseNpgsql(configuration.GetConnectionString(BusManagementDbContext.ConnectionStringName)));
+        context.Services.AddAbpDbContext<BusManagementDbContext>();
+        Configure<AbpDbContextOptions>(options => options.Configure<BusManagementDbContext>(db =>
+            db.DbContextOptions.UseNpgsql(configuration.GetConnectionString(BusManagementDbContext.ConnectionStringName))));
         // Business-day advisory locks must remain held through validation and SaveChanges.
         // Enable the ABP transaction for every service request so the lock is never released
         // between the guard query and the financial mutation/close.

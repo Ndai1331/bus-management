@@ -1,11 +1,15 @@
 using HCS.BusManagementService.Domain;
 using HCS.BusManagementService.Integration;
 using Microsoft.EntityFrameworkCore;
+using Volo.Abp.Data;
+using Volo.Abp.EntityFrameworkCore;
 using Volo.Abp.EntityFrameworkCore.Modeling;
 
 namespace HCS.BusManagementService.Data;
 
-public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbContext> options) : DbContext(options)
+[ConnectionStringName(ConnectionStringName)]
+public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbContext> options)
+    : AbpDbContext<BusManagementDbContext>(options)
 {
     public const string ConnectionStringName = "BusManagement";
     public const string Schema = "hcs_bus_management";
@@ -22,6 +26,8 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
     public DbSet<DepartureCheck> DepartureChecks => Set<DepartureCheck>();
     public DbSet<Tariff> Tariffs => Set<Tariff>();
     public DbSet<ParkingTariff> ParkingTariffs => Set<ParkingTariff>();
+    public DbSet<ParkingSpot> ParkingSpots => Set<ParkingSpot>();
+    public DbSet<ParkingReservation> ParkingReservations => Set<ParkingReservation>();
     public DbSet<ParkingSession> ParkingSessions => Set<ParkingSession>();
     public DbSet<RevenueReceipt> RevenueReceipts => Set<RevenueReceipt>();
     public DbSet<RevenueLine> RevenueLines => Set<RevenueLine>();
@@ -150,6 +156,34 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
             b.HasIndex(x => new { x.StationId, x.VehicleType, x.EffectiveFrom, x.EffectiveTo, x.IsActive });
             b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
         });
+        builder.Entity<ParkingSpot>(b =>
+        {
+            b.ToTable("ParkingSpots"); b.ConfigureByConvention();
+            b.Property(x => x.Code).HasMaxLength(BusConsts.CodeLength).IsRequired();
+            b.Property(x => x.Name).HasMaxLength(BusConsts.NameLength).IsRequired();
+            b.Property(x => x.VehicleType).HasMaxLength(BusConsts.TypeLength);
+            b.HasIndex(x => new { x.StationId, x.Code }).IsUnique();
+            b.HasIndex(x => new { x.StationId, x.IsActive });
+            b.HasAlternateKey(x => new { x.Id, x.StationId });
+            b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
+        });
+        builder.Entity<ParkingReservation>(b =>
+        {
+            b.ToTable("ParkingReservations"); b.ConfigureByConvention();
+            b.Property(x => x.VehiclePlateNumber).HasMaxLength(BusConsts.CodeLength).IsRequired();
+            b.Property(x => x.VehicleType).HasMaxLength(BusConsts.TypeLength).IsRequired();
+            b.Property(x => x.Note).HasMaxLength(BusConsts.DescriptionLength);
+            b.Property(x => x.Status).HasMaxLength(BusConsts.StatusLength).IsRequired();
+            b.Property(x => x.StartUtc).HasColumnType("timestamp with time zone");
+            b.Property(x => x.EndUtc).HasColumnType("timestamp with time zone");
+            b.HasIndex(x => new { x.StationId, x.StartUtc, x.EndUtc });
+            b.HasIndex(x => new { x.ParkingSpotId, x.StartUtc, x.Status });
+            b.HasIndex(x => new { x.StationId, x.VehiclePlateNumber, x.StartUtc, x.Status });
+            b.HasAlternateKey(x => new { x.Id, x.StationId });
+            b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ParkingSpot>().WithMany().HasForeignKey(x => new { x.ParkingSpotId, x.StationId })
+                .HasPrincipalKey(x => new { x.Id, x.StationId }).OnDelete(DeleteBehavior.Restrict);
+        });
         builder.Entity<ParkingSession>(b =>
         {
             b.ToTable("ParkingSessions"); b.ConfigureByConvention();
@@ -165,12 +199,19 @@ public sealed class BusManagementDbContext(DbContextOptions<BusManagementDbConte
             b.Property(x => x.ChargedAmount).HasPrecision(18, 2);
             b.Property(x => x.Status).HasMaxLength(BusConsts.StatusLength).IsRequired();
             b.Property(x => x.CancellationReason).HasMaxLength(BusConsts.DescriptionLength);
+            b.HasIndex(x => x.ParkingReservationId).IsUnique().HasFilter("\"ParkingReservationId\" IS NOT NULL");
+            b.HasIndex(x => new { x.StationId, x.ParkingSpotId }).IsUnique()
+                .HasFilter("\"Status\" = 'Open' AND \"ParkingSpotId\" IS NOT NULL");
             b.HasIndex(x => new { x.StationId, x.BusinessDate, x.Status });
             b.HasIndex(x => new { x.StationId, x.BusinessDate, x.VehiclePlateNumber })
                 .HasFilter("\"Status\" = 'Open'").IsUnique();
             b.HasAlternateKey(x => new { x.Id, x.StationId });
             b.HasOne<BusStation>().WithMany().HasForeignKey(x => x.StationId).OnDelete(DeleteBehavior.Restrict);
             b.HasOne<ParkingTariff>().WithMany().HasForeignKey(x => x.ParkingTariffId).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ParkingSpot>().WithMany().HasForeignKey(x => new { x.ParkingSpotId, x.StationId })
+                .HasPrincipalKey(x => new { x.Id, x.StationId }).OnDelete(DeleteBehavior.Restrict);
+            b.HasOne<ParkingReservation>().WithMany().HasForeignKey(x => new { x.ParkingReservationId, x.StationId })
+                .HasPrincipalKey(x => new { x.Id, x.StationId }).OnDelete(DeleteBehavior.Restrict);
         });
         builder.Entity<RevenueReceipt>(b =>
         {

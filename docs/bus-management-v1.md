@@ -1,8 +1,8 @@
-# HCS Bus Management — vertical slice v1 và Phase 2–4A
+# HCS Bus Management — vertical slice v1 và Phase 2–4B
 
 Đây là bản tách từ working tree `HCS_web_free_license`, hiện được quản lý tại repository [Ndai1331/bus-management](https://github.com/Ndai1331/bus-management); bến xe là bounded context độc lập và không join database với Work/Document.
 
-Trạng thái: Phase 2–4A đã có vertical slice và đã harden trong working tree; nghiệm thu runtime end-to-end vẫn còn phụ thuộc PostgreSQL, Gateway/BFF, Keycloak và browser.
+Trạng thái: Phase 2–4B đã hoàn tất implementation và hardening; migration, service health, RabbitMQ, Gateway/BFF unauthenticated boundary và Keycloak OIDC discovery đã được smoke-test trên local. Authenticated role/station matrix và browser acceptance vẫn còn mở; automated concurrent PostgreSQL close/rollback coverage và authoritative departure-readiness validation vẫn là release limitation.
 
 ## Runtime contract
 
@@ -30,7 +30,7 @@ dotnet test services/bus-management/HCS.BusManagementService.Tests/HCS.BusManage
 dotnet run --project services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj
 ```
 
-Service tự chạy migration cho `BusManagement` khi khởi động. Khi chạy Compose, database `hcs_bus_management` được tạo trong PostgreSQL init script và connection string phải lấy từ secret môi trường. Không dùng connection string hoặc secret trong source control.
+Service tự chạy migration cho `BusManagement` khi khởi động. Khi chạy Compose, database `hcs_bus_management` được tạo trong PostgreSQL init script và connection string phải lấy từ secret môi trường. Root Compose, Ubuntu apps và Panel đều khởi động service `bus-management` và khai báo YARP cluster `/api/bus-management/{**catch-all}`. Không dùng connection string hoặc secret trong source control.
 
 ## Endpoint chính
 
@@ -82,7 +82,22 @@ API adjustment:
 - Migration thực hiện legacy parking backfill: đánh dấu các receipt `Parking` lịch sử chưa có session bằng `IsLegacyParking`, không làm dừng startup migration. Bản ghi legacy chỉ để bảo toàn lịch sử; mọi receipt parking mới bắt buộc liên kết session.
 - `ArrivalUtc`/`ExitUtc` phải là UTC; arrival không được ở tương lai, exit không được ở tương lai hoặc trước arrival. `BusinessDate` được kiểm tra từ `ArrivalUtc` theo timezone của bến; tiền parking làm tròn theo VND (0 chữ số thập phân). Cấu hình tariff cùng bến/loại xe được serialize bằng PostgreSQL advisory lock.
 - Parking create/close/cancel và daily close chạy trong explicit transaction (hoặc savepoint khi đã có transaction), dùng cùng PostgreSQL advisory transaction lock theo `(station, business date)`. Close parking ghi session, receipt, receipt line, revenue/parking outbox và audit trong cùng boundary; daily close khóa, kiểm tra và ghi chốt nguyên tử.
-- DTO/event giữ snapshot cần cho downstream: `ParkingSessionDto` trả arrival/exit, duration, billed units, billing unit, rate, minimum charge, tariff description, charged amount, status và receipt; `RevenueReceiptDto` trả `ParkingSessionId`; `BusParkingSessionChangedEto` mang business date, status, charged amount, receipt id, billing unit và cancellation reason.
+- DTO/event giữ snapshot cần cho downstream: `ParkingSessionDto` trả arrival/exit, duration, billed units, billing unit, rate, minimum charge, tariff description, charged amount, status, spot và reservation; `RevenueReceiptDto` trả `ParkingSessionId`; `BusParkingSessionChangedEto` mang vehicle/tariff snapshot đầy đủ cùng lifecycle fields, còn `BusRevenueRecordedEto` mang `ParkingSessionId` khi là thu parking.
+
+## Phase 4B đã triển khai
+
+- `ParkingSpot` quản lý vị trí đỗ theo bến với code duy nhất, loại xe tùy chọn và trạng thái active.
+- `ParkingReservation` quản lý khung giờ UTC, biển số, loại xe và trạng thái `Reserved → CheckedIn → Completed`; hủy được từ `Reserved` hoặc `CheckedIn`.
+- Server chống đặt trùng theo cùng vị trí hoặc cùng biển số trong khoảng thời gian giao nhau. Kiểm tra overlap được serialize bằng PostgreSQL advisory lock theo bến.
+- Parking session có thể gắn spot/reservation. Check-in reservation và tạo session cùng transaction; close session hoàn tất reservation; cancel session hủy reservation.
+- FK ghép `(Id, StationId)` ngăn liên kết chéo bến; partial unique index ngăn hai session mở cùng một spot.
+- Outbox `hcs.bus.parking-reservation.changed.v1` và audit mutation được ghi cùng boundary với thay đổi reservation.
+
+API Phase 4B:
+
+- `GET/POST/PUT /api/bus-management/revenue/parking/spots`
+- `GET/POST /api/bus-management/revenue/parking/reservations`
+- `POST /api/bus-management/revenue/parking/reservations/{id}/check-in|cancel|complete`
 
 ## Migration và validation evidence
 
@@ -94,14 +109,16 @@ Migration chain hiện có trong bounded context:
 - `20260828121058_AddBusPhaseTwo`
 - `20260829040425_AddBusPhaseThreeScopeIntegrity`
 - `20260829133927_AddBusPhaseFourParking`
+- `20260830023530_AddBusParkingOperations`
+- `20260830023907_AddParkingSpotOccupancyGuard`
 
-Snapshot validation ngày 2026-08-29:
+Snapshot validation ngày 2026-08-30:
 
 ```text
-Focused Bus Management tests: 27 passed, 0 failed
+Focused Bus Management tests: 40 passed, 0 failed
 AuthServer.Tests:           18 passed, 0 failed
 MigrationImporter.Tests:    11 passed, 0 failed
-Full solution tests:        383 passed, 0 failed
+Full solution tests:        396 passed, 0 failed
 Bus service build:          0 warnings, 0 errors
 has-pending-model-changes:  No changes have been made to the model since the last migration.
 ```
@@ -117,10 +134,18 @@ dotnet ef migrations has-pending-model-changes \
   --startup-project services/bus-management/HCS.BusManagementService/HCS.BusManagementService.csproj --no-build
 ```
 
-Gateway `118/118` và EFCore `13/13` đã xanh trong lần cross-project verification ngày 2026-08-28; chưa có HTTP acceptance suite riêng cho Bus Management. `dotnet ef migrations list` hiện liệt kê đủ sáu migration nhưng không xác định được migration nào đã apply vì PostgreSQL `127.0.0.1:5432` chưa chạy. EF tooling cũng cảnh báo `10.0.5` thấp hơn runtime `10.0.9`.
+Gateway `118/118` và EFCore `13/13` đã xanh trong lần cross-project verification ngày 2026-08-28; chưa có HTTP acceptance suite riêng cho Bus Management. EF tooling cảnh báo `10.0.5` thấp hơn runtime `10.0.9`.
 
-Runtime limitation hiện tại: chưa có bằng chứng live cho advisory lock/explicit transaction, bãi đỗ, BFF/YARP route, Keycloak claim/role matrix hoặc browser export vì PostgreSQL/Gateway/Keycloak chưa được khởi động trong snapshot này. Cần chạy local infrastructure, seed role/permission, rồi smoke-test browser qua Gateway trước khi đánh dấu Phase 2–4A production-ready.
+Runtime evidence ngày 2026-08-30:
 
-## Còn ngoài phạm vi Phase 4A
+- Local PostgreSQL đã apply đủ 8 migration; kiểm tra trực tiếp xác nhận schema `hcs_bus_management`, các bảng parking/reservation, composite FK parking receipt và source check constraint đều tồn tại. `has-pending-model-changes` không có thay đổi.
+- Bus service chạy được cả standalone `https://localhost:44416` (`/health=200`, Swagger `200`) và smoke container HTTP nội bộ; container ghi nhận migration up-to-date, kết nối RabbitMQ tạm thời và `Application started`.
+- Gateway smoke container trả health `Healthy`; request chưa xác thực tới `/api/bus-management/dashboard` trả `401`, chứng minh protected BFF boundary. Compose root, Ubuntu và Panel đều parse thành công với service `bus-management`.
+- Keycloak `http://localhost:5110/realms/bd/.well-known/openid-configuration` trả `200`. AuthServer đã kiểm thử quy tắc user mới nhận `nhanvien` và đăng nhập lại không ghi đè role ABP local; token claim và station assignment end-to-end vẫn cần test user/seed acceptance riêng.
+- Browser smoke được thử trên In-app Browser và Chrome nhưng cả hai không trust CA nội bộ của `hcs.localhost` (`ERR_CERT_AUTHORITY_INVALID`). Không bypass chứng thư; cần trust CA local rồi chạy lại login, route, permission và export download.
 
-Chi tiết bản đồ/vị trí bãi đỗ, reservation/barrier/camera/payment, notification/workflow tài liệu, kế toán tổng hợp/VAT/công nợ/ngân hàng, realtime vận hành và tích hợp read model Work/Document vẫn để phase tiếp theo. Hai hệ thống không join database; dùng outbox event làm điểm nối.
+Các release limitation còn lại: chưa có authenticated role × permission × station acceptance, chưa có browser export acceptance, chưa có PostgreSQL concurrency/rollback integration test tự động, và departure readiness vẫn còn nhận một phần transport-order/control flags từ client thay vì suy luận hoàn toàn từ hồ sơ server. Vì vậy Phase 2–4B vẫn giữ trạng thái `in-progress`.
+
+## Còn ngoài phạm vi Phase 4B
+
+Chi tiết occupancy map, barrier/camera/payment, notification/workflow tài liệu, kế toán tổng hợp/VAT/công nợ/ngân hàng, realtime vận hành và tích hợp read model Work/Document vẫn để phase tiếp theo. Hai hệ thống không join database; dùng outbox event làm điểm nối.

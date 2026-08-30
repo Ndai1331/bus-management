@@ -26,7 +26,7 @@ Folder trên panel:
 └── hcs/             ← .58 — apps + Redis + Rabbit (khuyến nghị, một project)
 ```
 
-Trước `./up.sh` trên **.58**: mở firewall `.64` cho `5432`, `9000` từ `.58`; tạo DB `hcs_*` trên Postgres `.64`.
+Trước `./up.sh` trên **.58**: mở firewall `.64` cho `5432`, `9000` từ `.58`; tài khoản `HCS_POSTGRES_USER` phải có quyền kiểm tra/tạo database. `bus-db-init` trong apps compose sẽ tạo `hcs_bus_management` nếu database này chưa tồn tại, sau đó `db-migrator` apply schema. Các database còn lại (`hcs_*`) vẫn phải tồn tại theo các service đang dùng.
 
 ## Một server vs hai server (tổng quát)
 
@@ -84,7 +84,7 @@ chmod 600 .env
 nano .env
 ```
 
-**Copy cùng** mật khẩu Postgres/MinIO từ axis stack trên `10.17.227.64` (xem `.env.example`). PFX trong `./.hcs-certs/`.
+**Copy cùng** mật khẩu Postgres/MinIO từ axis stack trên `10.17.227.64` (xem `.env.example`). PFX trong `./.hcs-certs/`. Script installer cố ý loại trừ thư mục này khỏi `rsync --delete` để không xóa private key khi cập nhật bundle.
 
 Chỉnh WASM client nếu cần: `config/blazor-client.appsettings.json`.
 

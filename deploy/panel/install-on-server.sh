@@ -10,7 +10,7 @@ script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 
 echo "Installing to ${remote}:${panel_root}/hcs-infra and .../hcs"
 
-ssh "$remote" "mkdir -p ${panel_root}/hcs-data/postgres ${panel_root}/hcs-infra ${panel_root}/hcs/config"
+ssh "$remote" "mkdir -p ${panel_root}/hcs-data/postgres ${panel_root}/hcs-infra ${panel_root}/hcs/config ${panel_root}/hcs/.hcs-certs"
 
 rsync -av --delete \
   --exclude '.env' \
@@ -22,6 +22,7 @@ rsync -av --delete \
 
 rsync -av --delete \
   --exclude '.env' \
+  --exclude '.hcs-certs/' \
   "$script_dir/hcs/" "${remote}:${panel_root}/hcs/"
 
 ssh "$remote" "chmod +x ${panel_root}/hcs-data/up.sh ${panel_root}/hcs-infra/up.sh ${panel_root}/hcs/up.sh"
